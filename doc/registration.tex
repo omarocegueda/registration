@@ -5,6 +5,51 @@
 \begin{document}
 
 \maketitle
+\section{Rotation operations}
+Given three vectors $u,v,w \in \mathbf{R}^3$, we have the following identity (it can be directly verified):
+\begin{equation}
+    u\times(v \times w) = (u^T w)v - (u^T v)w,
+\end{equation}
+in particular, for $u=v$:
+\begin{equation}
+    v\times(v \times w) = (v^T w)v - ||v||^2w.
+\end{equation}
+By defining the ``hat'' transformation for a vector $v=(v_0, v_1, v_2)$ to a skew symmetric matrix:
+\begin{equation}
+    \hat{v} = \left[\begin{array}{ccc}
+        0 & -v_2 & v_1 \\
+        v_2 & 0 & -v_0 \\
+        -v_1 & v_0 & 0
+    \end{array}\right],
+\end{equation}
+we have the following property:
+\begin{equation}
+    \hat{v}w = v \times w
+\end{equation}
+where $\hat{v}w$ is the usual matrix-vector product. Now, let's fix a vector $v\in \mathbf{R}^{3}$, then, \textbf{for every} vector $w\in \mathbf{R}^{3}$ we have
+\begin{equation}
+    \hat{v}^{3}w = \hat{v}(v\times (v \times w)) = \hat{v}(v^T w - ||v||^2 w) = (v^T w)\hat{v}w - ||v||^{2}\hat{v}w = - ||v||^{2}\hat{v}w
+\end{equation}
+because $\hat{v}v=v \times v = 0$. Therefore, $\hat{v}^{3} = -||v||^{2}\hat{v}$. Now:
+\begin{equation}
+    \hat{v}^{4} = \hat{v}^{3}\hat{v} = -||v||^{2}\hat{v}^{2}
+\end{equation}
+and interestingly, all powers can be written as scalar factors of $\hat{v}$ and $\hat{v}^{2}$ (alternating signs):
+\begin{equation}
+    \begin{array}{l}
+        \hat{v}^{2n+1} = (-1)^{n}||v||^{2n}\hat{v}\\
+        \hat{v}^{2n+2} = (-1)^{n}||v||^{2n}\hat{v}^{2}
+    \end{array}.
+\end{equation}
+This allows us to easily compute the exponential of any skew symmetric matrix of the form $\hat{v}$ by splitting the powers of the Taylor expansion into odd and even powers:
+\begin{equation}
+    \exp(\hat{v})=\sum_{k=0}^{\infty}\frac{1}{k!}\hat{v}^{k} = I + \left[\sum_{k=0}^{\infty}\frac{(-1)^{k}||v||^{2k}}{(2k+1)!}\right]\hat{v}+
+    \left[\sum_{k=0}^{\infty}\frac{(-1)^{k}||v||^{2k}}{(2k+2)!}\right]\hat{v}^{2}
+\end{equation}
+\begin{equation}
+    \exp(\hat{v})=I + \frac{\sin{||v||}}{||v||}\hat{v} + \frac{1-\cos{||v||}}{||v||^{2}}\hat{v}^2
+\end{equation}
+This is known as the Rodriguez Formula, and is useful because we can fit the best skew-symmetric matrix to our rigid registration model (find $v$, which is the same as finding $\hat{v}$) and then easily compute the corresponding rotation $\exp(\hat{v})$.
 
 \section{Formulation}
 
@@ -42,7 +87,7 @@ To compute the new approximation at the next pyramid level:
 \begin{equation}
 	\min_{\theta} \frac{1}{2}\sum_{x\in\mathcal{T}} ||I_0(x) - I_1(\Delta \hat{x})||_{2}^{2}
 \end{equation}
-where $\hat{x} = Rx$, and $R$ is the rotation computed at the previous level of the Gaussian pyramid and is of the form $R = \left[\begin{array}{cc}a & -b \\ b & a\end{array}\right]$ . Everything is exactly the same, just replacing $x$ with $\hat{x}$. Now, 
+where $\hat{x} = Rx$, and $R$ is the rotation computed at the previous level of the Gaussian pyramid and is of the form $R = \left[\begin{array}{cc}a & -b \\ b & a\end{array}\right]$ . Everything is exactly the same, just replacing $x$ with $\hat{x}$. Now,
 $d_{x}=I_{0}(x) - I_{1}(\hat{x})$ and $\epsilon_{x} = (R^{\perp}x)^T \nabla I_{2}(\hat{x})$, where $R^{\perp} = \left[\begin{array}{cc}-b & -a \\ a & -b\end{array}\right]$:
 \begin{equation}
 	 \epsilon_{x} = (g_{0}(\hat{x})(-bx_{0} - ax_{1}) + g_{1}(\hat{x})(ax_{0} - bx_{1}))
@@ -54,19 +99,19 @@ Let's add a displacement vector $b$ to the model:
 \begin{equation}
 	\min_{\theta} \frac{1}{2}\sum_{x\in\mathcal{T}} ||I_0(x) - I_1(\Delta x + b)||_{2}^{2}.
 \end{equation}
-The linear approximation of $I_1$ is 
+The linear approximation of $I_1$ is
 
 \begin{equation}
 	I_{1}(\Delta x + b) \approx I_{1}(x) + (\theta x^{\perp} + b)^{T}\nabla I_{1}(x).
 \end{equation}
-Let's define the vector 
+Let's define the vector
 \begin{equation}
 	c_x = \left[\begin{array}{c}\epsilon_{x} \\ g_{0}(x) \\ g_{1}(x)\end{array}\right]
 \end{equation}
  where $\epsilon_{x} = (x^{\perp})^{T}\nabla I_{1}(x)$ and
 \begin{equation}
 	\left[\begin{array}{c}g_{0}(x) \\ g_{1}(x)\end{array}\right]=\nabla I_{2}(x).
-\end{equation} 
+\end{equation}
 Further define the parameter vector $\beta^{T} = (\theta, b_{0}, b_{1}) $ Then, the objective function is
 \begin{equation}
 	\min_{\theta} \frac{1}{2}\sum_{x\in\mathcal{T}} ||I_0(x) - I_1(x) - c_{x}^{T}\beta||_{2}^{2}.
@@ -93,13 +138,13 @@ where $d_{x} = I_{0}(x) - I_{1}(x)$, as usual.
 We can approximate the second image after an infinitesimal rotation as
 \begin{equation}
 	I_{2}(Rx) = I_{2}(x + \left[R-I\right]x)\approx I_{2}(x) + \nabla I_{2}(x)^{T}\left[ \begin{array}{c}
-	-\gamma x_{1} + \beta x_{2}\\ 
+	-\gamma x_{1} + \beta x_{2}\\
 	 \gamma x_{0} - \alpha x_{2}\\
 	 -\beta x_{0} + \alpha x_{1}\end{array}\right],
 \end{equation}
 and reorganizing the terms we get
 \begin{equation}
-	I_{2}(Rx) \approx I_{2}(x) + 
+	I_{2}(Rx) \approx I_{2}(x) +
 	\left( \begin{array}{c}
 		   -g_{1}(x)x_{2} + g_{2}(x)x_{1}\\
 			g_{0}(x)x_{2} - g_{2}(x)x_{0}\\
@@ -177,17 +222,17 @@ Differentiating with respect to the single vector $d_{x}$ at voxel $x$ and equat
 \end{equation}
 assuming $\lambda>0$ and $\sigma_{x}^{2}>0$, the above system has a unique solution given by
 \begin{equation}
-	d_{x} =\left[g_{x}g_{x}^{T} + \sigma_{x}^{2}\lambda|\mathcal{N}_x|I \right]^{-1}\left[\delta_{x}g_{x} + \sigma_{x}^{2}\lambda\sum_{y \in \mathcal{N}_x}d_{y}\right] 
+	d_{x} =\left[g_{x}g_{x}^{T} + \sigma_{x}^{2}\lambda|\mathcal{N}_x|I \right]^{-1}\left[\delta_{x}g_{x} + \sigma_{x}^{2}\lambda\sum_{y \in \mathcal{N}_x}d_{y}\right]
 \end{equation}
 
 \section{A straightforward registration formulation using EC-QMMF}
-Let's get back to the original formulation of image registration. Given the observed fixed and moving images $I_{f}, I_{m}$ respectively, defined over the lattice $\mathcal{L}$, we assume that there exists a transformation $\phi:\mathcal{L} \rightarrow \mathcal{L}$ such that 
+Let's get back to the original formulation of image registration. Given the observed fixed and moving images $I_{f}, I_{m}$ respectively, defined over the lattice $\mathcal{L}$, we assume that there exists a transformation $\phi:\mathcal{L} \rightarrow \mathcal{L}$ such that
 \begin{equation}
 	I_{f}(x) = I_{m}(\phi(x)).
 \end{equation}
 We are interested in the multimodal case: the range of the fixed image $I_f$(the set of possible values $I_{f}(x)$ may take at each site $x\in \mathcal{L}$) is $F$ and the range of $I_{m}$ is $M$, we equivalently say that the range of the first (fixed) modality is $F$ and the range of the second (moving) modality is $M$.\\
 
-Image registration based on Mutual Information maximization relies on the estimation of the joint probability distribution 
+Image registration based on Mutual Information maximization relies on the estimation of the joint probability distribution
 \begin{equation}
 	P(i, j)=P(I_{f}(x)=i,I_{m}(\phi(x))=j), \forall (i,j)\in F\times M
 \end{equation}
@@ -284,7 +329,7 @@ Analogously, the optimal estimatr for $\tilde{\sigma}^{2}_j$ is
 \begin{equation}
 	\tilde{\sigma}_{j}^{2} = \frac{\sum_{x\in\mathcal{L}}\sum_{i\in F} p_{i,j}^{2}(x)[I_{m}(\phi(x)) - \tilde{\mu}_i]^{2}}{\sum_{x\in\mathcal{L}}\sum_{j\in M} p_{i,j}^{2}(x)}.
 \end{equation}
-The traditional regularization and entropy control terms are: 
+The traditional regularization and entropy control terms are:
 \begin{equation}
 	R(p) = \sum_{x\in\mathcal{L}}\sum_{<x,y>}\left||p(x)-p(y)\right||^{2}
 \end{equation}
@@ -300,14 +345,14 @@ with the non-negative hyper parameters $\nu, \lambda$ controlling the entropy an
 	\begin{array}{ll}
 		p_{i,j}(x)\in [0,1] & \forall x\in \mathcal{L}, i\in{F}, j\in M\\
 		\sum_{i\in F}\sum_{j\in M}p_{i,j}(x)=1 & \forall x\in \mathcal{L}
-	\end{array} 
+	\end{array}
 \end{equation}
 
 There are some interesting remarks about this formulation:
 \begin{itemize}
 	\item{There is no explicit transfer function involved! (this seems to be wrong...). The transfer function is, aparently, codified in the local joint probability distributions.}
 	\item{Instead of using the global joint distribution, which doesn't take into account the spatial relationship of the lattice sites, we now casted it as the sum of pixelwise joint distributions, whose values are spatially related by the QMMF regularization term}
-	\item{If we really want to estimate the global joint probability distribution (and subsequently its entropy, mutual information, etc.), it is possible to estimate it by 
+	\item{If we really want to estimate the global joint probability distribution (and subsequently its entropy, mutual information, etc.), it is possible to estimate it by
 \begin{equation}
 	P(i, j) = \sum_{x\in\mathcal{L}}p_{i,j}(x)
 \end{equation}}
