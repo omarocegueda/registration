@@ -97,7 +97,13 @@ def getRotationMatrix(angles):
     sa=np.sin(angles[0])
     sb=np.sin(angles[1])
     sg=np.sin(angles[2])
-    return np.array([[cb*cg,-ca*sg+sa*sb*cg,sa*sg+ca*sb*cg],[cb*sg,ca*cg+sa*sb*sg,-sa*cg+ca*sb*sg],[-sb,sa*cb,ca*cb]])    
+    return np.array([[cb*cg,-ca*sg+sa*sb*cg,sa*sg+ca*sb*cg],[cb*sg,ca*cg+sa*sb*sg,-sa*cg+ca*sb*sg],[-sb,sa*cb,ca*cb]])
+
+def getRotationMatrix2D(angle):
+    c=np.cos(angle)
+    s=np.sin(angle)
+    return np.array([[c, -s],[s, c]])
+
 
 def applyRigidTransformation3D(image, beta):
     sh=image.shape
@@ -114,13 +120,17 @@ def applyRigidTransformation3D(image, beta):
 
 def pyramid_gaussian_3D(image, max_layer, mask=None):
     yield image.copy().astype(np.float64)
+    sigma=1.0/3.0
+    sampling=1
     for i in range(max_layer):
-        newImage=np.empty(shape=((image.shape[0]+1)//2, (image.shape[1]+1)//2, (image.shape[2]+1)//2), dtype=np.float64)
-        newImage[...]=sp.ndimage.filters.gaussian_filter(image, 2.0/3.0)[::2,::2,::2]
+        sigma*=2.0
+        sampling*=2
+        newImage=np.empty(shape=((image.shape[0]+sampling-1)//sampling, (image.shape[1]+sampling-1)//sampling, (image.shape[2]+sampling-1)//sampling), dtype=np.float64)
+        newImage[...]=sp.ndimage.filters.gaussian_filter(image, sigma)[::sampling,::sampling,::sampling]
         if(mask!=None):
-            mask=mask[::2,::2,::2]
+            mask=mask[::sampling,::sampling,::sampling]
             newImage*=mask
-        image=newImage
+        #image=newImage
         yield newImage
 
 def pyramid_gaussian_2D(image, max_layer, mask=None):

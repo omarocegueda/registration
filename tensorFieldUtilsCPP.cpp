@@ -652,3 +652,87 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
 
 
 
+
+
+void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, int nclasses, double *probs, double *means, double *variances){
+    const double EPSILON=1e-9;
+    memset(means, 0, sizeof(double)*nclasses);
+    memset(variances, 0, sizeof(double)*nclasses);
+    double *sums=new double[nclasses];
+    memset(sums, 0, sizeof(double)*nclasses);
+    int nsites=dims[0]*dims[1];
+    //---means---
+    double *p=probs;
+    for(int i=0;i<nsites;++i, p+=nclasses)if(mask[i]!=0){
+        for(int k=0;k<nclasses;++k){
+            double p2=p[k]*p[k];
+            means[k]+=img[i]*p2;
+            sums[k]+=p2;
+        }
+    }
+    for(int k=0;k<nclasses;++k){
+        if(sums[k]>EPSILON){
+            means[k]/=sums[k];
+        }
+    }
+    //---variances---
+    p=probs;
+    for(int i=0;i<nsites;++i, p+=nclasses)if(mask[i]!=0){
+        for(int k=0;k<nclasses;++k){
+            double p2=p[k]*p[k];
+            variances[k]+=(img[i]-means[k])*(img[i]-means[k])*p2;
+        }
+    }
+    for(int k=0;k<nclasses;++i){
+        if(sums[k]>EPSILON){
+            variances[k]/=sums[k];
+        }else{
+            variances[k]=INF64;
+        }
+    }
+    delete[] sums;
+}
+
+
+void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw){
+    int k=dims[2];
+    int nsites=dims[0]*dims[1];
+    double *AA=new double[k*k*nclasses];
+    double *bb=new double[k*nclasses];
+    double *sums=new double[nclasses];
+    memset(AA, 0, sizeof(double)*k*k*nclasses);
+    memset(bb, 0, sizeof(double)*k*nclasses);
+    memset(sums, 0, sizeof(double)*nclasses);
+    double *qq=q;
+    double *p=probs;
+    //--------TO-DO: how to handle the p^2's ? --
+    for(int pos=0;pos<nsites;++pos, qq+=k, p+=nclasses)if(mask[pos]!=0){
+        for(int idx=0;idx<nclasses;++idx){
+            double *A=&AA[k*k*idx];
+            double *b=&bb[k*idx];
+            double p2=p[idx]*p[idx];
+            sums[idx]+=p2;
+            for(int i=0;i<k;++i){
+                b[i]+=p2*qq[i]*diff[pos];
+                for(int j=0;j<k;++j){
+                    A[k*i+j]+=p2*qq[i]*qq[j];
+                }
+            }
+        }
+    }
+    memset(Aw, 0, sizeof(double)*k*k);
+    memset(bw, 0, sizeof(double)*k);
+    double *A=AA;
+    double *b=bb;
+    for(int c=0;c<nclasses;++c, A+=(k*k), b+=k){
+        for(int i=0;i<k;++i){
+            bw[i]+=weights[c]*b[i];
+            for(int j=0;j<k;++j){
+                Aw[i*k+j]+=weights[c]*A[i*k+j];
+            }
+        }
+    }
+    delete[] AA;
+    delete[] bb;
+    delete[] sums;
+}

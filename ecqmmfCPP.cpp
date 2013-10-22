@@ -2,13 +2,20 @@
 #include <math.h>
 #include "bitsCPP.h"
 #include "ecqmmfCPP.h"
+#include <stdio.h>
 //-------------------------------------------------------------------
-int updateConstantModels(double *img, double *probs, int nrows, int ncols, int nclasses, double *means, double *variances){
+double updateConstantModels(double *img, double *probs, int nrows, int ncols, int nclasses, double *means, double *variances){
     int nsites=nrows*ncols;
     double *sump2=new double[nclasses];
+    double *prevMeans=new double[nclasses];
+    double *prevVariances=new double[nclasses];
+    memcpy(prevMeans, means, sizeof(double)*nclasses);
+    memcpy(prevVariances, variances, sizeof(double)*nclasses);
     double *p=probs;
     memset(means, 0, sizeof(double)*nclasses);
+#ifdef ESTIMATE_VARIANCES
     memset(variances, 0, sizeof(double)*nclasses);
+#endif
     memset(sump2, 0, sizeof(double)*nclasses);
     for(int i=0;i<nsites;++i, p+=nclasses){
         for(int k=0;k<nclasses;++k){
@@ -40,20 +47,72 @@ int updateConstantModels(double *img, double *probs, int nrows, int ncols, int n
             variances[k]/=sump2[k];
         }
     }
-#endif    
+#endif
+    double mse=0;
+    for(int i=0;i<nclasses;++i){
+        mse+=(prevMeans[i]-means[i])*(prevMeans[i]-means[i]);
+    }
+    mse/=nclasses;
+#ifdef ESTIMATE_VARIANCES
+    double mseVariances=0;
+    for(int i=0;i<nclasses;++i){
+        mseVariances+=(prevVariances[i]-variances[i])*(prevVariances[i]-variances[i]);
+    }
+    mseVariances/=nclasses;
+    if(mse<mseVariances){
+        mse=mseVariances;
+    }
+#endif
+    delete[] sump2;
+    delete[] prevMeans;
+    delete[] prevVariances;
+    return mse;
+}
+
+int updateVariances(double *img, double *probs, int nrows, int ncols, int nclasses, double *means, double *variances){
+    int nsites=nrows*ncols;
+    double *sump2=new double[nclasses];
+    double *p=probs;
+    memset(variances, 0, sizeof(double)*nclasses);
+    memset(sump2, 0, sizeof(double)*nclasses);
+    p=probs;
+    for(int i=0;i<nsites;++i, p+=nclasses){
+        for(int k=0;k<nclasses;++k){
+            double p2=p[k]*p[k];
+            double diff=(img[i]-means[k]);
+            variances[k]+=p2*diff*diff;
+            sump2[k]+=p2;
+        }
+    }
+    for(int k=0;k<nclasses;++k){
+        if(sump2[k]<EPSILON){
+            variances[k]=0;
+        }else{
+            variances[k]/=sump2[k];
+        }
+    }
     delete[] sump2;
     return 0;
 }
 
-int iterateMarginalsAt(int row, int col, double *negLogLikelihood, double *probs, int nrows, int ncols, 
-                        int nclasses, double lambda, double mu, double *N, double *D){
+
+double iterateMarginalsAt(int row, int col, double *negLogLikelihood, double *probs, int nrows, int ncols, 
+                        int nclasses, double lambda, double mu, double *N, double *D, double *prev){
     double *v=&negLogLikelihood[nclasses*(row*ncols+col)];
     for(int k=0;k<nclasses;++k){
         if(v[k]<EPSILON){
+            double mse=0;
             double *p=&probs[nclasses*(row*ncols+col)];
-            memset(p, 0, sizeof(double)*nclasses);
-            p[k]=1;
-            return 0;
+            for(int i=0;i<nclasses;++i){
+                if(i==k){
+                    mse+=(p[i]-1)*(p[i]-1);
+                    p[i]=1;
+                }else{
+                    mse+=(p[i]*p[i]);
+                    p[i]=0;
+                }
+            }
+            return mse/nclasses;
         }
         double num=0;
         int cnt=0;
@@ -82,6 +141,7 @@ int iterateMarginalsAt(int row, int col, double *negLogLikelihood, double *probs
         }
     }
     double *p=&probs[nclasses*(row*ncols+col)];
+    memcpy(prev, p, sizeof(double)*nclasses);
     double ss=0;
     for(int k=0;k<nclasses;k++){
         if(isInfinite(D[k])){
@@ -97,21 +157,26 @@ int iterateMarginalsAt(int row, int col, double *negLogLikelihood, double *probs
         }
         ss+=p[k];
     }
+    double mse=0;
     for(int k=0;k<nclasses;k++){
         p[k]/=ss;
+        mse+=(p[k]-prev[k])*(p[k]-prev[k]);
     }
-    return 0;
+    return mse/nclasses;
 }
 
-int iterateMarginals(double *likelihood, double *probs, int nrows, int ncols, 
-                        int nclasses, double lambda, double mu, double *N, double *D){
-    int nsites=nrows*ncols;
+double iterateMarginals(double *likelihood, double *probs, int nrows, int ncols, 
+                        int nclasses, double lambda, double mu, double *N, double *D, double *prev){
+    double maxDiff=0;
     for(int i=0;i<nrows;++i){
         for(int j=0;j<ncols;++j){
-            iterateMarginalsAt(i,j,likelihood, probs, nrows, ncols, nclasses, lambda, mu, N, D);   
+            double opt=iterateMarginalsAt(i,j,likelihood, probs, nrows, ncols, nclasses, lambda, mu, N, D, prev);   
+            if(maxDiff<opt){
+                maxDiff=opt;
+            }
         }
     }
-    return 0;
+    return maxDiff;
 }
 
 int computeNegLogLikelihoodConstantModels(double *img, int nrows, int ncols, int nclasses, double *means, double *variances, double *likelihood){
@@ -217,16 +282,25 @@ int initializeNormalizedLikelihood(double *negLogLikelihood, int nrows, int ncol
     double *p=probs;
     for(int i=0;i<nsites;++i, v+=nclasses, p+=nclasses){
         double sum=0;
+        int closest=-1;
         for(int k=0;k<nclasses;++k){
             if(isInfinite(v[k])){
                 p[k]=0;
             }else{
                 p[k]=exp(-v[k]);
-            }            
+            }
+            if((closest<0) || (v[k]<v[closest])){
+                closest=k;
+            }
             sum+=p[k];
         }
-        for(int k=0;k<nclasses;++k){
-            p[k]/=sum;
+        if(sum<EPSILON){
+            memset(p,0,sizeof(double)*nclasses);
+            p[closest]=1;
+        }else{
+            for(int k=0;k<nclasses;++k){
+                p[k]/=sum;
+            }
         }
     }
     return 0;

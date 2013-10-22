@@ -24,6 +24,8 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void integrateMaskedWeightedTensorFieldProductsCPP(int *mask, double *q, int *dims, double *diff, int numLabels, int *labels, double *weights, double *Aw, double *bw)
     double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
     double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
+    void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, int numLabels, double *probs, double *means, double *variances)
+    void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
 
 def testFunction(param):
     print 'Testing', param
@@ -170,3 +172,24 @@ cpdef iterateDisplacementField3DCYTHON(double[:,:,:] deltaField, double[:,:,:] s
     dims[2]=deltaField.shape[2]
     maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0,0], &displacementField[0,0,0,0], &residuals[0,0,0])
     return maxDisplacement
+
+cpdef computeMaskedVolumeClassStatsProbsCYTHON(int[:,:] mask, double[:,:] img, double[:,:,:] probs):
+    cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
+    dims[0]=probs.shape[0]
+    dims[1]=probs.shape[1]
+    nclasses=probs.shape[2]
+    cdef double[:] means=np.zeros(shape=(nclasses,), dtype=np.double)
+    cdef double[:] variances=np.zeros(shape=(nclasses, ), dtype=np.double)
+    computeMaskedVolumeClassStatsProbsCPP(&mask[0,0], img[0,0], &dims[0], nclasses, &probs[0,0,0], &means[0], &variances[0]):
+    return means, variances
+    
+cpdef integrateMaskedWeightedTensorFieldProductsProbsCYTHON(int[:,:] mask, double[:,:,:] q, double[:,:] diff, int nclasses, double[:,:,:] probs, double[:] weights):
+    cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
+    dims[0]=q.shape[0]
+    dims[1]=q.shape[1]
+    dims[2]=q.shape[2]
+    cdef int k=dims[2]
+    cdef double[:,:] Aw=np.zeros(shape=(k, k), dtype=np.double)
+    cdef double[:] bw=np.zeros(shape=(k,), dtype=np.double)
+    integrateMaskedWeightedTensorFieldProductsProbsCPP(&mask[0,0], &q[0,0,0], &dims[0], &diff[0,0], nclasses, &probs[0,0,0], &weights[0], &Aw[0,0], &bw[0])
+    return Aw,bw

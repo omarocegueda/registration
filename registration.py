@@ -17,14 +17,15 @@ if __name__=='__main__':
     #betaGT=np.array([3.0, -2.0, 1.0, 0.0, 0.5, 1.0])
     #betaGT=np.array([.0, .0, .0, 0.0, 0.0, 0.0])
     #betaGT=np.array([8.0, -6.0, 5.5, 0.0, 0.5, 1.0])
-    level=5
+    level=4
     #testRigidTransformationMultiScale3D(betaGT,level)
-    #testMultimodalRigidTransformationMultiScale3D(betaGT, level)
+    rrigid.testMultimodalRigidTransformationMultiScale3D(betaGT, level)
     #testMultimodalRigidTransformationMultiScale3D_opposite(betaGT, level)
     #testNipyRegistration(betaGT)
-    fname0='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
-    fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
-    rrigid.testIntersubjectRigidRegistration(fname0, fname1)
+    #fname0='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
+    #fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
+    #ofname='output.nii.gz'
+    #rrigid.testIntersubjectRigidRegistration(fname0, fname1, level, ofname)
 
 
 #sudo ./ANTS 3 -m MSQ[fixed.nii, moving.nii,1,0] -o test --rigid-affine true

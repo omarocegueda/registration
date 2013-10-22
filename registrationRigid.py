@@ -17,6 +17,7 @@ from nipy.core.api import Image, AffineTransform
 import nibabel as nib
 import nipy
 from registrationCommon import const_prefilter_map_coordinates
+import ecqmmf
 ###############################################################
 ##########################Rotation only########################
 ###############################################################
@@ -390,16 +391,20 @@ def estimateMultiModalRigidTransformationMultiscale3D(leftPyramid, rightPyramid,
     return beta
 
 def testMultimodalRigidTransformationMultiScale3D(betaGT, level):
+    leftName='data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb'
+    rightName='data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb'
+    #rightName='data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb'
+    #leftName='data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb'
     betaGTRads=np.array(betaGT, dtype=np.float64)
     betaGTRads[0:3]=np.copy(np.pi*betaGTRads[0:3]/180.0)
     ns=181
     nr=217
     nc=181
     print 'Loading volume...'
-    left=np.fromfile('data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb', dtype=np.ubyte).reshape(ns,nr,nc)
+    left=np.fromfile(leftName, dtype=np.ubyte).reshape(ns,nr,nc)
     left=left.astype(np.float64)
     print 'Generating pyramid at level',level,'...'
-    right=np.fromfile('data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb', dtype=np.ubyte).reshape(ns,nr,nc)
+    right=np.fromfile(rightName, dtype=np.ubyte).reshape(ns,nr,nc)
     right=right.astype(np.float64)
     right=rcommon.applyRigidTransformation3D(right, betaGTRads)
     leftPyramid=[i for i in rcommon.pyramid_gaussian_3D(left, level)]
@@ -411,6 +416,104 @@ def testMultimodalRigidTransformationMultiScale3D(betaGT, level):
     plotSlicePyramidsAxial(leftPyramid, rightPyramid)
     return beta
 
+###############################################################################
+###############################################################################
+################################USING EC-QMMF 2D###############################
+###############################################################################
+###############################################################################
+
+def estimateNewMultimodalRigidTransformation2D_ecqmmf(moving, fixed, probs, nclasses, previousBeta=None):
+    epsilon=1e-9
+    sh=moving.shape
+    center=(np.array(sh)-1)/2.0
+    X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
+    X0=X0-center[0]
+    X1=X1-center[1]
+    mask=np.ones_like(X0, dtype=np.int32)
+    if((previousBeta!=None) and (np.max(np.abs(previousBeta))>epsilon)):
+        R=rcommon.getRotationMatrix2D(previousBeta[0])
+        X0new,X1new=(R[0,0]*X0 + R[0,1]*X1 + center[0] + 2.0*previousBeta[1],
+                     R[1,0]*X0 + R[1,1]*X1 + center[1] + 2.0*previousBeta[2])
+        moving=ndimage.map_coordinates(moving, [X0new, X1new], prefilter=const_prefilter_map_coordinates)
+        mask[...]=(X0new<0) + (X0new>(sh[0]-1))
+        mask[...]=mask + (X1new<0) + (X1new>(sh[1]-1))
+        mask[...]=1-mask
+    means, variances=tf.computeMaskedVolumeClassStatsProbsCYTHON(mask, moving, probs)
+    means=np.array(means)
+    weights=np.array([1.0/x if(x>0) else 0 for x in variances], dtype=np.float64)
+    g0, g1=sp.gradient(moving)
+    q=np.empty(shape=(X0.shape)+(3,), dtype=np.float64)
+    q[...,0]=g1*X0-g0*X1
+    q[...,1]=g0
+    q[...,2]=g1
+    expected=probs.dot(means)
+    diff=expected-moving
+    Aw, bw=tf.integrateMaskedWeightedTensorFieldProductsCYTHON(mask, q, diff, numLevels, rightQ, weights)
+    beta=linalg.solve(Aw,bw)
+    return beta
+
+def estimateMultiModalRigidTransformationMultiscale3D_ecqmmf(leftPyramid, rightPyramid, level=0, paramList=None):
+    n=len(leftPyramid)
+    quantizationLevels=256//(2**level)
+    if(level>=n):
+        return np.array([0,0,0,0,0,0], dtype=np.float64)
+    if(level==(n-1)):
+        solution=None
+        rightQ, grayLevels, hist=tf.quantizeVolumeCYTHON(rightPyramid[level], quantizationLevels)
+        rightQ=np.array(rightQ, dtype=np.int32)
+        for i in range(level+1):
+            beta=estimateNewMultimodalRigidTransformation3D_ecqmmf(leftPyramid[level], rightPyramid[level], probs, quantizationLevels,solution)
+            solution=beta if solution==None else solution+beta
+        if(paramList!=None):
+            paramList.append(beta)
+        print 'Level',level,': ',180*beta[:3]/np.pi, beta[3:]
+        #plotToneTransferFunction(leftPyramid[level], rightQ, quantizationLevels, beta)
+        return beta
+    betaSub=estimateMultiModalRigidTransformationMultiscale3D_ecqmmf(leftPyramid, rightPyramid, level+1, paramList)
+    rightQ, grayLevels, hist=tf.quantizeVolumeCYTHON(rightPyramid[level], quantizationLevels)
+    rightQ=np.array(rightQ, dtype=np.int32)
+    for i in range(2*(level+1)):
+        beta=estimateNewMultimodalRigidTransformation3D_ecqmmf(leftPyramid[level], rightPyramid[level], rightQ, quantizationLevels, betaSub)
+        betaSub+=beta*np.array([1.0, 1.0, 1.0, 0.5, 0.5, 0.5])
+    if(paramList!=None):
+        paramList.append(beta)
+    beta=betaSub*np.array([1.0, 1.0, 1.0, 2.0, 2.0, 2.0])
+    print 'Level ',level,': ',180*beta[:3]/np.pi, beta[3:]
+    plotEstimatedTransferedImage(leftPyramid[level], quantizationLevels, rightQ, beta)
+    #plotToneTransferFunction(leftPyramid[level], rightQ, quantizationLevels, beta)
+    return beta
+
+def testMultimodalRigidTransformationMultiScale3D_ecqmmf(betaGT, level):
+    leftName='data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb'
+    rightName='data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb'
+    #rightName='data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb'
+    #leftName='data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb'
+    betaGTRads=np.array(betaGT, dtype=np.float64)
+    betaGTRads[0:3]=np.copy(np.pi*betaGTRads[0:3]/180.0)
+    ns=181
+    nr=217
+    nc=181
+    print 'Loading volume...'
+    left=np.fromfile(leftName, dtype=np.ubyte).reshape(ns,nr,nc)
+    left=left.astype(np.float64)
+    print 'Generating pyramid at level',level,'...'
+    right=np.fromfile(rightName, dtype=np.ubyte).reshape(ns,nr,nc)
+    right=right.astype(np.float64)
+    right=rcommon.applyRigidTransformation3D(right, betaGTRads)
+    leftPyramid=[i for i in rcommon.pyramid_gaussian_3D(left, level)]
+    rightPyramid=[i for i in rcommon.pyramid_gaussian_3D(right, level)]
+    print 'Estimation started.'
+    beta=estimateMultiModalRigidTransformationMultiscale3D(leftPyramid, rightPyramid)
+    print 'Estimation finished.'
+    print 'Ground truth:', betaGT
+    plotSlicePyramidsAxial(leftPyramid, rightPyramid)
+    return beta
+
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
 
 def generateTestingPair(betaGT):
     betaGTRads=np.array(betaGT, dtype=np.float64)
@@ -443,10 +546,12 @@ def testIntersubjectRigidRegistration(fname0, fname1, level, outfname):
     rcommon.applyRigidTransformation3D(left, beta)
     sl=np.array(left.shape)//2
     sr=np.array(right.shape)//2
+    rcommon.overlayImages(left[sl[0],:,:], leftPyramid[0][sr[0],:,:])
     rcommon.overlayImages(left[sl[0],:,:], right[sr[0],:,:])
     affine_transform=AffineTransform('ijk', ['aligned-z=I->S','aligned-y=P->A', 'aligned-x=L->R'], np.eye(4))
     left=Image(left, affine_transform)
     nipy.save_image(left,outfname)
+    
     return beta
 
 def peelTemplateBrain():
@@ -477,3 +582,7 @@ def generateRegistrationScript():
                     outFile      ='IBSR_'+idxi+'_to_'+idxj+'.nii'
                     outMatrix    ='IBSR_'+idxi+'_to_'+idxj+'.txt'
                     f.write('flirt -in '+inputFile+' -ref '+referenceFile+' -omat '+outMatrix+' -out '+outFile+'\n')
+if __name__=='__main__':
+    betaGT=np.array([14.0, -14.0, 14.0, 7.0, 5.5, 2.0])
+    level=4
+    testMultimodalRigidTransformationMultiScale3D(betaGT, level)
