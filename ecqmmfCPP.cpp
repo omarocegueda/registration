@@ -97,7 +97,7 @@ int updateVariances(double *img, double *probs, int nrows, int ncols, int nclass
 
 
 double iterateMarginalsAt(int row, int col, double *negLogLikelihood, double *probs, int nrows, int ncols, 
-                        int nclasses, double lambda, double mu, double *N, double *D, double *prev){
+                        int nclasses, double lambdaParam, double mu, double *N, double *D, double *prev){
     double *v=&negLogLikelihood[nclasses*(row*ncols+col)];
     for(int k=0;k<nclasses;++k){
         if(v[k]<EPSILON){
@@ -126,11 +126,11 @@ double iterateMarginalsAt(int row, int col, double *negLogLikelihood, double *pr
             num+=p[k];
             ++cnt;
         }
-        N[k]=lambda*num;
+        N[k]=lambdaParam*num;
         if(isInfinite(v[k])){
             D[k]=INF64;
         }else{
-            D[k]=v[k] - mu + lambda*cnt;
+            D[k]=v[k] - mu + lambdaParam*cnt;
         }
     }
     double sNum=0, sDen=0;
@@ -166,11 +166,11 @@ double iterateMarginalsAt(int row, int col, double *negLogLikelihood, double *pr
 }
 
 double iterateMarginals(double *likelihood, double *probs, int nrows, int ncols, 
-                        int nclasses, double lambda, double mu, double *N, double *D, double *prev){
+                        int nclasses, double lambdaParam, double mu, double *N, double *D, double *prev){
     double maxDiff=0;
     for(int i=0;i<nrows;++i){
         for(int j=0;j<ncols;++j){
-            double opt=iterateMarginalsAt(i,j,likelihood, probs, nrows, ncols, nclasses, lambda, mu, N, D, prev);   
+            double opt=iterateMarginalsAt(i,j,likelihood, probs, nrows, ncols, nclasses, lambdaParam, mu, N, D, prev);   
             if(maxDiff<opt){
                 maxDiff=opt;
             }
@@ -178,6 +178,34 @@ double iterateMarginals(double *likelihood, double *probs, int nrows, int ncols,
     }
     return maxDiff;
 }
+
+
+double optimizeMarginals(double *likelihood, double *probs, int nrows, int ncols, int nclasses, 
+                        double lambdaParam, double mu, int maxIter, double tolerance){
+    double *N=new double[nclasses];
+    double *D=new double[nclasses];
+    double *prev=new double[nclasses];
+    double maxDiff=0;
+    for(int iter=0;iter<maxIter;++iter){
+        maxDiff=0;
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j){
+                double opt=iterateMarginalsAt(i,j,likelihood, probs, nrows, ncols, nclasses, lambdaParam, mu, N, D, prev);   
+                if(maxDiff<opt){
+                    maxDiff=opt;
+                }
+            }
+        }
+        if(maxDiff<tolerance){
+            break;
+        }
+    }
+    delete[] N;
+    delete[] D;
+    delete[] prev;
+    return maxDiff;
+}
+
 
 int computeNegLogLikelihoodConstantModels(double *img, int nrows, int ncols, int nclasses, double *means, double *variances, double *likelihood){
     int nsites=nrows*ncols;

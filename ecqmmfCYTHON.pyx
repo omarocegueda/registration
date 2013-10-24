@@ -11,6 +11,7 @@ cdef extern from "ecqmmfCPP.h":
     int initializeMaximumLikelihoodProbs(double *negLogLikelihood, int nrows, int ncols, int nclasses, double *probs)
     int initializeNormalizedLikelihood(double *negLogLikelihood, int nrows, int ncols, int nclasses, double *probs)
     int getImageModes(double *probs, int nrows, int ncols, int nclasses, double *means, double *modes)
+    double optimizeMarginals(double *likelihood, double *probs, int nrows, int ncols, int nclasses, double lambdaParam, double mu, int maxIter, double tolerance)
 
 cpdef update_constant_models(double[:,:] img, double[:,:,:] probs, double[:] means, double[:] variances):
     cdef int nrows=probs.shape[0]
@@ -36,6 +37,14 @@ cpdef iterate_marginals(double[:,:,:] likelihood, double[:,:,:] probs, double la
     cdef double retVal
     retVal=iterateMarginals(&likelihood[0,0,0], &probs[0,0,0], nrows, ncols, nclasses, lambdaParam, mu, &N[0], &D[0], &prev[0])
     return retVal
+    
+cpdef optimize_marginals(double[:,:,:] likelihood, double[:,:,:] probs, double lambdaParam, double mu, int maxIter, double tolerance):
+    cdef int nrows=probs.shape[0]
+    cdef int ncols=probs.shape[1]
+    cdef int nclasses=probs.shape[2]
+    cdef double retVal
+    retVal=optimizeMarginals(&likelihood[0,0,0], &probs[0,0,0], nrows, ncols, nclasses, lambdaParam, mu, maxIter, tolerance)
+    return retVal
 
 cpdef compute_neg_log_likelihood_constant_models(double[:,:] img, double[:] means, double[:] variances, double[:,:,:] negLogLikelihood):
     cdef int nrows=negLogLikelihood.shape[0]
@@ -53,6 +62,20 @@ cpdef initialize_constant_models(double[:,:] img, int nclasses):
     cdef double[:] variances=np.zeros((nclasses,))
     retVal=initializeConstantModels(&img[0,0], nrows, ncols, nclasses, &means[0], &variances[0])
     return means, variances
+    
+cpdef initialize_normalized_likelihood(double[:,:,:] negLogLikelihood, double[:,:,:] probs):
+    cdef int nrows=probs.shape[0]
+    cdef int ncols=probs.shape[1]
+    cdef int nclasses=probs.shape[2]
+    cdef int retVal
+    retVal=initializeNormalizedLikelihood(&negLogLikelihood[0,0,0], nrows, ncols, nclasses, &probs[0,0,0])
+
+cpdef initialize_maximum_likelihood(double[:,:,:] negLogLikelihood, double[:,:,:] probs):
+    cdef int nrows=probs.shape[0]
+    cdef int ncols=probs.shape[1]
+    cdef int nclasses=probs.shape[2]
+    cdef int retVal
+    retVal=initializeMaximumLikelihoodProbs(&negLogLikelihood[0,0,0], nrows, ncols, nclasses, &probs[0,0,0])
 
 cpdef ecqmmf(double[:,:] img, int nclasses, double lambdaParam, double mu, int outerIter, int innerIter, double tolerance):
     cdef int iter_count

@@ -6,80 +6,7 @@ Created on Fri Sep 20 19:03:32 2013
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-const int 		EXPONENT_MASK32=(255<<23);
-const long long EXPONENT_MASK64=(2047LL<<52);
-const int 		MANTISSA_MASK32=((1<<23)-1);
-const long long MANTISSA_MASK64=((1LL<<52)-1);
-const int 		SIGNALING_BIT32=(1<<22);
-const long long SIGNALING_BIT64=(1LL<<51);
-const int 		iQNAN32=EXPONENT_MASK32|((MANTISSA_MASK32+1)>>1);
-const float 	QNAN32=*(float*)(&iQNAN32);
-const long long iQNAN64=EXPONENT_MASK64|((MANTISSA_MASK64+1LL)>>1);
-const double 	QNAN64=*(double*)(&iQNAN64);
-
-const int 		iSNAN32=(EXPONENT_MASK32|MANTISSA_MASK32)&(~SIGNALING_BIT32);
-const float 	SNAN32=*(float*)(&iSNAN32);
-const long long iSNAN64=(EXPONENT_MASK64|MANTISSA_MASK64)&(~SIGNALING_BIT64);
-const double 	SNAN64=*(double*)(&iSNAN64);
-
-const float  	INF32=*((float*)(&EXPONENT_MASK32));
-const double 	INF64=*((double*)(&EXPONENT_MASK64));
-
-bool isNumber(float x){
-	return ((*((int*)(&x)))&EXPONENT_MASK32)!=EXPONENT_MASK32;
-}
-
-bool isInfinite(float x){
-	if((*((int*)(&x)))&MANTISSA_MASK32){
-		return false;
-	}
-	return ((*((int*)(&x)))&EXPONENT_MASK32)==EXPONENT_MASK32;
-}
-
-bool isSNAN(float x){
-	if(((*((int*)(&x)))&EXPONENT_MASK32)!=EXPONENT_MASK32){
-		return false;
-	}
-	if((*((int*)(&x)))&MANTISSA_MASK32){
-		return !((*((int*)(&x)))&SIGNALING_BIT32);
-	}
-	return false;
-}
-
-bool isQNAN(float x){
-	if(((*((int*)(&x)))&EXPONENT_MASK32)!=EXPONENT_MASK32){
-		return false;
-	}
-	return ((*((int*)(&x)))&SIGNALING_BIT32);
-}
-
-bool isNumber(double x){
-	return ((*((long long*)(&x)))&EXPONENT_MASK64)!=EXPONENT_MASK64;
-}
-
-bool isInfinite(double x){
-	if((*((long long*)(&x)))&MANTISSA_MASK64){
-		return false;
-	}
-	return ((*((long long*)(&x)))&EXPONENT_MASK64)==EXPONENT_MASK64;
-}
-
-bool isSNAN(double x){
-	if(((*((long long*)(&x)))&EXPONENT_MASK64)!=EXPONENT_MASK64){
-		return false;
-	}
-	if((*((long long*)(&x)))&MANTISSA_MASK64){
-		return !((*((long long*)(&x)))&SIGNALING_BIT64);
-	}
-	return false;
-}
-
-bool isQNAN(double x){
-	if(((*((long long*)(&x)))&EXPONENT_MASK64)!=EXPONENT_MASK64){
-		return false;
-	}
-	return ((*((long long*)(&x)))&SIGNALING_BIT64);
-}
+#include "bitsCPP.h"
 
 void integrateTensorFieldProductsCPP(double *q, int *dims, double *diff, double *A, double *b){
     int k=dims[3];
@@ -534,9 +461,9 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
                 y[0]=(delta*g[0]) + sigma*lambdaParam*y[0];
                 y[1]=(delta*g[1]) + sigma*lambdaParam*y[1];
 #endif
-                A[0]=g[0]*g[0] + sigma*lambdaParam*nn;
+                A[0]=g[0]*g[0] + sigma*lambdaParam*(nn);
                 A[1]=g[0]*g[1];
-                A[2]=g[1]*g[1] + sigma*lambdaParam*nn;
+                A[2]=g[1]*g[1] + sigma*lambdaParam*(nn);
                 double xx=d[0];
                 double yy=d[1];
                 solve2DSymmetricPositiveDefiniteSystem(A,y,d, &residual[pos]);
@@ -551,6 +478,96 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
     }//rows
     return sqrt(maxDisplacement);
 }
+
+double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual){
+    const static int numNeighbors=4;
+    const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
+    const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
+    int nrows=dims[0];
+    int ncols=dims[1];
+    double *d=displacementField;
+    double *prevd=previousDisplacement;
+    double *g=gradientField;
+    double y[2];
+    double A[3];
+    int pos=0;
+    double maxDisplacement=0;
+    int *mm=mask;
+    for(int r=0;r<nrows;++r){
+        for(int c=0;c<ncols;++c, ++pos, d+=2, prevd+=2, g+=2, ++mm){
+            if(!*mm){
+                d[0]=d[1]=0;
+                continue;
+            }
+            double delta=deltaField[pos];
+            double sigma=sigmaField[pos];
+            int nn=0;
+            y[0]=y[1]=0;
+            for(int k=0;k<numNeighbors;++k){
+                int dr=r+dRow[k];
+                if((dr<0) || (dr>=nrows)){
+                    continue;
+                }
+                int dc=c+dCol[k];
+                if((dc<0) || (dc>=ncols)){
+                    continue;
+                }
+                if(mask[dr*ncols+dc]==0){
+                    continue;
+                }
+                ++nn;
+                double *dneigh=&displacementField[2*(dr*ncols + dc)];
+#ifdef GLOBAL_FIELD_CORRECTION
+                double *prevNeigh=&previousDisplacement[2*(dr*ncols + dc)];
+                y[0]+=dneigh[0]+prevNeigh[0];
+                y[1]+=dneigh[1]+prevNeigh[1];
+#else
+                y[0]+=dneigh[0];
+                y[1]+=dneigh[1];
+#endif
+            }
+            if(nn<2){
+                d[0]=d[1]=0;
+                continue;
+            }
+            if(isInfinite(sigma)){
+                double xx=d[0];
+                double yy=d[1];
+                d[0]=y[0]/nn;
+                d[1]=y[1]/nn;
+                xx-=d[0];
+                yy-=d[1];
+                double opt=xx*xx+yy*yy;
+                if(maxDisplacement<opt){
+                    maxDisplacement=opt;
+                }
+                residual[pos]=0;
+            }else{
+#ifdef GLOBAL_FIELD_CORRECTION
+                y[0]=(delta*g[0]) + sigma*lambdaParam*(y[0]-nn*prevd[0]);
+                y[1]=(delta*g[1]) + sigma*lambdaParam*(y[1]-nn*prevd[1]);
+#else
+                y[0]=(delta*g[0]) + sigma*lambdaParam*y[0];
+                y[1]=(delta*g[1]) + sigma*lambdaParam*y[1];
+#endif
+                A[0]=g[0]*g[0] + sigma*lambdaParam*(nn);
+                A[1]=g[0]*g[1];
+                A[2]=g[1]*g[1] + sigma*lambdaParam*(nn);
+                double xx=d[0];
+                double yy=d[1];
+                solve2DSymmetricPositiveDefiniteSystem(A,y,d, &residual[pos]);
+                xx-=d[0];
+                yy-=d[1];
+                double opt=xx*xx+yy*yy;
+                if(maxDisplacement<opt){
+                    maxDisplacement=opt;
+                }
+            }//if
+        }//cols
+    }//rows
+    return sqrt(maxDisplacement);
+}
+
 
 double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual){
     const static int numNeighbors=6;
@@ -683,7 +700,7 @@ void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, in
             variances[k]+=(img[i]-means[k])*(img[i]-means[k])*p2;
         }
     }
-    for(int k=0;k<nclasses;++i){
+    for(int k=0;k<nclasses;++k){
         if(sums[k]>EPSILON){
             variances[k]/=sums[k];
         }else{

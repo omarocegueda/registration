@@ -26,6 +26,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
     void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, int numLabels, double *probs, double *means, double *variances)
     void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
+    double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
 
 def testFunction(param):
     print 'Testing', param
@@ -165,6 +166,13 @@ cpdef iterateDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigma
     maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], &residuals[0,0])
     return maxDisplacement
 
+cpdef iterateMaskedDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  int[:,:] mask, double lambdaParam, double[:,:,:] previousDisplacement, double[:,:,:] displacementField, double[:,:] residuals):
+    cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    maxDisplacement=iterateMaskedDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &mask[0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], &residuals[0,0])
+    return maxDisplacement
+
 cpdef iterateDisplacementField3DCYTHON(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double lambdaParam, double[:,:,:,:] previousDisplacement, double[:,:,:,:] displacementField, double[:,:,:] residuals):
     cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
     dims[0]=deltaField.shape[0]
@@ -180,7 +188,7 @@ cpdef computeMaskedVolumeClassStatsProbsCYTHON(int[:,:] mask, double[:,:] img, d
     nclasses=probs.shape[2]
     cdef double[:] means=np.zeros(shape=(nclasses,), dtype=np.double)
     cdef double[:] variances=np.zeros(shape=(nclasses, ), dtype=np.double)
-    computeMaskedVolumeClassStatsProbsCPP(&mask[0,0], img[0,0], &dims[0], nclasses, &probs[0,0,0], &means[0], &variances[0]):
+    computeMaskedVolumeClassStatsProbsCPP(&mask[0,0], &img[0,0], &dims[0], nclasses, &probs[0,0,0], &means[0], &variances[0])
     return means, variances
     
 cpdef integrateMaskedWeightedTensorFieldProductsProbsCYTHON(int[:,:] mask, double[:,:,:] q, double[:,:] diff, int nclasses, double[:,:,:] probs, double[:] weights):

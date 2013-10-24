@@ -14,6 +14,46 @@ import nibabel as nib
 ###############################################################
 const_prefilter_map_coordinates=False
 
+def getDistribution(img1, img2):
+    sh=img1.shape
+    dist=np.zeros((256,256))
+    for i in range(sh[0]):
+        for j in range(sh[1]):
+            a=int(img1[i,j])
+            b=int(img2[i,j])
+            dist[a,b]+=1
+    return dist
+
+def drawLattice(nrows, ncols, delta):
+    lattice=np.ndarray((1+(delta+1)*nrows, 1+(delta+1)*ncols), dtype=np.float64)
+    lattice[...]=127
+    for i in range(nrows+1):
+        lattice[i*(delta+1), :]=0
+    for j in range(ncols+1):
+        lattice[:, j*(delta+1)]=0
+    return lattice
+
+def createDeformationField_type1(nrows, ncols, maxDistp):
+    deff=np.ndarray((nrows, ncols, 2), dtype=np.float64)
+    midCol=ncols//2
+    for i in range(nrows):
+        deff[i,:,0]=maxDistp*np.sin(2*np.pi*(np.array(range(ncols), dtype=np.float64)-midCol)/ncols)
+    for j in range(ncols):
+        deff[:,j,1]=maxDistp*np.sin(2*np.pi*(np.array(range(nrows), dtype=np.float64)-midCol)/nrows)
+    return deff
+
+def createDeformationField_type2(nrows, ncols, maxDistp):
+    deff=np.ndarray((nrows, ncols, 2), dtype=np.float64)
+    midCol=ncols//2
+    for i in range(nrows):
+        deff[i,:,0]=maxDistp*np.sin(2*np.pi*(np.array(range(ncols), dtype=np.float64)-midCol)/ncols)
+        deff[i,:,1]=maxDistp*np.sin(2*np.pi*(np.array(range(ncols), dtype=np.float64)-midCol)/ncols)
+    for j in range(ncols):
+        deff[:,j,0]*=np.sin(2*np.pi*(2*np.array(range(nrows), dtype=np.float64)-midCol)/nrows)
+        deff[:,j,1]*=np.sin(2*np.pi*(2*np.array(range(nrows), dtype=np.float64)-midCol)/nrows)
+    return deff
+
+    
 def warpImage(image, displacement):
     sh=image.shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]

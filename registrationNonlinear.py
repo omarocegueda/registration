@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 from scipy import ndimage
 import registrationCommon as rcommon
 from registrationCommon import const_prefilter_map_coordinates
+import ecqmmf
+import os.path
 
 ###############################################################
 ####### Non-linear Monomodal registration - EM (2D)############
@@ -213,7 +215,7 @@ def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
 ###############################################################
 ####### Non-linear Multimodal registration - EM (2D)###########
 ###############################################################
-def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizationLevels, previousDisplacement=None):
+def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizationLevels, previousDisplacement=None, useECQMMF=False):
     epsilon=1e-4
     sh=left.shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
@@ -223,7 +225,22 @@ def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizati
     totalDisplacement=np.zeros(shape=(left.shape)+(2,), dtype=np.float64)
     if(previousDisplacement!=None):
         totalDisplacement[...]=previousDisplacement
-    rightQ, grayLevels, hist=tf.quantizePositiveImageCYTHON(right, quantizationLevels)
+    rightQ=None
+    grayLevels=None
+    if(useECQMMF):
+        lambdaParam=.05
+        mu=.01
+        outerIter=20
+        innerIter=50
+        tolerance=1e-5
+        means, variances=ecqmmf.initialize_constant_models(right, quantizationLevels)
+        means=np.array(means)
+        variances=np.array(variances)
+        segmented, means, variances, probs=ecqmmf.ecqmmf(right, quantizationLevels, lambdaParam, mu, outerIter, innerIter, tolerance)
+        rightQ=segmented
+        grayLevels=means
+    else:
+        rightQ, grayLevels, hist=tf.quantizePositiveImageCYTHON(right, quantizationLevels)
     rightQ=np.array(rightQ, dtype=np.int32)
     finished=False
     maxOuterIter=100
@@ -233,7 +250,6 @@ def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizati
     maxResidual=0
     while((not finished) and (outerIter<maxOuterIter)):
         outerIter+=1
-        print "Outer:", outerIter
         #---E step---
         warped=ndimage.map_coordinates(left, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], prefilter=True)
         leftMask=(left>0)*1.0
@@ -269,13 +285,13 @@ def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizati
         maxDisplacement=np.max(nrm)
         if((maxDisplacement<epsilon)or(outerIter>=maxOuterIter)):
             finished=True
-            plt.figure()
-            plt.subplot(1,2,1)
-            plt.imshow(means[rightQ],cmap=plt.cm.gray)
-            plt.title("Estimated warped modality")
-            plt.subplot(1,2,2)
-            plt.plot(means)
-            plt.title("Means")
+#            plt.figure()
+#            plt.subplot(1,2,1)
+#            plt.imshow(means[rightQ],cmap=plt.cm.gray)
+#            plt.title("Estimated warped modality")
+#            plt.subplot(1,2,2)
+#            plt.plot(means)
+#            plt.title("Means")
     print "Iter: ",outerIter, "Max displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
     if(previousDisplacement!=None):
         return totalDisplacement-previousDisplacement
@@ -284,6 +300,7 @@ def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizati
 def estimateMultimodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lambdaParam, level=0, displacementList=None):
     n=len(leftPyramid)
     quantizationLevels=256//(2**level)
+    #quantizationLevels=256
     if(level==(n-1)):
         displacement=estimateNewMultimodalDeformationField2D(leftPyramid[level], rightPyramid[level], lambdaParam, quantizationLevels, None)
         if(displacementList!=None):
@@ -301,29 +318,65 @@ def estimateMultimodalDeformationField2DMultiScale(leftPyramid, rightPyramid, la
         displacementList.insert(0, newDisplacement)
     return newDisplacement
 
-def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam):
-    fname0='IBSR_01_to_02.nii.gz'
-    fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
-    nib_left = nib.load(fname0)
-    nib_right = nib.load(fname1)
-    left=nib_left.get_data().squeeze()
-    right=nib_right.get_data().squeeze()
+def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic=False):
+    #fname0='IBSR_01_to_02.nii.gz'
+    #fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
+    displacementGTName='templateToIBSR01_GT.npy'
+    fnameMoving='data/t2/IBSR_t2template_to_01.nii.gz'
+    fnameFixed='data/t1/IBSR_template_to_01.nii.gz'
+    nib_left = nib.load(fnameMoving)
+    nib_right = nib.load(fnameFixed)
+    left=nib_left.get_data().squeeze().astype(np.float64)
+    right=nib_right.get_data().squeeze().astype(np.float64)
     sl=left.shape
-    sr=right.shape
-    level=5
-    #---sagital---
-    #left=left[sl[0]//2,:,:].copy()
-    #right=right[sr[0]//2,:,:].copy()
-    #---coronal---
+    sr=right.shape    
     left=left[:,sl[1]//2,:].copy()
     right=right[:,sr[1]//2,:].copy()
-    #---axial---
-    #left=left[:,:,sl[2]//2].copy()
-    #right=right[:,:,sr[2]//2].copy()
+    left=(left-left.min())/(left.max()-left.min())
+    right=(right-right.min())/(right.max()-right.min())
+    if(synthetic):
+        print 'Generating synthetic field...'
+        #----apply synthetic deformation field to fixed image
+        GT=rcommon.createDeformationField_type2(right.shape[0], right.shape[1], 8)
+        warpedRight=rcommon.warpImage(right,GT)
+    else:
+        templateT1=nib.load('data/t1/IBSR_template_to_01.nii.gz')
+        templateT1=templateT1.get_data().squeeze().astype(np.float64)
+        sh=templateT1.shape
+        templateT1=templateT1[:,sh[1]//2,:]
+        templateT1=(templateT1-templateT1.min())/(templateT1.max()-templateT1.min())
+        if(os.path.exists(displacementGTName)):
+            print 'Loading precomputed realistic field...'
+            GT=np.load(displacementGTName)
+        else:
+            print 'Generating realistic field...'
+            #load two T1 images: the template and an IBSR sample
+            ibsrT1=nib.load('data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
+            ibsrT1=ibsrT1.get_data().squeeze().astype(np.float64)
+            ibsrT1=ibsrT1[:,sh[1]//2,:]
+            ibsrT1=(ibsrT1-ibsrT1.min())/(ibsrT1.max()-ibsrT1.min())
+            #register the template(moving) to the ibsr sample(fixed)
+            maskMoving=templateT1>0
+            maskFixed=ibsrT1>0
+            movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(templateT1, 3, maskMoving)]
+            fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(ibsrT1, 3, maskFixed)]
+            #----apply 'realistic' deformation field to fixed image
+            GT=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam,0, None)
+            np.save(displacementGTName, GT)
+        warpedRight=rcommon.warpImage(templateT1, GT)
+    print 'Registering T2 (template) to deformed T1 (template)...'
+    level=3
     maskLeft=left>0
-    maskRight=right>0
+    maskRight=warpedRight>0
     leftPyramid=[img for img in rcommon.pyramid_gaussian_2D(left, level, maskLeft)]
-    rightPyramid=[img for img in rcommon.pyramid_gaussian_2D(right, level, maskRight)]
+    rightPyramid=[img for img in rcommon.pyramid_gaussian_2D(warpedRight, level, maskRight)]
+    plt.figure()
+    plt.subplot(1,2,1)
+    plt.imshow(left, cmap=plt.cm.gray)
+    plt.title('Moving')
+    plt.subplot(1,2,2)
+    plt.imshow(warpedRight, cmap=plt.cm.gray)
+    plt.title('Fixed')
     rcommon.plotOverlaidPyramids(leftPyramid, rightPyramid)
     displacementList=[]
     displacement=estimateMultimodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lambdaParam,0,displacementList)
@@ -331,15 +384,19 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam):
     rcommon.plotOverlaidPyramids(warpPyramid, rightPyramid)
     rcommon.overlayImages(warpPyramid[0], rightPyramid[0])
     rcommon.plotDeformationField(displacement)
+    displacement[...,0]*=(maskRight)
+    displacement[...,1]*=(maskRight)
     nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
     maxNorm=np.max(nrm)
-    displacement[...,0]*=(maskLeft + maskRight)
-    displacement[...,1]*=(maskLeft + maskRight)
     rcommon.plotDeformationField(displacement)
+    residual=((displacement-GT))**2
+    meanDisplacementError=np.sqrt(residual.sum(2)*(maskRight)).mean()
+    stdevDisplacementError=np.sqrt(residual.sum(2)*(maskRight)).std()
     #nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
     #plt.figure()
     #plt.imshow(nrm)
     print 'Max global displacement: ', maxNorm
+    print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
 ###############################################################
 ####### Non-linear Multimodal registration - EM (3D)###########
@@ -483,35 +540,36 @@ def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam):
     
 if __name__=="__main__":
     #---Monomodal 3D---
-    lambdaParam=150
-    displacementList, warpPyramid=testEstimateMonomodalDeformationField3DMultiScale(lambdaParam)
+    #displacementList, warpPyramid=testEstimateMonomodalDeformationField3DMultiScale(250)
+    #---Multimodal 2D
+    testEstimateMultimodalDeformationField2DMultiScale(250, False)
     #---Multimodal 3D---
-    t1_template=nib.load('IBSR_template_to_01.nii.gz')
-    t1_template=t1_template.get_data().squeeze()
-    t1_real=nib.load('data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
-    t1_real=t1_real.get_data().squeeze()
-    t2_template=nib.load('IBSR_t2template_to_01.nii.gz')
-    t2_template=t2_template.get_data().squeeze()
-    #This is the "ground truth": register t1_template to t1_real    
-    displacement, warped=registerNonlinearMonomodal3D(t1_template, t1_real, lambdaParam, 3)
-    #now try to reproduce using multimodal: t2_template to t1_real
-    displacement, warped=registerNonlinearMultimodal3D(t2_template, t1_real, lambdaParam, 3)
-    #now synthetically deform template[T1] and try to recover the deformation field using
-    #template T2
-    t1displacement=np.load('template_to_01.npy')
-    t1templateWarped=rcommon.warpVolume(t1_template, t1displacement)
-    dispRecovered, warpedRecovered=registerNonlinearMultimodal3D(t2_template, t1templateWarped, lambdaParam, 3)
-    
-    
-    
-    t2_template=nib.load('data/t2/t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-    t2_template=t2_template.get_data().squeeze()
-    rcommon.overlayImages(t2_template[:,64,:],t1templateWarped[:,64,:])
-    
-    left=np.fromfile('data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb', dtype=np.ubyte).reshape(ns,nr,nc)
-    left=left.astype(np.float64)
-    right=np.fromfile('data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb', dtype=np.ubyte).reshape(ns,nr,nc)
-    right=right.astype(np.float64)
+#    t1_template=nib.load('IBSR_template_to_01.nii.gz')
+#    t1_template=t1_template.get_data().squeeze()
+#    t1_real=nib.load('data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
+#    t1_real=t1_real.get_data().squeeze()
+#    t2_template=nib.load('IBSR_t2template_to_01.nii.gz')
+#    t2_template=t2_template.get_data().squeeze()
+#    #This is the "ground truth": register t1_template to t1_real    
+#    displacement, warped=registerNonlinearMonomodal3D(t1_template, t1_real, lambdaParam, 3)
+#    #now try to reproduce using multimodal: t2_template to t1_real
+#    displacement, warped=registerNonlinearMultimodal3D(t2_template, t1_real, lambdaParam, 3)
+#    #now synthetically deform template[T1] and try to recover the deformation field using
+#    #template T2
+#    t1displacement=np.load('template_to_01.npy')
+#    t1templateWarped=rcommon.warpVolume(t1_template, t1displacement)
+#    dispRecovered, warpedRecovered=registerNonlinearMultimodal3D(t2_template, t1templateWarped, lambdaParam, 3)
+#    
+#    
+#    
+#    t2_template=nib.load('data/t2/t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
+#    t2_template=t2_template.get_data().squeeze()
+#    rcommon.overlayImages(t2_template[:,64,:],t1templateWarped[:,64,:])
+#    
+#    left=np.fromfile('data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb', dtype=np.ubyte).reshape(ns,nr,nc)
+#    left=left.astype(np.float64)
+#    right=np.fromfile('data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb', dtype=np.ubyte).reshape(ns,nr,nc)
+#    right=right.astype(np.float64)
     
     
 #    The objective is to register these two volumes:

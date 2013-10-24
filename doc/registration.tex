@@ -364,6 +364,27 @@ There are some interesting remarks about this formulation:
 The minimization of the energy with respect to $p$ for a fixed $\phi$ is described in the original EC-QMMF paper. We need to differentiate with respect to the parameters of the segmentations: $\mu_{i}, \sigma_{i}, \tilde{\mu}_{j}, \tilde{\sigma}_j$. We also need to differentiate with respect to the parameters of the deformation $\phi$.
 
 
+\section{Reducing the degrees of freedom: a generalization of Arce's approach}
+If we assume that there exist two soft segmentations of $I_f$ and $I_m$ such that the
+measure fields are the same, then the corresponding EC-QMMF energy function is given by
+\begin{displaymath}
+	\sum_{x\in \mathcal{L}} \sum_{i=1}^{K}p_{i}^{2}(x) \left[(I_{f}(x) - \mu_i)^{2} + (I_{m}(x + d_x) - \nu_i)^{2} - \epsilon \right]
+\end{displaymath}
+\begin{displaymath}
+	+ \lambda_{1}\sum_{<x,y>\in\mathcal{C}_{2}}||p_{x} - p_{y}||_{2}^{2} + \lambda_{2}\sum_{<x,y>\in \mathcal{C}_{2}}||d_{x} - d_{y}||_{2}^{2}.
+\end{displaymath}
+The optimization with respect to $\mu_i$, $\nu_{j}$, and $p_{k}(x)$ is exactly the same as the original ECQMMF, and the optimization with respect to $d_x$ can be obtained by solving, for each $x \in \mathcal{L}$:
+\begin{equation}
+	\sum_{i=1}^{K}p_{i}^{2}(x)g_{x}(I_{m}(x)- \nu_{i} + g_{x}^{T}d_{x}) + \lambda_{2} \sum_{y\in \mathcal{N}_{x}}(d_{x} - d_{y}) = 0
+\end{equation}
+where $g_{x} = \nabla I_m(x)$, then:
+\begin{equation}
+	\left[g_{x}g_{x}^{T}\sum_{i=1}^{K}p_{i}^{2}(x) + \lambda_{2}|\mathcal{N}_{x}|I\right]d_x=g_{x}\sum_{i=1}^{K}p_{i}^{2}(x)\delta_{i}(x) + \lambda_{2} \sum_{y\in \mathcal{N}_{x}}d_{y}
+\end{equation}
+where $\delta_{i}(x) = \nu_{i} - I_{m}(x)$. If $\lambda_{2}>0$, the unique solution is given by:
+\begin{equation}
+	d_{x} = \left[g_{x}g_{x}^{T}\sum_{i=1}^{K}p_{i}^{2}(x) + \lambda_{2}|\mathcal{N}_{x}|I\right]^{-1} \left[ g_{x}\sum_{i=1}^{K}p_{i}^{2}(x)\delta_{i}(x) + \lambda_{2} \sum_{y\in \mathcal{N}_{x}}d_{y} \right]
+\end{equation}
 
 
 \end{document}
