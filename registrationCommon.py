@@ -24,7 +24,7 @@ def getDistribution(img1, img2):
             dist[a,b]+=1
     return dist
 
-def drawLattice(nrows, ncols, delta):
+def drawLattice2D(nrows, ncols, delta):
     lattice=np.ndarray((1+(delta+1)*nrows, 1+(delta+1)*ncols), dtype=np.float64)
     lattice[...]=127
     for i in range(nrows+1):
@@ -33,7 +33,7 @@ def drawLattice(nrows, ncols, delta):
         lattice[:, j*(delta+1)]=0
     return lattice
 
-def createDeformationField_type1(nrows, ncols, maxDistp):
+def createDeformationField2D_type1(nrows, ncols, maxDistp):
     deff=np.ndarray((nrows, ncols, 2), dtype=np.float64)
     midCol=ncols//2
     for i in range(nrows):
@@ -42,15 +42,46 @@ def createDeformationField_type1(nrows, ncols, maxDistp):
         deff[:,j,1]=maxDistp*np.sin(2*np.pi*(np.array(range(nrows), dtype=np.float64)-midCol)/nrows)
     return deff
 
-def createDeformationField_type2(nrows, ncols, maxDistp):
+def createDeformationField2D_type2(nrows, ncols, maxDistp):
     deff=np.ndarray((nrows, ncols, 2), dtype=np.float64)
     midCol=ncols//2
+    midRow=nrows//2
     for i in range(nrows):
         deff[i,:,0]=maxDistp*np.sin(2*np.pi*(np.array(range(ncols), dtype=np.float64)-midCol)/ncols)
         deff[i,:,1]=maxDistp*np.sin(2*np.pi*(np.array(range(ncols), dtype=np.float64)-midCol)/ncols)
     for j in range(ncols):
-        deff[:,j,0]*=np.sin(2*np.pi*(2*np.array(range(nrows), dtype=np.float64)-midCol)/nrows)
-        deff[:,j,1]*=np.sin(2*np.pi*(2*np.array(range(nrows), dtype=np.float64)-midCol)/nrows)
+        deff[:,j,0]*=np.sin(2*np.pi*(np.array(range(nrows), dtype=np.float64)-midRow)/nrows)
+        deff[:,j,1]*=np.sin(2*np.pi*(np.array(range(nrows), dtype=np.float64)-midRow)/nrows)
+    return deff
+
+def drawLattice3D(dims, delta):
+    lattice=np.ndarray((1+(delta+1)*dims[0], 1+(delta+1)*dims[1], 1+(delta+1)*dims[2]), dtype=np.float64)
+    lattice[...]=127
+    for i in range(dims[0]+1):
+        lattice[i*(delta+1), :, :]=0
+    for j in range(dims[1]+1):
+        lattice[:, j*(delta+1), :]=0
+    for k in range(dims[2]+1):
+        lattice[:, :, k*(delta+1)]=0
+    return lattice
+
+def createDeformationField3D_type2(dims, maxDistp):
+    deff=np.ndarray(dims+(3,), dtype=np.float64)
+    dims=np.array(dims, dtype=np.int32)
+    mid=dims//2
+    factor=maxDistp**(1.0/3.0)
+    for i in range(dims[0]):
+        deff[i,:,:,0]=factor*np.sin(2*np.pi*(np.array(range(dims[0]), dtype=np.float64)-mid[0])/dims[0])
+        deff[i,:,:,1]=factor*np.sin(2*np.pi*(np.array(range(dims[0]), dtype=np.float64)-mid[0])/dims[0])
+        deff[i,:,:,2]=factor*np.sin(2*np.pi*(np.array(range(dims[0]), dtype=np.float64)-mid[0])/dims[0])
+    for j in range(dims[1]):
+        deff[:,j,:,0]*=factor*np.sin(2*np.pi*(np.array(range(dims[1]), dtype=np.float64)-mid[1])/dims[1])
+        deff[:,j,:,1]*=factor*np.sin(2*np.pi*(np.array(range(dims[1]), dtype=np.float64)-mid[1])/dims[1])
+        deff[:,j,:,2]*=factor*np.sin(2*np.pi*(np.array(range(dims[1]), dtype=np.float64)-mid[1])/dims[1])
+    for k in range(dims[2]):
+        deff[:,:,k,0]*=factor*np.sin(2*np.pi*(np.array(range(dims[2]), dtype=np.float64)-mid[2])/dims[2])
+        deff[:,:,k,1]*=factor*np.sin(2*np.pi*(np.array(range(dims[2]), dtype=np.float64)-mid[2])/dims[2])
+        deff[:,:,k,2]*=factor*np.sin(2*np.pi*(np.array(range(dims[2]), dtype=np.float64)-mid[2])/dims[2])
     return deff
 
     
@@ -160,17 +191,13 @@ def applyRigidTransformation3D(image, beta):
 
 def pyramid_gaussian_3D(image, max_layer, mask=None):
     yield image.copy().astype(np.float64)
-    sigma=1.0/3.0
-    sampling=1
     for i in range(max_layer):
-        sigma*=2.0
-        sampling*=2
-        newImage=np.empty(shape=((image.shape[0]+sampling-1)//sampling, (image.shape[1]+sampling-1)//sampling, (image.shape[2]+sampling-1)//sampling), dtype=np.float64)
-        newImage[...]=sp.ndimage.filters.gaussian_filter(image, sigma)[::sampling,::sampling,::sampling]
+        newImage=np.empty(shape=((image.shape[0]+1)//2, (image.shape[1]+1)//2, (image.shape[2]+1)//2), dtype=np.float64)
+        newImage[...]=sp.ndimage.filters.gaussian_filter(image, 2.0/3.0)[::2,::2,::2]
         if(mask!=None):
-            mask=mask[::sampling,::sampling,::sampling]
+            mask=mask[::2,::2,::2]
             newImage*=mask
-        #image=newImage
+        image=newImage
         yield newImage
 
 def pyramid_gaussian_2D(image, max_layer, mask=None):

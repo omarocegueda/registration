@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Sep 30 15:51:32 2013
-
-@author: khayyam
-"""
 import numpy as np
 import scipy as sp
 import tensorFieldUtils as tf
@@ -19,25 +13,24 @@ import os.path
 ####### Non-linear Monomodal registration - EM (2D)############
 ###############################################################
 
-def estimateNewMonomodalDeformationField2D(left, right, lambdaParam, previousDisplacement=None):
-    epsilon=1e-4
-    sh=left.shape
+def estimateNewMonomodalDeformationField2D(moving, fixed, lambdaParam, maxIter, previousDisplacement=None):
+    epsilon=1e-5
+    sh=moving.shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
-    displacement     =np.zeros(shape=(left.shape)+(2,), dtype=np.float64)
-    residuals=np.zeros(shape=(left.shape), dtype=np.float64)
-    gradientField    =np.empty(shape=(left.shape)+(2,), dtype=np.float64)
-    totalDisplacement=np.zeros(shape=(left.shape)+(2,), dtype=np.float64)
+    displacement     =np.zeros(shape=(moving.shape)+(2,), dtype=np.float64)
+    residuals=np.zeros(shape=(moving.shape), dtype=np.float64)
+    gradientField    =np.empty(shape=(moving.shape)+(2,), dtype=np.float64)
+    totalDisplacement=np.zeros(shape=(moving.shape)+(2,), dtype=np.float64)
     if(previousDisplacement!=None):
         totalDisplacement[...]=previousDisplacement
-    warped=ndimage.map_coordinates(left, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], prefilter=const_prefilter_map_coordinates)
+    warped=ndimage.map_coordinates(moving, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], prefilter=const_prefilter_map_coordinates)
     sigmaField=np.ones_like(warped, dtype=np.float64)
-    deltaField=right-warped
+    deltaField=fixed-warped
     g0, g1=sp.gradient(warped)
     gradientField[:,:,0]=g0
     gradientField[:,:,1]=g1
     maxVariation=1+epsilon
     innerIter=0
-    maxIter=2000
     maxResidual=0
     while((maxVariation>epsilon)and(innerIter<maxIter)):
         innerIter+=1
@@ -49,20 +42,20 @@ def estimateNewMonomodalDeformationField2D(left, right, lambdaParam, previousDis
     print "Iter: ",innerIter, "Max lateral displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
     return displacement
 
-def estimateMonomodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lambdaParam, level=0, displacementList=None):
-    n=len(leftPyramid)
+def estimateMonomodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, level=0, displacementList=None):
+    n=len(movingPyramid)
     if(level==(n-1)):
-        displacement=estimateNewMonomodalDeformationField2D(leftPyramid[level], rightPyramid[level], lambdaParam, None)
+        displacement=estimateNewMonomodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, None)
         if(displacementList!=None):
             displacementList.insert(0,displacement)
         return displacement
-    subDisplacement=estimateMonomodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lambdaParam, level+1, displacementList)
-    sh=leftPyramid[level].shape
+    subDisplacement=estimateMonomodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, level+1, displacementList)
+    sh=movingPyramid[level].shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]*0.5
-    upsampled=np.empty(shape=(leftPyramid[level].shape)+(2,), dtype=np.float64)
+    upsampled=np.empty(shape=(movingPyramid[level].shape)+(2,), dtype=np.float64)
     upsampled[:,:,0]=ndimage.map_coordinates(subDisplacement[:,:,0], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,1]=ndimage.map_coordinates(subDisplacement[:,:,1], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
-    newDisplacement=estimateNewMonomodalDeformationField2D(leftPyramid[level], rightPyramid[level], lambdaParam, upsampled)
+    newDisplacement=estimateNewMonomodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, upsampled)
     newDisplacement+=upsampled
     if(displacementList!=None):
         displacementList.insert(0, newDisplacement)
@@ -71,67 +64,66 @@ def estimateMonomodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lam
 def testEstimateMonomodalDeformationField2DMultiScale(lambdaParam):
     fname0='IBSR_01_to_02.nii.gz'
     fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
-    nib_left = nib.load(fname0)
-    nib_right = nib.load(fname1)
-    left=nib_left.get_data().squeeze()
-    right=nib_right.get_data().squeeze()
-    sl=left.shape
-    sr=right.shape
+    nib_moving = nib.load(fname0)
+    nib_fixed= nib.load(fname1)
+    moving=nib_moving.get_data().squeeze()
+    fixed=nib_fixed.get_data().squeeze()
+    sl=moving.shape
+    sr=fixed.shape
     level=5
     #---sagital---
-    left=left[sl[0]//2,:,:].copy()
-    right=right[sr[0]//2,:,:].copy()
+    moving=moving[sl[0]//2,:,:].copy()
+    fixed=fixed[sr[0]//2,:,:].copy()
     #---coronal---
-    #left=left[:,sl[1]//2,:].copy()
-    #right=right[:,sr[1]//2,:].copy()
+    #moving=moving[:,sl[1]//2,:].copy()
+    #fixed=fixed[:,sr[1]//2,:].copy()
     #---axial---
-    #left=left[:,:,sl[2]//2].copy()
-    #right=right[:,:,sr[2]//2].copy()
-    maskLeft=left>0
-    maskRight=right>0
-    leftPyramid=[img for img in rcommon.pyramid_gaussian_2D(left, level, maskLeft)]
-    rightPyramid=[img for img in rcommon.pyramid_gaussian_2D(right, level, maskRight)]
-    rcommon.plotOverlaidPyramids(leftPyramid, rightPyramid)
+    #moving=moving[:,:,sl[2]//2].copy()
+    #fixed=fixed[:,:,sr[2]//2].copy()
+    maskMoving=moving>0
+    maskFixed=fixed>0
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(fixed, level, maskFixed)]
+    rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
     displacementList=[]
-    displacement=estimateMonomodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lambdaParam,0,displacementList)
-    warpPyramid=[rcommon.warpImage(leftPyramid[i], displacementList[i]) for i in range(level+1)]
-    rcommon.plotOverlaidPyramids(warpPyramid, rightPyramid)
-    rcommon.overlayImages(warpPyramid[0], rightPyramid[0])
+    displacement=estimateMonomodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam,0,displacementList)
+    warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
+    rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
+    rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
     rcommon.plotDeformationField(displacement)
     nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
     maxNorm=np.max(nrm)
-    displacement[...,0]*=(maskLeft + maskRight)
-    displacement[...,1]*=(maskLeft + maskRight)
+    displacement[...,0]*=(maskMoving + maskFixed)
+    displacement[...,1]*=(maskMoving + maskFixed)
     rcommon.plotDeformationField(displacement)
     #nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
     #plt.figure()
     #plt.imshow(nrm)
     print 'Max global displacement: ', maxNorm
-    
+
 ###############################################################
 ####### Non-linear Monomodal registration - EM (3D)############
 ###############################################################
 
-def estimateNewMonomodalDeformationField3D(left, right, lambdaParam, previousDisplacement=None):
+def estimateNewMonomodalDeformationField3D(moving, fixed, lambdaParam, maxIter, previousDisplacement=None):
     epsilon=1e-3
-    sh=left.shape
+    sh=moving.shape
     X0,X1,X2=np.mgrid[0:sh[0], 0:sh[1], 0:sh[2]]
-    displacement     =np.zeros(shape=(left.shape)+(3,), dtype=np.float64)
-    residuals        =np.zeros(shape=(left.shape), dtype=np.float64)
-    gradientField    =np.empty(shape=(left.shape)+(3,), dtype=np.float64)
-    totalDisplacement=np.zeros(shape=(left.shape)+(3,), dtype=np.float64)
+    displacement     =np.zeros(shape=(moving.shape)+(3,), dtype=np.float64)
+    residuals        =np.zeros(shape=(moving.shape), dtype=np.float64)
+    gradientField    =np.empty(shape=(moving.shape)+(3,), dtype=np.float64)
+    totalDisplacement=np.zeros(shape=(moving.shape)+(3,), dtype=np.float64)
     if(previousDisplacement!=None):
         totalDisplacement[...]=previousDisplacement
-    warped=ndimage.map_coordinates(left, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1], X2+totalDisplacement[...,2]], prefilter=const_prefilter_map_coordinates)
+    warped=ndimage.map_coordinates(moving, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1], X2+totalDisplacement[...,2]], prefilter=const_prefilter_map_coordinates)
     sigmaField=np.ones_like(warped, dtype=np.float64)
-    deltaField=right-warped
+    deltaField=fixed-warped
     g0, g1, g2=sp.gradient(warped)
     gradientField[:,:,:,0]=g0
     gradientField[:,:,:,1]=g1
     gradientField[:,:,:,2]=g2
     maxVariation=1+epsilon
     innerIter=0
-    maxIter=200
     maxResidual=0
     while((maxVariation>epsilon)and(innerIter<maxIter)):
         innerIter+=1
@@ -145,21 +137,21 @@ def estimateNewMonomodalDeformationField3D(left, right, lambdaParam, previousDis
     print "Iter: ",innerIter, "Max lateral displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
     return displacement
 
-def estimateMonomodalDeformationField3DMultiScale(leftPyramid, rightPyramid, lambdaParam, level=0, displacementList=None):
-    n=len(leftPyramid)
+def estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, level=0, displacementList=None):
+    n=len(movingPyramid)
     if(level==(n-1)):
-        displacement=estimateNewMonomodalDeformationField3D(leftPyramid[level], rightPyramid[level], lambdaParam, None)
+        displacement=estimateNewMonomodalDeformationField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, None)
         if(displacementList!=None):
             displacementList.insert(0,displacement)
         return displacement
-    subDisplacement=estimateMonomodalDeformationField3DMultiScale(leftPyramid, rightPyramid, lambdaParam, level+1, displacementList)
-    sh=leftPyramid[level].shape
+    subDisplacement=estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, level+1, displacementList)
+    sh=movingPyramid[level].shape
     X0,X1,X2=np.mgrid[0:sh[0], 0:sh[1], 0:sh[2]]*0.5
-    upsampled=np.empty(shape=(leftPyramid[level].shape)+(3,), dtype=np.float64)
+    upsampled=np.empty(shape=(movingPyramid[level].shape)+(3,), dtype=np.float64)
     upsampled[:,:,:,0]=ndimage.map_coordinates(subDisplacement[:,:,:,0], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,:,1]=ndimage.map_coordinates(subDisplacement[:,:,:,1], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,:,2]=ndimage.map_coordinates(subDisplacement[:,:,:,2], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
-    newDisplacement=estimateNewMonomodalDeformationField3D(leftPyramid[level], rightPyramid[level], lambdaParam, upsampled)
+    newDisplacement=estimateNewMonomodalDeformationField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, upsampled)
     newDisplacement+=upsampled
     if(displacementList!=None):
         displacementList.insert(0, newDisplacement)
@@ -177,35 +169,35 @@ def registerNonlinearMonomodal3D(moving, fixed, lambdaParam, levels):
 def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
     fname0='IBSR_01_to_02.nii.gz'
     fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
-    nib_left = nib.load(fname0)
-    nib_right = nib.load(fname1)
-    left=nib_left.get_data().squeeze()
-    right=nib_right.get_data().squeeze()
+    nib_moving = nib.load(fname0)
+    nib_fixed = nib.load(fname1)
+    moving=nib_moving.get_data().squeeze()
+    fixed=nib_fixed.get_data().squeeze()
     level=5
-    maskLeft=left>0
-    maskRight=right>0
-    leftPyramid=[img for img in rcommon.pyramid_gaussian_3D(left, level, maskLeft)]
-    rightPyramid=[img for img in rcommon.pyramid_gaussian_3D(right, level, maskRight)]
-    rcommon.plotOverlaidPyramids3DCoronal(leftPyramid, rightPyramid)
+    maskMoving=moving>0
+    maskFixed=fixed>0
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, level, maskFixed)]
+    rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
     displacementList=[]
-    displacement=estimateMonomodalDeformationField3DMultiScale(leftPyramid, rightPyramid, lambdaParam,0,displacementList)
-    warpPyramid=[rcommon.warpVolume(leftPyramid[i], displacementList[i]) for i in range(level+1)]
-    rcommon.plotOverlaidPyramids3DCoronal(warpPyramid, rightPyramid)
-    sh=leftPyramid[0].shape
-    rcommon.overlayImages(warpPyramid[0][:,sh[1]//4,:], rightPyramid[0][:,sh[1]//4,:])
-    rcommon.overlayImages(warpPyramid[0][:,sh[1]//2,:], rightPyramid[0][:,sh[1]//2,:])
-    rcommon.overlayImages(warpPyramid[0][:,3*sh[1]//4,:], rightPyramid[0][:,3*sh[1]//4,:])
-    rcommon.overlayImages(warpPyramid[0][sh[0]//4,:,:], rightPyramid[0][sh[0]//4,:,:])
-    rcommon.overlayImages(warpPyramid[0][sh[0]//2,:,:], rightPyramid[0][sh[0]//2,:,:])
-    rcommon.overlayImages(warpPyramid[0][3*sh[0]//4,:,:], rightPyramid[0][3*sh[0]//4,:,:])
-    rcommon.overlayImages(warpPyramid[0][:,:,sh[2]//4], rightPyramid[0][:,:,sh[2]//4])
-    rcommon.overlayImages(warpPyramid[0][:,:,sh[2]//2], rightPyramid[0][:,:,sh[2]//2])
-    rcommon.overlayImages(warpPyramid[0][:,:,3*sh[2]//4], rightPyramid[0][:,:,3*sh[2]//4])
+    displacement=estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam,0,displacementList)
+    warpPyramid=[rcommon.warpVolume(movingPyramid[i], displacementList[i]) for i in range(level+1)]
+    rcommon.plotOverlaidPyramids3DCoronal(warpPyramid, fixedPyramid)
+    sh=movingPyramid[0].shape
+    rcommon.overlayImages(warpPyramid[0][:,sh[1]//4,:], fixedPyramid[0][:,sh[1]//4,:])
+    rcommon.overlayImages(warpPyramid[0][:,sh[1]//2,:], fixedPyramid[0][:,sh[1]//2,:])
+    rcommon.overlayImages(warpPyramid[0][:,3*sh[1]//4,:], fixedPyramid[0][:,3*sh[1]//4,:])
+    rcommon.overlayImages(warpPyramid[0][sh[0]//4,:,:], fixedPyramid[0][sh[0]//4,:,:])
+    rcommon.overlayImages(warpPyramid[0][sh[0]//2,:,:], fixedPyramid[0][sh[0]//2,:,:])
+    rcommon.overlayImages(warpPyramid[0][3*sh[0]//4,:,:], fixedPyramid[0][3*sh[0]//4,:,:])
+    rcommon.overlayImages(warpPyramid[0][:,:,sh[2]//4], fixedPyramid[0][:,:,sh[2]//4])
+    rcommon.overlayImages(warpPyramid[0][:,:,sh[2]//2], fixedPyramid[0][:,:,sh[2]//2])
+    rcommon.overlayImages(warpPyramid[0][:,:,3*sh[2]//4], fixedPyramid[0][:,:,3*sh[2]//4])
     #rcommon.plotDeformationField(displacement)
     nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2 + displacement[...,2]**2)
     maxNorm=np.max(nrm)
-    #displacement[...,0]*=(maskLeft + maskRight)
-    #displacement[...,1]*=(maskLeft + maskRight)
+    #displacement[...,0]*=(maskMoving + maskFixed)
+    #displacement[...,1]*=(maskMoving + maskFixed)
     #rcommon.plotDeformationField(displacement)
     #figure()
     #imshow(nrm[:,sh[1]//2,:])
@@ -215,17 +207,17 @@ def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
 ###############################################################
 ####### Non-linear Multimodal registration - EM (2D)###########
 ###############################################################
-def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizationLevels, previousDisplacement=None, useECQMMF=False):
-    epsilon=1e-4
-    sh=left.shape
+def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaParam, quantizationLevels, maxOuterIter, previousDisplacement=None, useECQMMF=False):
+    epsilon=1e-5
+    sh=moving.shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
-    displacement     =np.empty(shape=(left.shape)+(2,), dtype=np.float64)
-    residuals=np.zeros(shape=(left.shape), dtype=np.float64)
-    gradientField    =np.empty(shape=(left.shape)+(2,), dtype=np.float64)
-    totalDisplacement=np.zeros(shape=(left.shape)+(2,), dtype=np.float64)
+    displacement     =np.empty(shape=(moving.shape)+(2,), dtype=np.float64)
+    residuals=np.zeros(shape=(moving.shape), dtype=np.float64)
+    gradientField    =np.empty(shape=(moving.shape)+(2,), dtype=np.float64)
+    totalDisplacement=np.zeros(shape=(moving.shape)+(2,), dtype=np.float64)
     if(previousDisplacement!=None):
         totalDisplacement[...]=previousDisplacement
-    rightQ=None
+    fixedQ=None
     grayLevels=None
     if(useECQMMF):
         lambdaParam=.05
@@ -233,17 +225,16 @@ def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizati
         outerIter=20
         innerIter=50
         tolerance=1e-5
-        means, variances=ecqmmf.initialize_constant_models(right, quantizationLevels)
+        means, variances=ecqmmf.initialize_constant_models(fixed, quantizationLevels)
         means=np.array(means)
         variances=np.array(variances)
-        segmented, means, variances, probs=ecqmmf.ecqmmf(right, quantizationLevels, lambdaParam, mu, outerIter, innerIter, tolerance)
-        rightQ=segmented
+        segmented, means, variances, probs=ecqmmf.ecqmmf(fixed, quantizationLevels, lambdaParam, mu, outerIter, innerIter, tolerance)
+        fixedQ=segmented
         grayLevels=means
     else:
-        rightQ, grayLevels, hist=tf.quantizePositiveImageCYTHON(right, quantizationLevels)
-    rightQ=np.array(rightQ, dtype=np.int32)
+        fixedQ, grayLevels, hist=tf.quantizePositiveImageCYTHON(fixed, quantizationLevels)
+    fixedQ=np.array(fixedQ, dtype=np.int32)
     finished=False
-    maxOuterIter=100
     outerIter=0
     maxDisplacement=None
     maxVariation=None
@@ -251,19 +242,16 @@ def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizati
     while((not finished) and (outerIter<maxOuterIter)):
         outerIter+=1
         #---E step---
-        warped=ndimage.map_coordinates(left, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], prefilter=True)
-        leftMask=(left>0)*1.0
-        warpedLeftMask=ndimage.map_coordinates(leftMask, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], order=0, prefilter=False)
-        warpedLeftMask=warpedLeftMask.astype(np.int32)
-        means, variances=tf.computeMaskedImageClassStatsCYTHON(warpedLeftMask, warped, quantizationLevels, rightQ)
+        warped=ndimage.map_coordinates(moving, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], prefilter=True)
+        movingMask=(moving>0)*1.0
+        warpedMovingMask=ndimage.map_coordinates(movingMask, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], order=0, prefilter=False)
+        warpedMovingMask=warpedMovingMask.astype(np.int32)
+        means, variances=tf.computeMaskedImageClassStatsCYTHON(warpedMovingMask, warped, quantizationLevels, fixedQ)
         means[0]=0
-        #means, variances=tf.computeImageClassStatsCYTHON(warped, quantizationLevels, rightQ)
         means=np.array(means)
-        #variances=np.array([s if s>1e-3 else 1e6 for s in variances])
-        #variances[0]=1e-6;
         variances=np.array(variances)
-        sigmaField=variances[rightQ]
-        deltaField=means[rightQ]-warped
+        sigmaField=variances[fixedQ]
+        deltaField=means[fixedQ]-warped
         #--M step--
         g0, g1=sp.gradient(warped)
         gradientField[:,:,0]=g0
@@ -287,7 +275,7 @@ def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizati
             finished=True
 #            plt.figure()
 #            plt.subplot(1,2,1)
-#            plt.imshow(means[rightQ],cmap=plt.cm.gray)
+#            plt.imshow(means[fixedQ],cmap=plt.cm.gray)
 #            plt.title("Estimated warped modality")
 #            plt.subplot(1,2,2)
 #            plt.plot(means)
@@ -297,48 +285,59 @@ def estimateNewMultimodalDeformationField2D(left, right, lambdaParam, quantizati
         return totalDisplacement-previousDisplacement
     return totalDisplacement
 
-def estimateMultimodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lambdaParam, level=0, displacementList=None):
-    n=len(leftPyramid)
+def estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None):
+    n=len(movingPyramid)
     quantizationLevels=256//(2**level)
     #quantizationLevels=256
     if(level==(n-1)):
-        displacement=estimateNewMultimodalDeformationField2D(leftPyramid[level], rightPyramid[level], lambdaParam, quantizationLevels, None)
+        displacement=estimateNewMultimodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], None)
         if(displacementList!=None):
             displacementList.insert(0,displacement)
         return displacement
-    subDisplacement=estimateMultimodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lambdaParam, level+1, displacementList)
-    sh=leftPyramid[level].shape
+    subDisplacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
+    sh=movingPyramid[level].shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]*0.5
-    upsampled=np.empty(shape=(leftPyramid[level].shape)+(2,), dtype=np.float64)
+    upsampled=np.empty(shape=(movingPyramid[level].shape)+(2,), dtype=np.float64)
     upsampled[:,:,0]=ndimage.map_coordinates(subDisplacement[:,:,0], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,1]=ndimage.map_coordinates(subDisplacement[:,:,1], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
-    newDisplacement=estimateNewMultimodalDeformationField2D(leftPyramid[level], rightPyramid[level], lambdaParam, quantizationLevels, upsampled)
+    newDisplacement=estimateNewMultimodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], upsampled)
     newDisplacement+=upsampled
     if(displacementList!=None):
         displacementList.insert(0, newDisplacement)
     return newDisplacement
 
-def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic=False):
+def registerNonlinearMultimodal2D(moving, fixed, lambdaParam, levels):
+    maskMoving=moving>0
+    maskFixed=fixed>0
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, levels, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, levels, maskFixed)]
+    maxOuterIter=[10,50,100,100,100,100]
+    displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, None)
+    warped=rcommon.warpVolume(movingPyramid[0], displacement)
+    return displacement, warped
+
+def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam=250, synthetic=False):
     #fname0='IBSR_01_to_02.nii.gz'
     #fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
     displacementGTName='templateToIBSR01_GT.npy'
     fnameMoving='data/t2/IBSR_t2template_to_01.nii.gz'
     fnameFixed='data/t1/IBSR_template_to_01.nii.gz'
-    nib_left = nib.load(fnameMoving)
-    nib_right = nib.load(fnameFixed)
-    left=nib_left.get_data().squeeze().astype(np.float64)
-    right=nib_right.get_data().squeeze().astype(np.float64)
-    sl=left.shape
-    sr=right.shape    
-    left=left[:,sl[1]//2,:].copy()
-    right=right[:,sr[1]//2,:].copy()
-    left=(left-left.min())/(left.max()-left.min())
-    right=(right-right.min())/(right.max()-right.min())
+    nib_moving = nib.load(fnameMoving)
+    nib_fixed = nib.load(fnameFixed)
+    moving=nib_moving.get_data().squeeze().astype(np.float64)
+    fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    sl=moving.shape
+    sr=fixed.shape    
+    moving=moving[:,sl[1]//2,:].copy()
+    fixed=fixed[:,sr[1]//2,:].copy()
+    moving=(moving-moving.min())/(moving.max()-moving.min())
+    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+    maxOuterIter=[10,50,100,100,100,100]
     if(synthetic):
         print 'Generating synthetic field...'
         #----apply synthetic deformation field to fixed image
-        GT=rcommon.createDeformationField_type2(right.shape[0], right.shape[1], 8)
-        warpedRight=rcommon.warpImage(right,GT)
+        GT=rcommon.createDeformationField_type2(fixed.shape[0], fixed.shape[1], 8)
+        warpedFixed=rcommon.warpImage(fixed,GT)
     else:
         templateT1=nib.load('data/t1/IBSR_template_to_01.nii.gz')
         templateT1=templateT1.get_data().squeeze().astype(np.float64)
@@ -361,58 +360,55 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic=Fa
             movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(templateT1, 3, maskMoving)]
             fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(ibsrT1, 3, maskFixed)]
             #----apply 'realistic' deformation field to fixed image
-            GT=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam,0, None)
+            GT=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, None)
             np.save(displacementGTName, GT)
-        warpedRight=rcommon.warpImage(templateT1, GT)
+        warpedFixed=rcommon.warpImage(templateT1, GT)
     print 'Registering T2 (template) to deformed T1 (template)...'
     level=3
-    maskLeft=left>0
-    maskRight=warpedRight>0
-    leftPyramid=[img for img in rcommon.pyramid_gaussian_2D(left, level, maskLeft)]
-    rightPyramid=[img for img in rcommon.pyramid_gaussian_2D(warpedRight, level, maskRight)]
+    maskMoving=moving>0
+    maskFixed=warpedFixed>0
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(warpedFixed, level, maskFixed)]
     plt.figure()
     plt.subplot(1,2,1)
-    plt.imshow(left, cmap=plt.cm.gray)
+    plt.imshow(moving, cmap=plt.cm.gray)
     plt.title('Moving')
     plt.subplot(1,2,2)
-    plt.imshow(warpedRight, cmap=plt.cm.gray)
+    plt.imshow(warpedFixed, cmap=plt.cm.gray)
     plt.title('Fixed')
-    rcommon.plotOverlaidPyramids(leftPyramid, rightPyramid)
+    rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
     displacementList=[]
-    displacement=estimateMultimodalDeformationField2DMultiScale(leftPyramid, rightPyramid, lambdaParam,0,displacementList)
-    warpPyramid=[rcommon.warpImage(leftPyramid[i], displacementList[i]) for i in range(level+1)]
-    rcommon.plotOverlaidPyramids(warpPyramid, rightPyramid)
-    rcommon.overlayImages(warpPyramid[0], rightPyramid[0])
+    displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, displacementList)
+    warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
+    rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
+    rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
     rcommon.plotDeformationField(displacement)
-    displacement[...,0]*=(maskRight)
-    displacement[...,1]*=(maskRight)
+    displacement[...,0]*=(maskFixed)
+    displacement[...,1]*=(maskFixed)
     nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
     maxNorm=np.max(nrm)
     rcommon.plotDeformationField(displacement)
     residual=((displacement-GT))**2
-    meanDisplacementError=np.sqrt(residual.sum(2)*(maskRight)).mean()
-    stdevDisplacementError=np.sqrt(residual.sum(2)*(maskRight)).std()
-    #nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
-    #plt.figure()
-    #plt.imshow(nrm)
+    meanDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).mean()
+    stdevDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).std()
     print 'Max global displacement: ', maxNorm
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
 ###############################################################
 ####### Non-linear Multimodal registration - EM (3D)###########
 ###############################################################
-def estimateNewMultimodalDeformationField3D(left, right, lambdaParam, maxOuterIter, quantizationLevels, previousDisplacement=None):
-    epsilon=1e-3
-    sh=left.shape
+def estimateNewMultimodalDeformationField3D(moving, fixed, lambdaParam, maxOuterIter, quantizationLevels, previousDisplacement=None):
+    epsilon=1e-4
+    sh=moving.shape
     X0,X1,X2=np.mgrid[0:sh[0], 0:sh[1], 0:sh[2]]
-    residuals        =np.zeros(shape=(left.shape),      dtype=np.float64)
-    displacement     =np.empty(shape=(left.shape)+(3,), dtype=np.float64)
-    gradientField    =np.empty(shape=(left.shape)+(3,), dtype=np.float64)
-    totalDisplacement=np.zeros(shape=(left.shape)+(3,), dtype=np.float64)
+    residuals        =np.zeros(shape=(moving.shape),      dtype=np.float64)
+    displacement     =np.empty(shape=(moving.shape)+(3,), dtype=np.float64)
+    gradientField    =np.empty(shape=(moving.shape)+(3,), dtype=np.float64)
+    totalDisplacement=np.zeros(shape=(moving.shape)+(3,), dtype=np.float64)
     if(previousDisplacement!=None):
         totalDisplacement[...]=previousDisplacement
-    rightQ, grayLevels, hist=tf.quantizePositiveVolumeCYTHON(right, quantizationLevels)
-    rightQ=np.array(rightQ, dtype=np.int32)
+    fixedQ, grayLevels, hist=tf.quantizePositiveVolumeCYTHON(fixed, quantizationLevels)
+    fixedQ=np.array(fixedQ, dtype=np.int32)
     finished=False
     outerIter=0
     maxDisplacement=None
@@ -422,16 +418,16 @@ def estimateNewMultimodalDeformationField3D(left, right, lambdaParam, maxOuterIt
         outerIter+=1
         print "Outer:", outerIter
         #---E step---
-        warped=ndimage.map_coordinates(left, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1], X2+totalDisplacement[...,2]], prefilter=True)
-        leftMask=(left>0)*1.0
-        warpedLeftMask=ndimage.map_coordinates(leftMask, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1], X2+totalDisplacement[...,2]], order=0, prefilter=False)
-        warpedLeftMask=warpedLeftMask.astype(np.int32)
-        means, variances=tf.computeMaskedVolumeClassStatsCYTHON(warpedLeftMask, warped, quantizationLevels, rightQ)
+        warped=ndimage.map_coordinates(moving, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1], X2+totalDisplacement[...,2]], prefilter=True)
+        movingMask=(moving>0)*1.0
+        warpedMovingMask=ndimage.map_coordinates(movingMask, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1], X2+totalDisplacement[...,2]], order=0, prefilter=False)
+        warpedMovingMask=warpedMovingMask.astype(np.int32)
+        means, variances=tf.computeMaskedVolumeClassStatsCYTHON(warpedMovingMask, warped, quantizationLevels, fixedQ)
         means[0]=0
         means=np.array(means)
         variances=np.array(variances)
-        sigmaField=variances[rightQ]
-        deltaField=means[rightQ]-warped
+        sigmaField=variances[fixedQ]
+        deltaField=means[fixedQ]-warped
         #--M step--
         g0, g1, g2=sp.gradient(warped)
         gradientField[:,:,:,0]=g0
@@ -456,7 +452,7 @@ def estimateNewMultimodalDeformationField3D(left, right, lambdaParam, maxOuterIt
             finished=True
             plt.figure()
             plt.subplot(1,2,1)
-            plt.imshow(means[rightQ[:,sh[1]//2,:]],cmap=plt.cm.gray)
+            plt.imshow(means[fixedQ[:,sh[1]//2,:]],cmap=plt.cm.gray)
             plt.title("Estimated warped modality")
             plt.subplot(1,2,2)
             plt.plot(means)
@@ -466,28 +462,27 @@ def estimateNewMultimodalDeformationField3D(left, right, lambdaParam, maxOuterIt
         return totalDisplacement-previousDisplacement
     return totalDisplacement
 
-def estimateMultimodalDeformationField3DMultiScale(leftPyramid, rightPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None):
-    n=len(leftPyramid)
+def estimateMultimodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None):
+    n=len(movingPyramid)
     quantizationLevels=256//(2**level)
     if(level==(n-1)):
-        displacement=estimateNewMultimodalDeformationField3D(leftPyramid[level], rightPyramid[level], lambdaParam, maxOuterIter[level], quantizationLevels, None)
+        displacement=estimateNewMultimodalDeformationField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], quantizationLevels, None)
         if(displacementList!=None):
             displacementList.insert(0,displacement)
         return displacement
-    subDisplacement=estimateMultimodalDeformationField3DMultiScale(leftPyramid, rightPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
-    sh=leftPyramid[level].shape
+    subDisplacement=estimateMultimodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
+    sh=movingPyramid[level].shape
     X0,X1,X2=np.mgrid[0:sh[0], 0:sh[1], 0:sh[2]]*0.5
-    upsampled=np.empty(shape=(leftPyramid[level].shape)+(3,), dtype=np.float64)
+    upsampled=np.empty(shape=(movingPyramid[level].shape)+(3,), dtype=np.float64)
     upsampled[:,:,:,0]=ndimage.map_coordinates(subDisplacement[:,:,:,0], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,:,1]=ndimage.map_coordinates(subDisplacement[:,:,:,1], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,:,2]=ndimage.map_coordinates(subDisplacement[:,:,:,2], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
-    newDisplacement=estimateNewMultimodalDeformationField3D(leftPyramid[level], rightPyramid[level], lambdaParam, maxOuterIter[level], quantizationLevels, upsampled)
+    newDisplacement=estimateNewMultimodalDeformationField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], quantizationLevels, upsampled)
     newDisplacement+=upsampled
     if(displacementList!=None):
         displacementList.insert(0, newDisplacement)
     return newDisplacement
-    
-    
+
 def registerNonlinearMultimodal3D(moving, fixed, lambdaParam, levels):
     maskMoving=moving>0
     maskFixed=fixed>0
@@ -498,83 +493,74 @@ def registerNonlinearMultimodal3D(moving, fixed, lambdaParam, levels):
     warped=rcommon.warpVolume(movingPyramid[0], displacement)
     return displacement, warped
 
-
-def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam):
-    fname0='IBSR_01_to_02.nii.gz'
-    fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
-    nib_left = nib.load(fname0)
-    nib_right = nib.load(fname1)
-    left=nib_left.get_data().squeeze()
-    right=nib_right.get_data().squeeze()
-    level=5
-    maskLeft=left>0
-    maskRight=right>0
-    leftPyramid=[img for img in rcommon.pyramid_gaussian_3D(left, level, maskLeft)]
-    rightPyramid=[img for img in rcommon.pyramid_gaussian_3D(right, level, maskRight)]
-    rcommon.plotOverlaidPyramids3DCoronal(leftPyramid, rightPyramid)
+def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam=250, synthetic=False):
+    displacementGTName='templateToIBSR01_GT3D.npy'
+    fnameMoving='data/t2/IBSR_t2template_to_01.nii.gz'
+    fnameFixed='data/t1/IBSR_template_to_01.nii.gz'
+    pyramidMaxLevel=3
+    maxDisplacement=2**pyramidMaxLevel
+    nib_moving = nib.load(fnameMoving)
+    nib_fixed = nib.load(fnameFixed)
+    moving=nib_moving.get_data().squeeze().astype(np.float64)
+    fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    moving=(moving-moving.min())/(moving.max()-moving.min())
+    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
     maxOuterIter=[10,50,100,100,100,100]
+    if(synthetic):
+        print 'Generating synthetic field...'
+        #----apply synthetic deformation field to fixed image
+        GT=rcommon.createDeformationField3D_type2(fixed.shape, maxDisplacement)
+        warpedFixed=rcommon.warpVolume(fixed,GT)
+    else:
+        templateT1=nib.load(fnameFixed)
+        templateT1=templateT1.get_data().squeeze().astype(np.float64)
+        templateT1=(templateT1-templateT1.min())/(templateT1.max()-templateT1.min())
+        if(os.path.exists(displacementGTName)):
+            print 'Loading precomputed realistic field...'
+            GT=np.load(displacementGTName)
+        else:
+            print 'Generating realistic field...'
+            #load two T1 images: the template and an IBSR sample
+            ibsrT1=nib.load('data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
+            ibsrT1=ibsrT1.get_data().squeeze().astype(np.float64)
+            ibsrT1=(ibsrT1-ibsrT1.min())/(ibsrT1.max()-ibsrT1.min())
+            #register the template(moving) to the ibsr sample(fixed)
+            maskMoving=templateT1>0
+            maskFixed=ibsrT1>0
+            movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(templateT1, pyramidMaxLevel, maskMoving)]
+            fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(ibsrT1, pyramidMaxLevel, maskFixed)]
+            #----apply 'realistic' deformation field to fixed image
+            GT=estimateMultimodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, None)
+            np.save(displacementGTName, GT)
+        warpedFixed=rcommon.warpVolume(templateT1, GT)
+    print 'Registering T2 (template) to deformed T1 (template)...'
+    maskMoving=moving>0
+    maskFixed=warpedFixed>0
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, pyramidMaxLevel, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(warpedFixed, pyramidMaxLevel, maskFixed)]
+    plt.figure()
+    plt.subplot(1,2,1)
+    plt.imshow(moving[:,moving.shape[1]//2,:], cmap=plt.cm.gray)
+    plt.title('Moving')
+    plt.subplot(1,2,2)
+    plt.imshow(warpedFixed[:,warpedFixed.shape[1]//2,:], cmap=plt.cm.gray)
+    plt.title('Fixed')
+    rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
     displacementList=[]
-    displacement=estimateMultimodalDeformationField3DMultiScale(leftPyramid, rightPyramid, lambdaParam, maxOuterIter,0,displacementList)
-    warpPyramid=[rcommon.warpVolume(leftPyramid[i], displacementList[i]) for i in range(level+1)]
-    rcommon.plotOverlaidPyramids3DCoronal(warpPyramid, rightPyramid)
-    sh=leftPyramid[0].shape
-    rcommon.overlayImages(warpPyramid[0][:,sh[1]//4,:], rightPyramid[0][:,sh[1]//4,:])
-    rcommon.overlayImages(warpPyramid[0][:,sh[1]//2,:], rightPyramid[0][:,sh[1]//2,:])
-    rcommon.overlayImages(warpPyramid[0][:,3*sh[1]//4,:], rightPyramid[0][:,3*sh[1]//4,:])
-    rcommon.overlayImages(warpPyramid[0][sh[0]//4,:,:], rightPyramid[0][sh[0]//4,:,:])
-    rcommon.overlayImages(warpPyramid[0][sh[0]//2,:,:], rightPyramid[0][sh[0]//2,:,:])
-    rcommon.overlayImages(warpPyramid[0][3*sh[0]//4,:,:], rightPyramid[0][3*sh[0]//4,:,:])
-    rcommon.overlayImages(warpPyramid[0][:,:,sh[2]//4], rightPyramid[0][:,:,sh[2]//4])
-    rcommon.overlayImages(warpPyramid[0][:,:,sh[2]//2], rightPyramid[0][:,:,sh[2]//2])
-    rcommon.overlayImages(warpPyramid[0][:,:,3*sh[2]//4], rightPyramid[0][:,:,3*sh[2]//4])
-    #rcommon.plotDeformationField(displacement)
+    displacement=estimateMultimodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, displacementList)
+    warpPyramid=[rcommon.warpVolume(movingPyramid[i], displacementList[i]) for i in range(pyramidMaxLevel+1)]
+    rcommon.plotOverlaidPyramids3DCoronal(warpPyramid, fixedPyramid)
+    displacement[...,0]*=(maskFixed)
+    displacement[...,1]*=(maskFixed)
+    displacement[...,2]*=(maskFixed)
     nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2 + displacement[...,2]**2)
     maxNorm=np.max(nrm)
-    #displacement[...,0]*=(maskLeft + maskRight)
-    #displacement[...,1]*=(maskLeft + maskRight)
-    #rcommon.plotDeformationField(displacement)
-    #figure()
-    #imshow(nrm[:,sh[1]//2,:])
+    residual=((displacement-GT))**2
+    meanDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).mean()
+    stdevDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).std()
     print 'Max global displacement: ', maxNorm
-    return displacementList, warpPyramid    
-    
+    print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
+
 if __name__=="__main__":
-    #---Monomodal 3D---
-    #displacementList, warpPyramid=testEstimateMonomodalDeformationField3DMultiScale(250)
-    #---Multimodal 2D
-    testEstimateMultimodalDeformationField2DMultiScale(250, False)
-    #---Multimodal 3D---
-#    t1_template=nib.load('IBSR_template_to_01.nii.gz')
-#    t1_template=t1_template.get_data().squeeze()
-#    t1_real=nib.load('data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
-#    t1_real=t1_real.get_data().squeeze()
-#    t2_template=nib.load('IBSR_t2template_to_01.nii.gz')
-#    t2_template=t2_template.get_data().squeeze()
-#    #This is the "ground truth": register t1_template to t1_real    
-#    displacement, warped=registerNonlinearMonomodal3D(t1_template, t1_real, lambdaParam, 3)
-#    #now try to reproduce using multimodal: t2_template to t1_real
-#    displacement, warped=registerNonlinearMultimodal3D(t2_template, t1_real, lambdaParam, 3)
-#    #now synthetically deform template[T1] and try to recover the deformation field using
-#    #template T2
-#    t1displacement=np.load('template_to_01.npy')
-#    t1templateWarped=rcommon.warpVolume(t1_template, t1displacement)
-#    dispRecovered, warpedRecovered=registerNonlinearMultimodal3D(t2_template, t1templateWarped, lambdaParam, 3)
-#    
-#    
-#    
-#    t2_template=nib.load('data/t2/t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-#    t2_template=t2_template.get_data().squeeze()
-#    rcommon.overlayImages(t2_template[:,64,:],t1templateWarped[:,64,:])
-#    
-#    left=np.fromfile('data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb', dtype=np.ubyte).reshape(ns,nr,nc)
-#    left=left.astype(np.float64)
-#    right=np.fromfile('data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb', dtype=np.ubyte).reshape(ns,nr,nc)
-#    right=right.astype(np.float64)
-    
-    
-#    The objective is to register these two volumes:
-#    np.save('t2_template.npy',t2_template)
-#    np.save('t1_templateWarped.npy',t1templateWarped)
-#    the ground truth is 'template_to_01.npy', which was used to deform the T1 
-#    template. This was my first attempt:
-#     dispRecovered, warpedRecovered=registerNonlinearMultimodal3D(t2_template, t1templateWarped, lambdaParam, 3)
+    #testEstimateMultimodalDeformationField2DMultiScale(250, False)
+    testEstimateMultimodalDeformationField3DMultiScale(250, False)    
