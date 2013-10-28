@@ -348,3 +348,19 @@ int getImageModes(double *probs, int nrows, int ncols, int nclasses, double *mea
     }
     return 0;
 }
+
+
+int getImageSegmentation(double *probs, int nrows, int ncols, int nclasses, double *means, int *seg){
+    int nsites=nrows*ncols;
+    double *p=probs;
+    for(int i=0;i<nsites;++i, p+=nclasses){
+        int sel=0;
+        for(int k=1;k<nclasses;++k){
+            if(p[sel]<p[k]){
+                sel=k;
+            }
+        }
+        seg[i]=sel;
+    }
+    return 0;
+}
