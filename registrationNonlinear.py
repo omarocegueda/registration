@@ -556,8 +556,8 @@ def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam=250, syntheti
     nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2 + displacement[...,2]**2)
     maxNorm=np.max(nrm)
     residual=((displacement-GT))**2
-    meanDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).mean()
-    stdevDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).std()
+    meanDisplacementError=np.sqrt(residual.sum(3)*(maskFixed)).mean()
+    stdevDisplacementError=np.sqrt(residual.sum(3)*(maskFixed)).std()
     print 'Max global displacement: ', maxNorm
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
