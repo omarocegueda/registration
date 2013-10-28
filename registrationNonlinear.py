@@ -282,7 +282,7 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
 def estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None, useECQMMF=True):
     n=len(movingPyramid)
     if(useECQMMF):
-        quantizationLevels=8
+        quantizationLevels=64
     else:
         quantizationLevels=256//(2**level)
     #quantizationLevels=256

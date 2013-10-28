@@ -79,6 +79,46 @@ int updateRegistrationConstantModels(double *fixed, double *moving, double *prob
     return 0;
 }
 
+
+void computeMaskedImageClassStatsCPP(int *mask, double *img, double *probs, int *dims, int *labels, double *means, double *variances, double *tbuffer){
+    int numPixels=dims[0]*dims[1];
+    int numLabels=dims[2];    
+    memset(means, 0, sizeof(double)*numLabels);
+    memset(variances, 0, sizeof(double)*numLabels);
+    memset(tbuffer, 0, sizeof(double)*numLabels);
+    double *p=probs;
+    for(int i=0;i<numPixels;++i, p+=numLabels)if(mask[i]!=0){
+        for(int k=0;k<numLabels;++k){
+            double p2=p[k]*p[k];
+            means[k]+=img[i]*p2;
+            tbuffer[k]+=p2;
+        }
+    }
+    for(int i=0;i<numLabels;++i){
+        if(tbuffer[i]>EPSILON){
+            means[i]/=tbuffer[i];
+        }else{
+            means[i]=INF64;
+        }
+    }
+    p=probs;
+    for(int i=0;i<numPixels;++i, p+=numLabels)if(mask[i]!=0){
+        for(int k=0;k<numLabels;++k){
+            double p2=p[k]*p[k];
+            double diff=(img[i]-means[k])*p2;
+            variances[k]+=diff*diff;
+        }
+    }
+    for(int i=0;i<numLabels;++i){
+        if(tbuffer[i]>EPSILON){
+            variances[i]/=tbuffer[i];
+        }else{
+            variances[i]=INF64;
+        }
+    }
+}
+
+
 /*
     Computes the linear system whose solution is the optimal estimator of the
     registration parameters (here we assume a linear model)

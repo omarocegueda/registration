@@ -4,6 +4,7 @@ import numpy as np
 
 cdef extern from "ecqmmf_regCPP.h":
     int updateRegistrationConstantModels(double *fixed, double *moving, double *probs, int nrows, int ncols, int nclasses, double *meansFixed, double *meansMoving, double *variancesFixed, double *variancesMoving, double *tbuffer)
+    void computeMaskedImageClassStatsCPP(int *mask, double *img, double *probs, int *dims, int *labels, double *means, double *variances, double *tbuffer)
     void integrateRegistrationProbabilisticWeightedTensorFieldProductsCPP(double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
     int computeRegistrationNegLogLikelihoodConstantModels(double *fixed, double *moving, int nrows, int ncols, int nclasses, 
                                     double *meansFixed, double *meansMoving, double *negLogLikelihood)
@@ -17,6 +18,13 @@ cpdef update_registration_constant_models(double[:,:] fixed, double[:,:] moving,
     cdef int nclasses=probs.shape[2]#==probs.shape[3]
     cdef int retVal
     retVal=updateRegistrationConstantModels(&fixed[0,0], &moving[0,0], &probs[0,0,0,0], nrows, ncols, nclasses, &meansFixed[0], &meansMoving[0], &variancesFixed[0], &variancesMoving[0], &tbuffer[0])
+
+cpdef compute_masked_image_class_stats(int[:,:] mask, double[:,:] img, double[:,:,:] probs, int[:,:] labels, double[:] means, double[:] variances, double[:] tbuffer):
+    cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
+    dims[0]=probs.shape[0]
+    dims[1]=probs.shape[1]
+    dims[2]=probs.shape[2]
+    computeMaskedImageClassStatsCPP(&mask[0,0], &img[0,0], &probs[0,0,0], &dims[0], &labels[0,0], &means[0], &variances[0], &tbuffer[0])
 
 cpdef integrate_registration_probabilistic_weighted_tensor_field_products(double[:,:,:] q, double[:,:] diff, double[:,:,:,:] probs, double[:] weights):
     cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
