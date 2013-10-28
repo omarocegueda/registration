@@ -11,6 +11,7 @@ cdef extern from "ecqmmfCPP.h":
     int initializeMaximumLikelihoodProbs(double *negLogLikelihood, int nrows, int ncols, int nclasses, double *probs)
     int initializeNormalizedLikelihood(double *negLogLikelihood, int nrows, int ncols, int nclasses, double *probs)
     int getImageModes(double *probs, int nrows, int ncols, int nclasses, double *means, double *modes)
+    int getImageSegmentation(double *probs, int nrows, int ncols, int nclasses, double *means, int *seg)
     double optimizeMarginals(double *likelihood, double *probs, int nrows, int ncols, int nclasses, double lambdaParam, double mu, int maxIter, double tolerance)
 
 cpdef update_constant_models(double[:,:] img, double[:,:,:] probs, double[:] means, double[:] variances):
@@ -88,7 +89,7 @@ cpdef ecqmmf(double[:,:] img, int nclasses, double lambdaParam, double mu, int o
     cdef double[:] variances=np.zeros((nclasses,))
     cdef double [:,:,:] probs=np.zeros((nrows, ncols, nclasses))
     cdef double [:,:,:] negLogLikelihood=np.zeros((nrows, ncols, nclasses))
-    cdef double [:,:] segmented=np.zeros((nrows, ncols))
+    cdef int [:,:] segmented=np.ndarray((nrows, ncols), dtype=np.int32)
     cdef double mseProbs, mseModels
     cdef int retVal, inner, outer
     retVal=initializeConstantModels(&img[0,0], nrows, ncols, nclasses, &means[0], &variances[0])
@@ -106,7 +107,7 @@ cpdef ecqmmf(double[:,:] img, int nclasses, double lambdaParam, double mu, int o
         if(mseModels<tolerance):
             break
         retVal=computeNegLogLikelihoodConstantModels(&img[0,0], nrows, ncols, nclasses, &means[0], &variances[0], &negLogLikelihood[0,0,0])
-    getImageModes(&probs[0,0,0], nrows, ncols, nclasses, &means[0], &segmented[0,0])
+    getImageSegmentation(&probs[0,0,0], nrows, ncols, nclasses, &means[0], &segmented[0,0])
     return segmented, means, variances, probs
     
     

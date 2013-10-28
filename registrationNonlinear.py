@@ -207,7 +207,7 @@ def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
 ###############################################################
 ####### Non-linear Multimodal registration - EM (2D)###########
 ###############################################################
-def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaParam, quantizationLevels, maxOuterIter, previousDisplacement=None, useECQMMF=False):
+def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, quantizationLevels, maxOuterIter, previousDisplacement, useECQMMF):
     epsilon=1e-5
     sh=moving.shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
@@ -220,17 +220,8 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaParam, quantiza
     fixedQ=None
     grayLevels=None
     if(useECQMMF):
-        lambdaParam=.05
-        mu=.01
-        outerIter=20
-        innerIter=50
-        tolerance=1e-5
-        means, variances=ecqmmf.initialize_constant_models(fixed, quantizationLevels)
-        means=np.array(means)
-        variances=np.array(variances)
-        segmented, means, variances, probs=ecqmmf.ecqmmf(fixed, quantizationLevels, lambdaParam, mu, outerIter, innerIter, tolerance)
-        fixedQ=segmented
-        grayLevels=means
+        grayLevels, variances=ecqmmf.initialize_constant_models(fixed, quantizationLevels)
+        fixedQ, grayLevels, variances, probs=ecqmmf.ecqmmf(fixed, quantizationLevels, 0.05, 0.01, 20, 50, 1e-5)
     else:
         fixedQ, grayLevels, hist=tf.quantizePositiveImageCYTHON(fixed, quantizationLevels)
     fixedQ=np.array(fixedQ, dtype=np.int32)
@@ -262,7 +253,7 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaParam, quantiza
         displacement[...]=0
         while((maxVariation>epsilon)and(innerIter<maxInnerIter)):
             innerIter+=1
-            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, totalDisplacement, displacement, residuals)
+            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaDisplacement, totalDisplacement, displacement, residuals)
             opt=np.max(residuals)
             if(maxResidual<opt):
                 maxResidual=opt
@@ -273,34 +264,40 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaParam, quantiza
         maxDisplacement=np.max(nrm)
         if((maxDisplacement<epsilon)or(outerIter>=maxOuterIter)):
             finished=True
-#            plt.figure()
-#            plt.subplot(1,2,1)
-#            plt.imshow(means[fixedQ],cmap=plt.cm.gray)
-#            plt.title("Estimated warped modality")
-#            plt.subplot(1,2,2)
-#            plt.plot(means)
-#            plt.title("Means")
+            plt.figure()
+            plt.subplot(1,3,1)
+            plt.imshow(means[fixedQ],cmap=plt.cm.gray)
+            plt.title("Estimated warped modality")
+            plt.subplot(1,3,2)
+            plt.imshow(warpedMovingMask,cmap=plt.cm.gray)
+            plt.title("Warped mask")
+            plt.subplot(1,3,3)
+            plt.plot(means)
+            plt.title("Means")
     print "Iter: ",outerIter, "Max displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
     if(previousDisplacement!=None):
         return totalDisplacement-previousDisplacement
     return totalDisplacement
 
-def estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None):
+def estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None, useECQMMF=True):
     n=len(movingPyramid)
-    quantizationLevels=256//(2**level)
+    if(useECQMMF):
+        quantizationLevels=8
+    else:
+        quantizationLevels=256//(2**level)
     #quantizationLevels=256
     if(level==(n-1)):
-        displacement=estimateNewMultimodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], None)
+        displacement=estimateNewMultimodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], None, useECQMMF)
         if(displacementList!=None):
             displacementList.insert(0,displacement)
         return displacement
-    subDisplacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
+    subDisplacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList, useECQMMF)
     sh=movingPyramid[level].shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]*0.5
     upsampled=np.empty(shape=(movingPyramid[level].shape)+(2,), dtype=np.float64)
     upsampled[:,:,0]=ndimage.map_coordinates(subDisplacement[:,:,0], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,1]=ndimage.map_coordinates(subDisplacement[:,:,1], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
-    newDisplacement=estimateNewMultimodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], upsampled)
+    newDisplacement=estimateNewMultimodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], upsampled, useECQMMF)
     newDisplacement+=upsampled
     if(displacementList!=None):
         displacementList.insert(0, newDisplacement)
@@ -312,11 +309,11 @@ def registerNonlinearMultimodal2D(moving, fixed, lambdaParam, levels):
     movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, levels, maskMoving)]
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, levels, maskFixed)]
     maxOuterIter=[10,50,100,100,100,100]
-    displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, None)
+    displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, None, False)
     warped=rcommon.warpVolume(movingPyramid[0], displacement)
     return displacement, warped
 
-def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam=250, synthetic=False):
+def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic, useECQMMF):
     #fname0='IBSR_01_to_02.nii.gz'
     #fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
     displacementGTName='templateToIBSR01_GT.npy'
@@ -360,7 +357,7 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam=250, syntheti
             movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(templateT1, 3, maskMoving)]
             fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(ibsrT1, 3, maskFixed)]
             #----apply 'realistic' deformation field to fixed image
-            GT=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, None)
+            GT=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, None, useECQMMF)
             np.save(displacementGTName, GT)
         warpedFixed=rcommon.warpImage(templateT1, GT)
     print 'Registering T2 (template) to deformed T1 (template)...'
@@ -378,7 +375,7 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam=250, syntheti
     plt.title('Fixed')
     rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
     displacementList=[]
-    displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, displacementList)
+    displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, displacementList, useECQMMF)
     warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
     rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
     rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
@@ -562,5 +559,5 @@ def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam=250, syntheti
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
 if __name__=="__main__":
-    #testEstimateMultimodalDeformationField2DMultiScale(250, False)
-    testEstimateMultimodalDeformationField3DMultiScale(250, False)    
+    testEstimateMultimodalDeformationField2DMultiScale(250, False, True)
+    #testEstimateMultimodalDeformationField3DMultiScale(250, False)    

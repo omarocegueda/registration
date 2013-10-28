@@ -14,5 +14,6 @@ int initializeConstantModels(double *img, int nrows, int ncols, int nclasses, do
 int initializeMaximumLikelihoodProbs(double *negLogLikelihood, int nrows, int ncols, int nclasses, double *probs);
 int initializeNormalizedLikelihood(double *negLogLikelihood, int nrows, int ncols, int nclasses, double *probs);
 int getImageModes(double *probs, int nrows, int ncols, int nclasses, double *means, double *modes);
+int getImageSegmentation(double *probs, int nrows, int ncols, int nclasses, double *means, int *seg);
 double optimizeMarginals(double *likelihood, double *probs, int nrows, int ncols, int nclasses, double lambdaParam, double mu, int maxIter, double tolerance);
 #endif
