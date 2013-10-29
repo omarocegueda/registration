@@ -80,7 +80,7 @@ int updateRegistrationConstantModels(double *fixed, double *moving, double *prob
 }
 
 
-void computeMaskedImageClassStatsCPP(int *mask, double *img, double *probs, int *dims, int *labels, double *means, double *variances, double *tbuffer){
+void computeMaskedWeightedImageClassStats(int *mask, double *img, double *probs, int *dims, int *labels, double *means, double *variances, double *tbuffer){
     int numPixels=dims[0]*dims[1];
     int numLabels=dims[2];    
     memset(means, 0, sizeof(double)*numLabels);

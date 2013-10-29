@@ -7,6 +7,7 @@ from scipy import ndimage
 import registrationCommon as rcommon
 from registrationCommon import const_prefilter_map_coordinates
 import ecqmmf
+import ecqmmf_reg
 import os.path
 
 ###############################################################
@@ -221,7 +222,11 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
     grayLevels=None
     if(useECQMMF):
         grayLevels, variances=ecqmmf.initialize_constant_models(fixed, quantizationLevels)
-        fixedQ, grayLevels, variances, probs=ecqmmf.ecqmmf(fixed, quantizationLevels, 0.05, 0.01, 20, 50, 1e-5)
+        fixedQ, grayLevels, variances, probs=ecqmmf.ecqmmf(fixed, quantizationLevels, 0.025, 0.02, 20, 50, 1e-5)
+        probs=np.array(probs)
+        sqProbs=(probs**2)
+        sumSqProbs=np.sum(sqProbs,2)
+        sqProbs/=sumSqProbs[...,None]
     else:
         fixedQ, grayLevels, hist=tf.quantizePositiveImageCYTHON(fixed, quantizationLevels)
     fixedQ=np.array(fixedQ, dtype=np.int32)
@@ -234,15 +239,22 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
         outerIter+=1
         #---E step---
         warped=ndimage.map_coordinates(moving, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], prefilter=True)
-        movingMask=(moving>0)*1.0
+        movingMask=((moving>0)*1.0)*((fixed>0)*1.0)
         warpedMovingMask=ndimage.map_coordinates(movingMask, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], order=0, prefilter=False)
         warpedMovingMask=warpedMovingMask.astype(np.int32)
-        means, variances=tf.computeMaskedImageClassStatsCYTHON(warpedMovingMask, warped, quantizationLevels, fixedQ)
+        #means, variances=tf.computeMaskedImageClassStatsCYTHON(warpedMovingMask, warped, quantizationLevels, fixedQ)
+        if(useECQMMF):
+            means, variances=ecqmmf_reg.compute_masked_weighted_image_class_stats(warpedMovingMask, warped, probs, fixedQ)
+        else:
+            means, variances=tf.computeMaskedImageClassStatsCYTHON(warpedMovingMask, warped, quantizationLevels, fixedQ)
         means[0]=0
         means=np.array(means)
         variances=np.array(variances)
         sigmaField=variances[fixedQ]
-        deltaField=means[fixedQ]-warped
+        if(useECQMMF):
+            deltaField=sqProbs.dot(means)-warped#########Delta-field using ECQMMF rule
+        else:
+            deltaField=means[fixedQ]-warped#########Delta-field using Arce's rule
         #--M step--
         g0, g1=sp.gradient(warped)
         gradientField[:,:,0]=g0
@@ -266,11 +278,18 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
             finished=True
             plt.figure()
             plt.subplot(1,3,1)
-            plt.imshow(means[fixedQ],cmap=plt.cm.gray)
+            if(useECQMMF):
+                plt.imshow(sqProbs.dot(means),cmap=plt.cm.gray)
+            else:
+                plt.imshow(means[fixedQ],cmap=plt.cm.gray)
             plt.title("Estimated warped modality")
             plt.subplot(1,3,2)
-            plt.imshow(warpedMovingMask,cmap=plt.cm.gray)
-            plt.title("Warped mask")
+#            plt.imshow(warpedMovingMask,cmap=plt.cm.gray)
+#            plt.title("Warped mask")
+#            plt.imshow(warped,cmap=plt.cm.gray)
+#            plt.title("Warped")
+            plt.imshow(fixedQ,cmap=plt.cm.gray)
+            plt.title("Quantized")
             plt.subplot(1,3,3)
             plt.plot(means)
             plt.title("Means")
@@ -282,10 +301,10 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
 def estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None, useECQMMF=True):
     n=len(movingPyramid)
     if(useECQMMF):
-        quantizationLevels=64
-    else:
         quantizationLevels=256//(2**level)
-    #quantizationLevels=256
+    else:
+        #quantizationLevels=256//(2**level)
+        quantizationLevels=256
     if(level==(n-1)):
         displacement=estimateNewMultimodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], None, useECQMMF)
         if(displacementList!=None):
@@ -383,6 +402,7 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic, u
     displacement[...,0]*=(maskFixed)
     displacement[...,1]*=(maskFixed)
     nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
+    nrm*=maskFixed
     maxNorm=np.max(nrm)
     rcommon.plotDeformationField(displacement)
     residual=((displacement-GT))**2
@@ -559,5 +579,5 @@ def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam=250, syntheti
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
 if __name__=="__main__":
-    testEstimateMultimodalDeformationField2DMultiScale(250, False, True)
+    testEstimateMultimodalDeformationField2DMultiScale(250, False, False)
     #testEstimateMultimodalDeformationField3DMultiScale(250, False)    
