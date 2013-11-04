@@ -27,6 +27,9 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, int numLabels, double *probs, double *means, double *variances)
     void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
     double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
+    int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats)
+    int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats)
+    int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv)
 
 def testFunction(param):
     print 'Testing', param
@@ -201,3 +204,34 @@ cpdef integrateMaskedWeightedTensorFieldProductsProbsCYTHON(int[:,:] mask, doubl
     cdef double[:] bw=np.zeros(shape=(k,), dtype=np.double)
     integrateMaskedWeightedTensorFieldProductsProbsCPP(&mask[0,0], &q[0,0,0], &dims[0], &diff[0,0], nclasses, &probs[0,0,0], &weights[0], &Aw[0,0], &bw[0])
     return Aw,bw
+
+cpdef invert_vector_field(double[:,:,:] d, double lambdaParam, int maxIter, double tolerance):
+    cdef int retVal
+    cdef int nrows=d.shape[0]
+    cdef int ncols=d.shape[1]
+    cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
+    cdef double[:,:,:] invd=np.zeros_like(d)
+    retVal=invertVectorField(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0], &stats[0])
+    print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
+    return invd
+
+cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
+    cdef int nrows=d1.shape[0]
+    cdef int ncols=d1.shape[1]
+    cdef double[:,:,:] comp=np.zeros_like(d1)
+    cdef int retVal
+    cdef double[:] stats=cvarray(shape=(3,), itemsize=sizeof(double), format='d')
+    retVal=composeVectorFields(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &comp[0,0,0], &stats[0])
+    print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
+    return comp
+
+cpdef vector_field_exponential(double[:,:,:] v):
+    cdef double[:,:,:] expv = np.zeros_like(v)
+    cdef double[:,:,:] invexpv = np.zeros_like(v)
+    cdef int retVal
+    cdef int nrows=v.shape[0]
+    cdef int ncols=v.shape[1]
+    retVal=vectorFieldExponential(&v[0,0,0], nrows, ncols, &expv[0,0,0], &invexpv[0,0,0])
+    return expv, invexpv
+
+

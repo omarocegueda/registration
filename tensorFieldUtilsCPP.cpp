@@ -753,3 +753,283 @@ void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, in
     delete[] bb;
     delete[] sums;
 }
+
+
+int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats){
+    const static int numNeighbors=4;
+    const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
+    const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
+    double *temp=new double[nrows*ncols*2];
+    double *denom=new double[nrows*ncols];
+    memset(invd, 0, sizeof(double)*nrows*ncols*2);
+    double maxChange=tolerance+1;
+    int iter;
+    for(iter=0;(tolerance*tolerance<maxChange)&&(iter<maxIter);++iter){
+        memset(temp, 0, sizeof(double)*nrows*ncols*2);
+        memset(denom, 0, sizeof(double)*nrows*ncols);
+        double *dx=d;
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=2){
+                for(int k=0;k<numNeighbors;++k){
+                    int ii=i+dRow[k];
+                    if((ii<0)||(ii>=nrows)){
+                        continue;
+                    }
+                    int jj=j+dCol[k];
+                    if((jj<0)||(jj>=ncols)){
+                        continue;
+                    }
+                    denom[i*ncols+j]+=lambdaParam;
+                    temp[2*(i*ncols+j)]+=lambdaParam*invd[2*(ii*ncols+jj)];
+                    temp[2*(i*ncols+j)+1]+=lambdaParam*invd[2*(ii*ncols+jj)+1];
+                }
+                //find top-left coordinates
+                int ii=floor(dx[0]);
+                int jj=floor(dx[1]);
+                double calpha=dx[0]-ii;//by definition these factors are nonnegative
+                double cbeta=dx[1]-jj;
+                ii+=i;
+                jj+=j;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                //top-left corner (x+dx is located at region 1 w.r.t site [ii,jj])
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    double *z=&temp[2*(ii*ncols+jj)];
+                    double &den=denom[ii*ncols+jj];
+                    den+=alpha*alpha*beta*beta;
+                    z[0]-=alpha*beta*dx[0];
+                    z[1]-=alpha*beta*dx[1];
+                    if(jj<ncols-1){//right neighbor
+                        double *zright=&invd[2*(ii*ncols+jj+1)];
+                        z[0]-=alpha*alpha*beta*cbeta*zright[0];
+                        z[1]-=alpha*alpha*beta*cbeta*zright[1];
+                    }
+                    if(ii<nrows-1){//bottom neighbor
+                        double *zbottom=&invd[2*((ii+1)*ncols+jj)];
+                        z[0]-=alpha*calpha*beta*beta*zbottom[0];
+                        z[1]-=alpha*calpha*beta*beta*zbottom[1];
+                    }
+                    if((jj<ncols-1) && (ii<nrows-1)){//bottom right corner
+                        double *zbright=&invd[2*((ii+1)*ncols+jj+1)];
+                        z[0]-=alpha*calpha*beta*cbeta*zbright[0];
+                        z[1]-=alpha*calpha*beta*cbeta*zbright[1];
+                    }
+                }
+                ++jj;
+                //top-right corner (x+dx is located at region 2 w.r.t site [ii,jj])
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    double *z=&temp[2*(ii*ncols+jj)];
+                    double &den=denom[ii*ncols+jj];
+                    den+=alpha*alpha*cbeta*cbeta;
+                    z[0]-=alpha*cbeta*dx[0];
+                    z[1]-=alpha*cbeta*dx[1];
+                    if(ii<nrows-1){//bottom neighbor
+                        double *zbottom=&invd[2*((ii+1)*ncols+jj)];
+                        z[0]-=alpha*calpha*cbeta*cbeta*zbottom[0];
+                        z[1]-=alpha*calpha*cbeta*cbeta*zbottom[1];
+                    }
+                    if(jj>0){//left neighbor
+                        double *zleft=&invd[2*(ii*ncols+jj-1)];
+                        z[0]-=alpha*alpha*beta*cbeta*zleft[0];
+                        z[1]-=alpha*alpha*beta*cbeta*zleft[1];
+                    }
+                    if((ii<nrows-1) && (jj>0)){//bottom-left neighbor
+                        double *zbleft=&invd[2*(ii+1)*ncols+jj-1];
+                        z[0]-=alpha*calpha*beta*cbeta*zbleft[0];
+                        z[1]-=alpha*calpha*beta*cbeta*zbleft[1];
+                    }
+                }
+                ++ii;
+                //bottom-right corner (x+dx is located at region 4 w.r.t site [ii,jj])
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    double *z=&temp[2*(ii*ncols+jj)];
+                    double &den=denom[ii*ncols+jj];
+                    den+=calpha*calpha*cbeta*cbeta;
+                    z[0]-=calpha*cbeta*dx[0];
+                    z[1]-=calpha*cbeta*dx[1];
+                    if(ii>0){//top neighbor
+                        double *ztop=&invd[2*((ii-1)*ncols+jj)];
+                        z[0]-=alpha*calpha*cbeta*cbeta*ztop[0];
+                        z[1]-=alpha*calpha*cbeta*cbeta*ztop[1];
+                    }
+                    if(jj>0){//left neighbor
+                        double *zleft=&invd[2*(ii*ncols+jj-1)];
+                        z[0]-=calpha*calpha*beta*cbeta*zleft[0];
+                        z[1]-=calpha*calpha*beta*cbeta*zleft[1];
+                    }
+                    if((ii>0)&&(jj>0)){//top-left neighbor
+                        double *ztleft=&invd[2*((ii-1)*ncols+jj-1)];
+                        z[0]-=alpha*calpha*cbeta*cbeta*ztleft[0];
+                        z[1]-=alpha*calpha*cbeta*cbeta*ztleft[1];
+                    }
+                }
+                --jj;
+                //bottom-left corner (x+dx is located at region 3 w.r.t site [ii,jj])
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    double *z=&temp[2*(ii*ncols+jj)];
+                    double &den=denom[ii*ncols+jj];
+                    den+=calpha*calpha*beta*beta;
+                    z[0]-=calpha*beta*dx[0];
+                    z[1]-=calpha*beta*dx[1];
+                    if(ii>0){//top neighbor
+                        double *ztop=&invd[2*((ii-1)*ncols+jj)];
+                        z[0]-=alpha*calpha*beta*beta*ztop[0];
+                        z[1]-=alpha*calpha*beta*beta*ztop[1];
+                    }
+                    if(jj<ncols-1){//right neighbor
+                        double *zright=&invd[2*(ii*ncols+jj+1)];
+                        z[0]-=calpha*calpha*beta*cbeta*zright[0];
+                        z[1]-=calpha*calpha*beta*cbeta*zright[1];
+                    }
+                    if((ii>0)&&(jj<ncols-1)){//top-right neighbor
+                        double *ztright=&invd[2*((ii-1)*ncols+jj+1)];
+                        z[0]-=alpha*calpha*beta*cbeta*ztright[0];
+                        z[1]-=alpha*calpha*beta*cbeta*ztright[1];
+                    }//if
+                }///if
+            }//for ncols
+        }//for nrows
+        //update the inverse
+        double *id=invd;
+        double *tmp=temp;
+        double *den=denom;
+        maxChange=0;
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, id+=2, tmp+=2, den++){
+                tmp[0]/=(*den);
+                tmp[1]/=(*den);
+                double nrm=(tmp[0]-id[0])*(tmp[0]-id[0])+(tmp[1]-id[1])*(tmp[1]-id[1]);
+                if(maxChange<nrm){
+                    maxChange=nrm;
+                }
+                id[0]=tmp[0];
+                id[1]=tmp[1];
+            }
+        }
+    }//for iter
+    delete[] temp;
+    delete[] denom;
+    stats[0]=sqrt(maxChange);
+    stats[1]=iter;
+    return 0;
+}
+
+int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats){
+    double *dx=d1;
+    double *res=comp;
+    double maxNorm=0;
+    double meanNorm=0;
+    double stdNorm=0;
+    int cnt=0;
+    //memcpy(comp, d1, sizeof(double)*nrows*ncols*2);
+    memset(comp, 0, sizeof(double)*nrows*ncols*2); 
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, dx+=2, res+=2){
+            int ii=floor(dx[0]);
+            int jj=floor(dx[1]);
+            double calpha=dx[0]-ii;//by definition these factors are nonnegative
+            double cbeta=dx[1]-jj;
+            double alpha=1-calpha;
+            double beta=1-cbeta;
+            //---top-left
+            ii+=i;
+            jj+=j;
+            if((ii<0)||(jj<0)||(ii>=nrows)||(jj>=ncols)){
+                continue;
+            }
+            res[0]=dx[0];
+            res[1]=dx[1];
+            double *z=&d2[2*(ii*ncols+jj)];
+            res[0]+=alpha*beta*z[0];
+            res[1]+=alpha*beta*z[1];
+            //---top-right
+            ++jj;
+            if(jj<ncols){
+                z=&d2[2*(ii*ncols+jj)];
+                res[0]+=alpha*cbeta*z[0];
+                res[1]+=alpha*cbeta*z[1];
+            }
+            //---bottom-right
+            ++ii;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                z=&d2[2*(ii*ncols+jj)];
+                res[0]+=calpha*cbeta*z[0];
+                res[1]+=calpha*cbeta*z[1];
+            }
+            //---bottom-left
+            --jj;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                z=&d2[2*(ii*ncols+jj)];
+                res[0]+=calpha*beta*z[0];
+                res[1]+=calpha*beta*z[1];
+            }
+            //consider only displacements that land inside the image
+            if((i+dx[0]>=0 && i+dx[0]<=nrows-1) && (j+dx[1]>=0 && j+dx[1]<=ncols-1)){
+                double nn=res[0]*res[0]+res[1]*res[1];
+                if(maxNorm<nn){
+                    maxNorm=nn;
+                }
+                meanNorm+=sqrt(nn);
+                stdNorm+=nn;
+                ++cnt;
+            }
+        }
+    }
+    stats[0]=sqrt(maxNorm);
+    stats[1]=meanNorm/cnt;
+    stats[2]=stdNorm/cnt - stats[1]*stats[1];
+    return 0;
+}
+
+int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv){
+    double EXP_EPSILON=0.05;//such that the vector field exponential is approx the identity
+    //---compute the maximum norm---
+    double stats[3];
+    int nsites=nrows*ncols;
+    double maxNorm=0;
+    double *d=v;
+    for(int i=0;i<nsites;++i, d+=2){
+        double nn=d[0]*d[0]+d[1]*d[1];
+        if(maxNorm<nn){
+            maxNorm=nn;
+        }
+    }
+    maxNorm=sqrt(maxNorm);
+    int n=0;
+    double factor=1.0;
+    while(EXP_EPSILON<maxNorm){
+        maxNorm*=0.5;
+        factor*=0.5;
+        ++n;
+    }
+    //---base case---
+    if(n<1){
+        memcpy(expv, v, sizeof(double)*2*nsites);
+        invertVectorField(v, nrows, ncols, 0.1, 20, 1e-4, invexpv, stats);
+        return 0;
+    }
+    //---prepare memory buffers---
+    double *tmp[2]={NULL, NULL};
+    tmp[n%2]=new double[nsites*2];
+    tmp[1-n%2]=expv;
+    //---perform binary exponentiation: exponential---
+    for(int i=2*nsites-1;i>=0;--i){
+        tmp[1][i]=v[i]*factor;
+    }
+    for(int i=1;i<=n;++i){
+        composeVectorFields(tmp[i&1], tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
+    }
+    //---perform binary exponentiation: inverse---
+    tmp[1-n%2]=invexpv;
+    for(int i=2*nsites-1;i>=0;--i){
+        tmp[0][i]=v[i]*factor;
+    }
+    invertVectorField(tmp[0], nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
+    for(int i=1;i<=n;++i){
+        composeVectorFields(tmp[i&1], tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
+    }
+    delete[] tmp[n%2];
+    return 0;
+}
+
+

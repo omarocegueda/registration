@@ -578,6 +578,33 @@ def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam=250, syntheti
     print 'Max global displacement: ', maxNorm
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
+def testInvertVectorField():
+    lambdaParam=3
+    maxIter=1000
+    tolerance=1e-4
+    #d=rcommon.createDeformationField2D_type1(100,100,1)
+    #d=rcommon.createDeformationField2D_type2(100,100,1)
+    d=rcommon.createDeformationField2D_type3(100,100,1)
+    expd, invexpd=tf.vector_field_exponential(d)
+    diff=np.sqrt(np.sum((d-expd)**2, 2))
+    print 'mean |d-expd|:', diff.mean(),'(',diff.std(),')'
+    invd=tf.invert_vector_field(d, lambdaParam, maxIter, tolerance)
+    residual=tf.compose_vector_fields(d,invd)
+    residualexpd=tf.compose_vector_fields(expd,invexpd)
+    rcommon.plotDeformationField(d)
+    plt.title('d');
+    rcommon.plotDeformationField(invd)
+    plt.title('invd');
+    rcommon.plotDeformationField(residual)
+    plt.title('residual: d, invd');
+    rcommon.plotDeformationField(expd)
+    plt.title('expd');
+    rcommon.plotDeformationField(invexpd)
+    plt.title('invexpd');
+    rcommon.plotDeformationField(residualexpd)
+    plt.title('residual: expd, invexpd');
+    
 if __name__=="__main__":
-    testEstimateMultimodalDeformationField2DMultiScale(250, False, False)
+    testInvertVectorField()
+    #testEstimateMultimodalDeformationField2DMultiScale(250, True, False)
     #testEstimateMultimodalDeformationField3DMultiScale(250, False)    

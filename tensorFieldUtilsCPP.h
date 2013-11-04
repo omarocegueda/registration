@@ -21,3 +21,7 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
 void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, int nclasses, double *probs, double *means, double *variances);
 void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw);
 double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual);
+
+int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats);
+int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats);
+int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv);

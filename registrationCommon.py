@@ -54,6 +54,17 @@ def createDeformationField2D_type2(nrows, ncols, maxDistp):
         deff[:,j,1]*=np.sin(2*np.pi*(np.array(range(nrows), dtype=np.float64)-midRow)/nrows)
     return deff
 
+def createDeformationField2D_type3(nrows, ncols, maxDistp):
+    deff=np.ndarray((nrows, ncols, 2), dtype=np.float64)
+    X0,X1=np.mgrid[0:nrows, 0:ncols]
+    midCol=ncols//2
+    midRow=nrows//2
+    nn=np.sqrt(midCol*midCol+midRow*midRow)
+    factor=maxDistp/nn
+    deff[...,0]=(X1-midCol)*(-factor)
+    deff[...,1]=(X0-midRow)*(factor)
+    return deff
+
 def drawLattice3D(dims, delta):
     lattice=np.ndarray((1+(delta+1)*dims[0], 1+(delta+1)*dims[1], 1+(delta+1)*dims[2]), dtype=np.float64)
     lattice[...]=127
