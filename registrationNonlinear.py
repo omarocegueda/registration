@@ -8,8 +8,6 @@ import registrationCommon as rcommon
 from registrationCommon import const_prefilter_map_coordinates
 import ecqmmf
 import ecqmmf_reg
-import os.path
-
 ###############################################################
 ####### Non-linear Monomodal registration - EM (2D)############
 ###############################################################
@@ -32,9 +30,9 @@ def estimateNewMonomodalDeformationField2DLarge(moving, fixed, lambdaParam, maxO
         outerIter+=1
         print 'Outer iter:', outerIter
         warped=ndimage.map_coordinates(moving, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], prefilter=const_prefilter_map_coordinates)
-#        if(outerIter%10==0):
-#            rcommon.overlayImages(warped, fixed)
-#            plt.title('Iter:'+str(outerIter))
+        if(outerIter%10==0):
+            rcommon.overlayImages(warped, fixed, True)
+            plt.title('Iter:'+str(outerIter))
         sigmaField=np.ones_like(warped, dtype=np.float64)
         deltaField=fixed-warped
         g0, g1=sp.gradient(warped)
@@ -752,6 +750,5 @@ def testInvertVectorField():
 if __name__=="__main__":
     #testInvertVectorField()
     #testCircleToCMultimodal(150)
-    testCircleToCMonomodal(1)
-    #testEstimateMultimodalDeformationField2DMultiScale(250, True, False)
+    testEstimateMultimodalDeformationField2DMultiScale(250, True, False)
     #testEstimateMultimodalDeformationField3DMultiScale(250, False)    

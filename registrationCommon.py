@@ -230,12 +230,15 @@ def pyramid_gaussian_2D(image, max_layer, mask=None):
         image=newImage
         yield newImage
 
-def overlayImages(img0, img1):
+def overlayImages(img0, img1, createFig=True):
     colorImage=np.zeros(shape=(img0.shape)+(3,), dtype=np.int8)
     colorImage[...,0]=renormalizeImage(img0)
     colorImage[...,1]=renormalizeImage(img1)
-    plt.figure()
+    fig=None
+    if(createFig):
+        fig=plt.figure()
     plt.imshow(colorImage)
+    return fig
 
 def testOverlayImages_raw():
     leftName='data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb'

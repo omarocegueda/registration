@@ -1,5 +1,7 @@
 \documentclass[11pt]{article}
 %Gummi|061|=)
+\usepackage{graphicx}
+\usepackage{subfig}
 \title{\textbf{Image registration}}
 \date{}
 \begin{document}
@@ -438,17 +440,26 @@ Finally, solving for $z^{\cdot}$, we obtain the Gauss-Seidel iterative update in
 	z^{\cdot}=-\frac{1}{C}\left[ \sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\beta_{x}d_{x} + \sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\beta_{x}^{c}d_{x}  + \sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}d_{x} + \sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}^{c}d_{x}\right.-
 \end{displaymath}
 \begin{displaymath}
-	\left.z^{\uparrow}\left(\sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}^{2} + \sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}^{c}\alpha_{x}(\beta_{x}^{c})^{2}\right)-z^{\rightarrow}\left(\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}^{2}\beta_{x}\beta_{x}^{c} + \sum_{x\in R_{3}(z^{\cdot})}(\alpha_{x}^{c})^{2}\beta_{x}\beta_{x}^{c}\right)-\right.
+	\left.z^{\uparrow}\left(\sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}^{2} + \sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}^{c}\alpha_{x}(\beta_{x}^{c})^{2}\right)+z^{\rightarrow}\left(\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}^{2}\beta_{x}\beta_{x}^{c} + \sum_{x\in R_{3}(z^{\cdot})}(\alpha_{x}^{c})^{2}\beta_{x}\beta_{x}^{c}\right)+\right.
 \end{displaymath}
 \begin{displaymath}
-	\left.z^{\downarrow}\left(\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}^{2} + \sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}(\beta_{x}^{c})^{2}\right)-z^{\leftarrow}\left(\sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}^{2}\beta_{x}\beta_{x}^{c} + \sum_{x\in R_{4}(z^{\cdot})}(\alpha_{x}^{c})^{2}\beta_{x}\beta_{x}^{c}\right)-\right.
+	\left.z^{\downarrow}\left(\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}^{2} + \sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}(\beta_{x}^{c})^{2}\right)+z^{\leftarrow}\left(\sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}^{2}\beta_{x}\beta_{x}^{c} + \sum_{x\in R_{4}(z^{\cdot})}(\alpha_{x}^{c})^{2}\beta_{x}\beta_{x}^{c}\right)+\right.
 \end{displaymath}
 \begin{displaymath}
-	z^{\searrow}\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}- z^{\swarrow}\sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}-
+	z^{\searrow}\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}+ z^{\swarrow}\sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}+
 \end{displaymath}
 \begin{displaymath}
-	z^{\nearrow}\sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}- z^{\nwarrow}\sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c} - \lambda \sum_{w\in\mathcal{N}((i,j))}z(w)
+	\left.z^{\nearrow}\sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}+ z^{\nwarrow}\sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c} + \lambda \sum_{w\in\mathcal{N}((i,j))}z(w)\right]
 \end{displaymath}
 
 
+\begin{figure}[ht]
+\centering
+    \subfloat[]{\label{fig:region2}\includegraphics[width=0.5\linewidth]{./images/R1.png}}
+    \subfloat[]{\label{fig:region2}\includegraphics[width=0.5\linewidth]{./images/R2.png}}\\
+    \subfloat[]{\label{fig:region2}\includegraphics[width=0.5\linewidth]{./images/R3.png}}
+    \subfloat[]{\label{fig:region2}\includegraphics[width=0.5\linewidth]{./images/R4.png}}
+    \caption{An input (warped) point $x+d_{x}$ located at regions 1(a),2(b),3(c) and 4(d), with respect to z. The interpolation coefficients can easily be computed as $(\alpha_{x}, \beta_{x})=(1,1)-\lfloor x+d_{x}\rfloor$. }
+    \label{fig:dayIndex}
+\end{figure}
 \end{document}
