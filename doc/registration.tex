@@ -386,5 +386,69 @@ where $\delta_{i}(x) = \nu_{i} - I_{m}(x)$. If $\lambda_{2}>0$, the unique solut
 	d_{x} = \left[g_{x}g_{x}^{T}\sum_{i=1}^{K}p_{i}^{2}(x) + \lambda_{2}|\mathcal{N}_{x}|I\right]^{-1} \left[ g_{x}\sum_{i=1}^{K}p_{i}^{2}(x)\delta_{i}(x) + \lambda_{2} \sum_{y\in \mathcal{N}_{x}}d_{y} \right]
 \end{equation}
 
+\section{Inverse of a displacement field}
+Given a vector field $d:\Omega_{F} \rightarrow \Omega_{M}$, we are interested in approximating another vector field $z:\Omega_{M} \rightarrow \Omega_{F}$, such that $z(x+d(x)) \approx -d(x), \forall x\in \Omega_{F}$. Here, we will approximate such an inverse in the regularized least-squares sense:
+\begin{equation}\label{eq_inv_ls}
+	z^{*} = \arg\min_{z}\sum_{x\in \Omega_{F}}||z(x+d(x)) + d(x)||_{2}^{2} + \lambda\sum_{<v,w>\in \mathcal{C}_{2}}||z(v)-z(w)||_{2}^{2}.
+\end{equation}
+Note that $z$ is a vector field defined only at lattice points in $\Omega_{M}$ and $x+d(x)$ may not be any of those lattice points, so $z(x+d(x))$ is understood as the discrete field $z$ bi-linearly interpolated at $x+d(x)$. Let $x+d(x)$ lie inside the square in $\Omega_{M}$ defined by the four lattice points $z_{i,j}, z_{i,j+1}, z_{i+1,j}, z_{i+1,j+1}$, which we will denote $z^{\cdot}, z^{\rightarrow}, z^{\downarrow}$ and $z^{\searrow}$, respectively (the arrows indicate relative positions with respect to $z=z_{i,j}$) in a lattice indexed from top to bottom (first coordinate) and from left to right (second coordinate). Then, vector field $z$ interpolated at $x+d(x)$ will be given by
+\begin{equation}
+	z(x+d(x))=\alpha_{x}\beta_{x}z^{\cdot} + \alpha_{x}(1-\beta_{x})z^{\rightarrow} + (1-\alpha_{x})\beta_{x}z^{\downarrow} + (1-\alpha_{x})(1-\beta_{x})z^{\searrow}
+\end{equation}
+where $\left(\begin{array}{c}\alpha_{x} \\ \beta_{x}\end{array}\right) = \left(\begin{array}{c}i+1 \\ j+1\end{array}\right) - (x+d(x))$.\\
+
+Let us denote $d_{x} = d(x)$. Since the unknowns are the values of the field $z$ at each $w\in\Omega_{M}$. Let $w=(i,j)$ be the coordinates of $w$, then we need to differentiate w.r.t. $z_{i,j}=z^{\cdot}$. From the above interpolation equation we can see that there are four possibilities: $x+d_{x}$ may lie inside a square where $z^{\cdot}$ corresponds to any of the corners. If $z^{\cdot}$ is the top-left corner, we will say that $x+d_{x}$ lies inside region $R_{1}(z^{\cdot})$. If $z^{\cdot}$ corresponds to the top-right corner, we say that $x+d_{x}$ lies inside region $R_{2}(z^{\cdot})$, similarly, it lies inside regions $R_{3}(z^{\cdot}), R_{4}(z^{\cdot})$, if $z^{\cdot}$ corresponds to the bottom-left and bottom-right corners, respectively. Now, we can re-write the objective function in equation (\ref{eq_inv_ls}) as:
+\begin{displaymath}
+	\sum_{x\in R_{1}(z^{\cdot})}||d_x + \alpha_{x}\beta_{x}z^{\cdot} + \alpha_{x}(1-\beta_{x})z^{\rightarrow} + (1-\alpha_{x})\beta_{x}z^{\downarrow} + (1-\alpha_{x})(1-\beta_{x})z^{\searrow}||_{2}^{2} +
+\end{displaymath}
+\begin{displaymath}
+	\sum_{x\in R_{2}(z^{\cdot})}||d_x + \alpha_{x}\beta_{x}z^{\leftarrow} + \alpha_{x}(1-\beta_{x})z^{\cdot} + (1-\alpha_{x})\beta_{x}z^{\swarrow} + (1-\alpha_{x})(1-\beta_{x})z^{\downarrow}||_{2}^{2} +
+\end{displaymath}
+\begin{displaymath}
+	\sum_{x\in R_{3}(z^{\cdot})}||d_x + \alpha_{x}\beta_{x}z^{\uparrow} + \alpha_{x}(1-\beta_{x})z^{\nearrow} + (1-\alpha_{x})\beta_{x}z^{\cdot} + (1-\alpha_{x})(1-\beta_{x})z^{\rightarrow}||_{2}^{2} +
+\end{displaymath}
+\begin{displaymath}
+	\sum_{x\in R_{4}(z^{\cdot})}||d_x + \alpha_{x}\beta_{x}z^{\nwarrow} + \alpha_{x}(1-\beta_{x})z^{\uparrow} + (1-\alpha_{x})\beta_{x}z^{\leftarrow} + (1-\alpha_{x})(1-\beta_{x})z^{\cdot}||_{2}^{2} +
+\end{displaymath}
+\begin{displaymath}
+	\lambda \sum_{<v,w>\in \mathcal{C}_{2}} ||z(v) -z(w)||_{2}^{2}.
+\end{displaymath}
+Now we can differentiate with respect to $z^{\cdot}$, let $\alpha_{x}^{c}=1-\alpha_{x}$ and $\beta_{x}^{c} = 1-\beta_{x}$:
+
+
+\begin{displaymath}
+	\sum_{x\in R_{1}(z^{\cdot})} \alpha_{x}\beta_{x}(d_x + \alpha_{x}\beta_{x}z^{\cdot} + \alpha_{x}\beta_{x}^{c}z^{\rightarrow} + \alpha_{x}^{c}\beta_{x}z^{\downarrow} + \alpha_{x}^{c}\beta_{x}^{c}z^{\searrow}) +
+\end{displaymath}
+\begin{displaymath}
+	\sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\beta_{x}^{c}(d_x + \alpha_{x}\beta_{x}z^{\leftarrow} + \alpha_{x}\beta_{x}^{c}z^{\cdot} + \alpha_{x}^{c}\beta_{x}z^{\swarrow} + \alpha_{x}^{c}\beta_{x}^{c}z^{\downarrow}) +
+\end{displaymath}
+\begin{displaymath}
+	\sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}(d_x + \alpha_{x}\beta_{x}z^{\uparrow} + \alpha_{x}\beta_{x}^{c}z^{\nearrow} + \alpha_{x}^{c}\beta_{x}z^{\cdot} + \alpha_{x}^{c}\beta_{x}^{c}z^{\rightarrow})+
+\end{displaymath}
+\begin{displaymath}
+	\sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}^{c}(d_x + \alpha_{x}\beta_{x}z^{\nwarrow} + \alpha_{x}\beta_{x}^{c}z^{\uparrow} + \alpha_{x}^{c}\beta_{x}z^{\leftarrow} + \alpha_{x}^{c}\beta_{x}^{c}z^{\cdot}) +
+\end{displaymath}
+\begin{displaymath}
+	\lambda \sum_{w\in\mathcal{N}((i,j))} z^{\cdot}-z(w) = 0
+\end{displaymath}
+Finally, solving for $z^{\cdot}$, we obtain the Gauss-Seidel iterative update in terms of the neighbors of $z^{\cdot}$ and the known coefficients $\alpha_{x}, \beta_{x}$:
+
+
+\begin{displaymath}
+	z^{\cdot}=-\frac{1}{C}\left[ \sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\beta_{x}d_{x} + \sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\beta_{x}^{c}d_{x}  + \sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}d_{x} + \sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}^{c}d_{x}\right.-
+\end{displaymath}
+\begin{displaymath}
+	\left.z^{\uparrow}\left(\sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}^{2} + \sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}^{c}\alpha_{x}(\beta_{x}^{c})^{2}\right)-z^{\rightarrow}\left(\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}^{2}\beta_{x}\beta_{x}^{c} + \sum_{x\in R_{3}(z^{\cdot})}(\alpha_{x}^{c})^{2}\beta_{x}\beta_{x}^{c}\right)-\right.
+\end{displaymath}
+\begin{displaymath}
+	\left.z^{\downarrow}\left(\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}^{2} + \sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}(\beta_{x}^{c})^{2}\right)-z^{\leftarrow}\left(\sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}^{2}\beta_{x}\beta_{x}^{c} + \sum_{x\in R_{4}(z^{\cdot})}(\alpha_{x}^{c})^{2}\beta_{x}\beta_{x}^{c}\right)-\right.
+\end{displaymath}
+\begin{displaymath}
+	z^{\searrow}\sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}- z^{\swarrow}\sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}-
+\end{displaymath}
+\begin{displaymath}
+	z^{\nearrow}\sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c}- z^{\nwarrow}\sum_{x\in R_{4}(z^{\cdot})}\alpha_{x}\alpha_{x}^{c}\beta_{x}\beta_{x}^{c} - \lambda \sum_{w\in\mathcal{N}((i,j))}z(w)
+\end{displaymath}
+
 
 \end{document}

@@ -859,8 +859,8 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     }
                     if((ii>0)&&(jj>0)){//top-left neighbor
                         double *ztleft=&invd[2*((ii-1)*ncols+jj-1)];
-                        z[0]-=alpha*calpha*cbeta*cbeta*ztleft[0];
-                        z[1]-=alpha*calpha*cbeta*cbeta*ztleft[1];
+                        z[0]-=alpha*calpha*beta*cbeta*ztleft[0];
+                        z[1]-=alpha*calpha*beta*cbeta*ztleft[1];
                     }
                 }
                 --jj;
@@ -914,6 +914,9 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
     return 0;
 }
 
+/*
+    Computes comp(x)=d2(d1(x)) (i.e. applies first d1, then d2 to the result)
+*/
 int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats){
     double *dx=d1;
     double *res=comp;
@@ -969,15 +972,16 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
                 if(maxNorm<nn){
                     maxNorm=nn;
                 }
-                meanNorm+=sqrt(nn);
-                stdNorm+=nn;
+                meanNorm+=nn;
+                stdNorm+=nn*nn;
                 ++cnt;
             }
         }
     }
+    meanNorm/=cnt;
     stats[0]=sqrt(maxNorm);
-    stats[1]=meanNorm/cnt;
-    stats[2]=stdNorm/cnt - stats[1]*stats[1];
+    stats[1]=sqrt(meanNorm);
+    stats[2]=sqrt(stdNorm/cnt - meanNorm*meanNorm);
     return 0;
 }
 

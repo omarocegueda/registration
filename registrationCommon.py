@@ -36,10 +36,18 @@ def drawLattice2D(nrows, ncols, delta):
 def createDeformationField2D_type1(nrows, ncols, maxDistp):
     deff=np.ndarray((nrows, ncols, 2), dtype=np.float64)
     midCol=ncols//2
+    midRow=nrows//2
     for i in range(nrows):
         deff[i,:,0]=maxDistp*np.sin(2*np.pi*(np.array(range(ncols), dtype=np.float64)-midCol)/ncols)
     for j in range(ncols):
-        deff[:,j,1]=maxDistp*np.sin(2*np.pi*(np.array(range(nrows), dtype=np.float64)-midCol)/nrows)
+        deff[:,j,1]=maxDistp*np.sin(2*np.pi*(np.array(range(nrows), dtype=np.float64)-midRow)/nrows)
+    v=np.array(range(nrows), dtype=np.float64)-midRow
+    h=np.array(range(ncols), dtype=np.float64)-midCol
+    nrm=midRow**2+midCol**2
+    p=np.exp(-(v[:,None]**2+h[None,:]**2)/(0.1*nrm))
+    p=(p-p.min())/(p.max()-p.min())
+    deff[:,:,0]*=p
+    deff[:,:,1]*=p
     return deff
 
 def createDeformationField2D_type2(nrows, ncols, maxDistp):
