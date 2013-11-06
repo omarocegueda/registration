@@ -222,7 +222,7 @@ cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     cdef int retVal
     cdef double[:] stats=cvarray(shape=(3,), itemsize=sizeof(double), format='d')
     retVal=composeVectorFields(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &comp[0,0,0], &stats[0])
-    print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
+    #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
     return comp
 
 cpdef vector_field_exponential(double[:,:,:] v):
