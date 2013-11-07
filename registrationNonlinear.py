@@ -15,7 +15,8 @@ def estimateNewMonomodalDeformationField2DLarge(moving, fixed, lambdaParam, maxO
     Warning: in the monomodal case, the parameter lambda must be significantly lower than in the multimodal case. Try lambdaParam=1,
     as opposed as lambdaParam=150 used in the multimodal case
     '''
-    epsilon=1e-4
+    innerTolerance=1e-4
+    outerTolerance=1e-3
     sh=moving.shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
     displacement     =np.zeros(shape=(moving.shape)+(2,), dtype=np.float64)
@@ -25,32 +26,39 @@ def estimateNewMonomodalDeformationField2DLarge(moving, fixed, lambdaParam, maxO
     if(previousDisplacement!=None):
         totalDisplacement[...]=previousDisplacement
     outerIter=0
+    framesToCapture=5
+    maxOuterIter=framesToCapture*((maxOuterIter+framesToCapture-1)/framesToCapture)
+    itersPerCapture=maxOuterIter/framesToCapture
+    plt.figure()
     while(outerIter<maxOuterIter):
         outerIter+=1
         print 'Outer iter:', outerIter
         warped=ndimage.map_coordinates(moving, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1]], prefilter=const_prefilter_map_coordinates)
-        if(outerIter%10==0):
-            rcommon.overlayImages(warped, fixed, True)
-            plt.title('Iter:'+str(outerIter))
+        if((outerIter==1) or (outerIter%itersPerCapture==0)):
+            plt.subplot(1,framesToCapture+1, 1+outerIter/itersPerCapture)
+            rcommon.overlayImages(warped, fixed, False)
+            plt.title('Iter:'+str(outerIter-1))
         sigmaField=np.ones_like(warped, dtype=np.float64)
         deltaField=fixed-warped
         g0, g1=sp.gradient(warped)
         gradientField[:,:,0]=g0
         gradientField[:,:,1]=g1
-        maxVariation=1+epsilon
+        maxVariation=1+innerTolerance
         innerIter=0
         maxResidual=0
         displacement[...]=0
         maxInnerIter=1000
-        while((maxVariation>epsilon)and(innerIter<maxInnerIter)):
+        while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
             maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, totalDisplacement, displacement, residuals)
             opt=np.max(residuals)
             if(maxResidual<opt):
                 maxResidual=opt
-        maxDisplacement=np.max(np.abs(displacement))
-        expd, invexpd=tf.vector_field_exponential(displacement)
-        totalDisplacement=tf.compose_vector_fields(expd, totalDisplacement)
+        maxDisplacement=np.mean(np.abs(displacement))
+        totalDisplacement+=displacement
+        #totalDisplacement=tf.compose_vector_fields(displacement, totalDisplacement)
+        if(maxDisplacement<outerTolerance):
+            break
     print "Iter: ",innerIter, "Max lateral displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
     if(previousDisplacement!=None):
         return totalDisplacement-previousDisplacement
@@ -96,7 +104,6 @@ def estimateNewMonomodalDeformationField2D(moving, fixed, lambdaParam, maxIter, 
 def estimateMonomodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level, displacementList):
     n=len(movingPyramid)
     if(level==(n-1)):
-        #displacement=estimateNewMonomodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], None)
         displacement=estimateNewMonomodalDeformationField2DLarge(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], None)
         if(displacementList!=None):
             displacementList.insert(0,displacement)
@@ -107,7 +114,6 @@ def estimateMonomodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, l
     upsampled=np.empty(shape=(movingPyramid[level].shape)+(2,), dtype=np.float64)
     upsampled[:,:,0]=ndimage.map_coordinates(subDisplacement[:,:,0], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,1]=ndimage.map_coordinates(subDisplacement[:,:,1], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
-    #newDisplacement=estimateNewMonomodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], upsampled)
     newDisplacement=estimateNewMonomodalDeformationField2DLarge(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], upsampled)
     newDisplacement+=upsampled
     if(displacementList!=None):
@@ -155,7 +161,7 @@ def testEstimateMonomodalDeformationField2DMultiScale(lambdaParam):
     #plt.imshow(nrm)
     print 'Max global displacement: ', maxNorm
 
-def testCircleToCMonomodal(lambdaParam):
+def testCircleToCMonomodal(lambdaParam, maxOuterIter):
     fname0='/home/omar/Desktop/circle.png'
     #fname0='/home/omar/Desktop/C_trans.png'
     fname1='/home/omar/Desktop/C.png'
@@ -172,28 +178,13 @@ def testCircleToCMonomodal(lambdaParam):
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(fixed, level, maskFixed)]
     rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
     displacementList=[]
-    maxOuterIter=[10,50,100,100,100,100,100,100,100]
     displacement=estimateMonomodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList)
+    inverse=tf.invert_vector_field(displacement, 1, 100, 1e-7)
+    residual=tf.compose_vector_fields(displacement, inverse)
     warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
     rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
     rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
-    rcommon.plotDeformationField(displacement)
-    nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
-    maxNorm=np.max(nrm)
-    displacement[...,0]*=(maskMoving + maskFixed)
-    displacement[...,1]*=(maskMoving + maskFixed)
-    rcommon.plotDeformationField(displacement)
-    invd=tf.invert_vector_field(displacement, 1, 100, 1e-7)
-    residual=tf.compose_vector_fields(displacement, invd)
-    rcommon.plotDeformationField(residual)
-    expd, invexpd=tf.vector_field_exponential(displacement)
-    residual=tf.compose_vector_fields(expd, invexpd)
-    rcommon.plotDeformationField(residual)
-    #nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
-    #plt.figure()
-    #plt.imshow(nrm)
-    print 'Max global displacement: ', maxNorm
-
+    rcommon.plotDiffeomorphism(displacement, inverse, residual, 7)
 ###############################################################
 ####### Non-linear Monomodal registration - EM (3D)############
 ###############################################################
@@ -301,7 +292,8 @@ def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
 ####### Non-linear Multimodal registration - EM (2D)###########
 ###############################################################
 def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, quantizationLevels, maxOuterIter, previousDisplacement):
-    epsilon=1e-5
+    innerTolerance=1e-4
+    outerTolerance=1e-3
     sh=moving.shape
     X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
     displacement     =np.empty(shape=(moving.shape)+(2,), dtype=np.float64)
@@ -337,11 +329,11 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
         g0, g1=sp.gradient(warped)
         gradientField[:,:,0]=g0
         gradientField[:,:,1]=g1
-        maxVariation=1+epsilon
+        maxVariation=1+innerTolerance
         innerIter=0
         maxInnerIter=1000
         displacement[...]=0
-        while((maxVariation>epsilon)and(innerIter<maxInnerIter)):
+        while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
             maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaDisplacement, totalDisplacement, displacement, residuals)
             opt=np.max(residuals)
@@ -351,8 +343,8 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
         totalDisplacement+=displacement
         #--check stop condition--
         nrm=np.sqrt(displacement[...,0]**2+displacement[...,1]**2)
-        maxDisplacement=np.max(nrm)
-        if((maxDisplacement<epsilon)or(outerIter>=maxOuterIter)):
+        maxDisplacement=np.mean(nrm)
+        if((maxDisplacement<outerTolerance)or(outerIter>=maxOuterIter)):
             finished=True
             plt.figure()
             plt.subplot(1,3,1)
@@ -368,7 +360,7 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
             plt.subplot(1,3,3)
             plt.plot(means)
             plt.title("Means")
-    print "Iter: ",outerIter, "Max displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
+    print "Iter: ",outerIter, "Mean displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
     if(previousDisplacement!=None):
         return totalDisplacement-previousDisplacement
     return totalDisplacement
@@ -498,20 +490,12 @@ def testCircleToCMultimodal(lambdaParam):
     rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
     displacementList=[]
     maxOuterIter=[10,50,100,100,100,100]
-    displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList, False)
+    displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList)
     warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
     rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
     rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
-    rcommon.plotDeformationField(displacement)
-    nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
-    maxNorm=np.max(nrm)
-    displacement[...,0]*=(maskMoving + maskFixed)
-    displacement[...,1]*=(maskMoving + maskFixed)
-    rcommon.plotDeformationField(displacement)
-    #nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
-    #plt.figure()
-    #plt.imshow(nrm)
-    print 'Max global displacement: ', maxNorm
+    rcommon.plotDeformedLattice(displacement)
+
 
 ###############################################################
 ####### Non-linear Multimodal registration - EM (3D)###########
@@ -734,6 +718,13 @@ def runArcesExperiment(rootDir, lambdaParam, maxOuterIter):
     GT=np.ndarray(shape=dx.shape+(2,), dtype=np.float64)
     GT[...,0]=dy
     GT[...,1]=dx
+#    invGT=tf.invert_vector_field(GT, 1, 100, 1e-7)
+#    residual=np.array(tf.compose_vector_fields(GT, invGT))
+#    rcommon.plotDiffeomorphism(GT,invGT,residual)
+#    residual=residual[...,0]**2+residual[...,1]**2
+#    resStats=np.sqrt(residual)
+#    print "Inverse residual:",resStats.mean(), "(",resStats.std(),")"
+#    return
     #---Load input images---
     fnameT1=rootDir+'t1.jpg'
     fnameT2=rootDir+'t2.jpg'
@@ -742,10 +733,24 @@ def runArcesExperiment(rootDir, lambdaParam, maxOuterIter):
     t1=plt.imread(fnameT1)[...,0].astype(np.float64)
     t2=plt.imread(fnameT2)[...,0].astype(np.float64)
     pd=plt.imread(fnamePD)[...,0].astype(np.float64)
-    t1=127*(t1-t1.min())/(t1.max()-t1.min())
-    t2=127*(t2-t2.min())/(t2.max()-t2.min())
-    pd=127*(pd-pd.min())/(pd.max()-pd.min())
+    t1=(t1-t1.min())/(t1.max()-t1.min())
+    t2=(t2-t2.min())/(t2.max()-t2.min())
+    pd=(pd-pd.min())/(pd.max()-pd.min())
     mask=plt.imread(fnameMask).astype(np.float64)
+    fixed=t1
+    moving=t2
+    maskMoving=mask>0
+    maskFixed=mask>0
+    fixed*=mask
+    moving*=mask
+    #Option 1: warp the fixed image (floating point accuracy)
+    #warpedFixed=rcommon.warpImage(fixed,GT)
+    #Option 2: load the warped image (integer accuracy)
+    fnameWarpedFixed=rootDir+'t1-def.jpg'
+    warpedFixed=plt.imread(fnameWarpedFixed).astype(np.float64)
+    warpedFixed*=mask
+    warpedFixed=(warpedFixed-warpedFixed.min())/(warpedFixed.max()-warpedFixed.min())
+    #----------------------------------------------------
     plt.figure()
     plt.subplot(1,4,1)
     plt.imshow(t1, cmap=plt.cm.gray)
@@ -760,13 +765,6 @@ def runArcesExperiment(rootDir, lambdaParam, maxOuterIter):
     plt.imshow(mask, cmap=plt.cm.gray)
     plt.title('Input Mask')
     #-------------------------
-    fixed=t1
-    moving=t2
-    maskMoving=mask>0
-    maskFixed=mask>0
-    fixed*=mask
-    moving*=mask
-    warpedFixed=rcommon.warpImage(fixed,GT)
     print 'Registering T2 (template) to deformed T1 (template)...'
     level=2
     movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
@@ -784,13 +782,13 @@ def runArcesExperiment(rootDir, lambdaParam, maxOuterIter):
     warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
     rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
     rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
-    rcommon.plotDeformationField(displacement)
+    rcommon.plotDeformedLattice(displacement)
+    #compute statistics
     displacement[...,0]*=(maskFixed)
     displacement[...,1]*=(maskFixed)
     nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
     nrm*=maskFixed
     maxNorm=np.max(nrm)
-    rcommon.plotDeformationField(displacement)
     residual=((displacement-GT))**2
     meanDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).mean()
     stdevDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).std()
@@ -807,9 +805,11 @@ def runAllArcesExperiments(lambdaParam, maxOuterIter):
         runArcesExperiment(rootDir, lambdaParam, maxOuterIter)
     print 'done.'
 if __name__=="__main__":
-    maxOuterIter=[10,50,100,100,100,100]
-    runAllArcesExperiments(250, maxOuterIter)
-    #testInvertVectorField()
-    #testCircleToCMultimodal(150)
+    #Parameters for Arce's experiments
+#    maxOuterIter=[500,500,500,500,500,500]
+#    runAllArcesExperiments(300, maxOuterIter)
+    #Parameters for circle-to-C experiment:
+    maxOuterIter=[57,114,51,382]
+    testCircleToCMonomodal(3,maxOuterIter)
     #testEstimateMultimodalDeformationField2DMultiScale(250, True)
     #testEstimateMultimodalDeformationField3DMultiScale(250, False)    

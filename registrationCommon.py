@@ -120,6 +120,16 @@ def plotDeformationField(d):
     plt.figure()
     plt.quiver(d[...,1], d[...,0])
 
+def plotDeformedLattice(d, delta=4):
+    nrows=d.shape[0]
+    ncols=d.shape[1]
+    lattice=drawLattice2D((nrows+delta)/(delta+1), (ncols+delta)/(delta+1), delta)
+    lattice=lattice[0:nrows,0:ncols]
+    gtLattice=warpImage(lattice, d)
+    plt.figure()
+    plt.imshow(gtLattice, cmap=plt.cm.gray)
+    plt.title('Deformed lattice')
+
 def plotDeformationFields(dList):
     n=len(dList)
     plt.figure()
@@ -264,3 +274,22 @@ def testOverlayImages_nii():
     overlayImages(left[sl[0],:,:,0], right[sr[0],:,:,0])
     overlayImages(left[:,sl[1],:,0], right[:,sr[1],:,0])
     overlayImages(left[:,:,sl[2],0], right[:,:,sr[2],0])
+
+def plotDiffeomorphism(GT, GTinv, GTres, delta=4):
+    nrows=GT.shape[0]
+    ncols=GT.shape[1]
+    lattice=drawLattice2D((nrows+delta)/(delta+1), (ncols+delta)/(delta+1), delta)
+    lattice=lattice[0:nrows,0:ncols]
+    gtLattice=warpImage(lattice, GT)
+    gtInvLattice=warpImage(lattice, GTinv)
+    gtResidual=warpImage(lattice, GTres)
+    plt.figure()
+    plt.subplot(1, 3, 1)
+    plt.imshow(gtLattice, cmap=plt.cm.gray)
+    plt.title('Deformation')
+    plt.subplot(1, 3, 2)
+    plt.imshow(gtInvLattice, cmap=plt.cm.gray)
+    plt.title('Inverse')
+    plt.subplot(1, 3, 3)
+    plt.imshow(gtResidual, cmap=plt.cm.gray)
+    plt.title('residual')

@@ -986,7 +986,7 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
 }
 
 int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv){
-    double EXP_EPSILON=0.05;//such that the vector field exponential is approx the identity
+    double EXP_EPSILON=0.1;//such that the vector field exponential is approx the identity
     //---compute the maximum norm---
     double stats[3];
     int nsites=nrows*ncols;
@@ -1009,7 +1009,7 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
     //---base case---
     if(n<1){
         memcpy(expv, v, sizeof(double)*2*nsites);
-        invertVectorField(v, nrows, ncols, 0.1, 20, 1e-4, invexpv, stats);
+        invertVectorField(v, nrows, ncols, 1, 20, 1e-4, invexpv, stats);
         return 0;
     }
     //---prepare memory buffers---
