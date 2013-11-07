@@ -125,9 +125,9 @@ def testEstimateMonomodalDiffeomorphicField2DMultiScale(lambdaParam):
     rcommon.plotDiffeomorphism(displacement, inverse, residual)
 
 def testCircleToCMonomodalDiffeomorphic(lambdaParam):
-    fname0='/home/omar/Desktop/circle.png'
+    fname0='data/circle.png'
     #fname0='/home/omar/Desktop/C_trans.png'
-    fname1='/home/omar/Desktop/C.png'
+    fname1='data/C.png'
     nib_moving=plt.imread(fname0)
     nib_fixed=plt.imread(fname1)
     moving=nib_moving[:,:,0]
