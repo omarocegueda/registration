@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy import ndimage
 import registrationCommon as rcommon
 from registrationCommon import const_prefilter_map_coordinates
-
+import os
 ###############################################################
 ####### Non-linear Monomodal registration - EM (2D)############
 ###############################################################
@@ -146,15 +146,15 @@ def testCircleToCMonomodalDiffeomorphic(lambdaParam):
     maxOuterIter=[10,50,100,100,100,100,100,100,100]
     displacement, inverse=estimateMonomodalDiffeomorphicField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList)
     directInverse=tf.invert_vector_field(displacement, 1, 1000, 1e-7)
-    residual=tf.compose_vector_fields(displacement, inverse)
-    directResidual=tf.compose_vector_fields(displacement, directInverse)
+    residual=np.array(tf.compose_vector_fields(displacement, inverse))
+    directResidual=np.array(tf.compose_vector_fields(displacement, directInverse))
     warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
     rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
     rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
 #    displacement[...,0]*=(maskMoving + maskFixed)
 #    displacement[...,1]*=(maskMoving + maskFixed)
-    rcommon.plotDiffeomorphism(displacement, inverse, residual, 7)
-    rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 7)
+    rcommon.plotDiffeomorphism(displacement, inverse, residual, 'inv-joint', 7)
+    rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 'inv-direct', 7)
 
 ###############################################################
 ####### Diffeomorphic Multimodal registration - EM (2D)########
@@ -343,7 +343,51 @@ def runAllArcesExperiments(lambdaParam, maxOuterIter):
         runArcesExperiment(rootDir, lambdaParam, maxOuterIter)
     print 'done.'
 
+def testInversion(lambdaParam):
+    fname0='data/circle.png'
+    fname1='data/C.png'
+    circleToCDisplacementName='circleToCDisplacement.npy'
+    circleToCDisplacementInverseName='circleToCDisplacementInverse.npy'
+    nib_moving=plt.imread(fname0)
+    nib_fixed=plt.imread(fname1)
+    moving=nib_moving[:,:,0]
+    fixed=nib_fixed[:,:,1]
+    moving=(moving-moving.min())/(moving.max() - moving.min())
+    fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
+    level=3
+    maskMoving=moving>0
+    maskFixed=fixed>0
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, np.ones_like(maskMoving))]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(fixed, level, np.ones_like(maskFixed))]
+    rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
+    displacementList=[]
+    maxOuterIter=[10,50,100,100,100,100,100,100,100]
+    if(os.path.exists(circleToCDisplacementName)):
+        displacement=np.load(circleToCDisplacementName)
+        inverse=np.load(circleToCDisplacementInverseName)
+    else:
+        displacement, inverse=estimateMonomodalDiffeomorphicField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList)
+        np.save(circleToCDisplacementName, displacement)
+        np.save(circleToCDisplacementInverseName, inverse)
+    print 'vector field exponential'
+    expd, invexpd=tf.vector_field_exponential(displacement)
+    print 'vector field inversion'
+    directInverse=tf.invert_vector_field(displacement, 1.0, 10000, 1e-7)
+    print 'vector field inversion'
+    directExpInverse=tf.invert_vector_field(expd, 1.0, 10000, 1e-7)
+    ###Now compare inversions###
+    residualJoint=np.array(tf.compose_vector_fields(displacement, inverse))
+    residualDirect=np.array(tf.compose_vector_fields(displacement, directInverse))
+    residualExpJoint=np.array(tf.compose_vector_fields(expd, invexpd))
+    residualExpDirect=np.array(tf.compose_vector_fields(expd, directExpInverse))
+    rcommon.plotDiffeomorphism(displacement, inverse, residualJoint, 'D-joint', 7)
+    rcommon.plotDiffeomorphism(expd, invexpd, residualExpJoint, 'expD-joint', 7)
+    rcommon.plotDiffeomorphism(displacement, directInverse, residualDirect, 'D-direct', 7)
+    rcommon.plotDiffeomorphism(expd, directExpInverse, residualExpDirect, 'expD-direct', 7)
+    
 if __name__=='__main__':
+#    testInversion(5)
     testCircleToCMonomodalDiffeomorphic(5)
+    #######################################
 #    maxOuterIter=[500,500,500,500,500,500]
 #    runAllArcesExperiments(2000, maxOuterIter)

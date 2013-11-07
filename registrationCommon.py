@@ -275,7 +275,7 @@ def testOverlayImages_nii():
     overlayImages(left[:,sl[1],:,0], right[:,sr[1],:,0])
     overlayImages(left[:,:,sl[2],0], right[:,:,sr[2],0])
 
-def plotDiffeomorphism(GT, GTinv, GTres, delta=4):
+def plotDiffeomorphism(GT, GTinv, GTres, titlePrefix, delta=4):
     nrows=GT.shape[0]
     ncols=GT.shape[1]
     lattice=drawLattice2D((nrows+delta)/(delta+1), (ncols+delta)/(delta+1), delta)
@@ -286,10 +286,15 @@ def plotDiffeomorphism(GT, GTinv, GTres, delta=4):
     plt.figure()
     plt.subplot(1, 3, 1)
     plt.imshow(gtLattice, cmap=plt.cm.gray)
-    plt.title('Deformation')
+    plt.title(titlePrefix+'[Deformation]')
     plt.subplot(1, 3, 2)
     plt.imshow(gtInvLattice, cmap=plt.cm.gray)
-    plt.title('Inverse')
+    plt.title(titlePrefix+'[Inverse]')
     plt.subplot(1, 3, 3)
     plt.imshow(gtResidual, cmap=plt.cm.gray)
-    plt.title('residual')
+    plt.title(titlePrefix+'[residual]')
+    residualNorm=np.sqrt(np.sum(GTres**2,2))#Data-term energy
+    g00, g01=sp.gradient(GTinv[...,0])
+    g10, g11=sp.gradient(GTinv[...,1])
+    priorEnergy=g00**2+g01**2+g10**2+g11**2
+    print titlePrefix,':', residualNorm.mean(), '(',residualNorm.std(),'). Prior:',priorEnergy.mean(),'(',priorEnergy.std(),')' 

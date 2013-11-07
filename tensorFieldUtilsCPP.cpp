@@ -7,6 +7,7 @@ Created on Fri Sep 20 19:03:32 2013
 #include <math.h>
 #include <stdlib.h>
 #include "bitsCPP.h"
+#include "tensorFieldUtilsCPP.h"
 
 void integrateTensorFieldProductsCPP(double *q, int *dims, double *diff, double *A, double *b){
     int k=dims[3];
@@ -754,6 +755,31 @@ void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, in
     delete[] sums;
 }
 
+double computeInverseEnergy(double *d, double *invd, int nrows, int ncols, double lambda){
+    double stats[3];
+    double *residual=new double[2*nrows*ncols];
+    composeVectorFields(d, invd, nrows, ncols, residual, stats);
+    double energy=0;
+    for(int i=0;i<nrows-1;++i){
+        for(int j=0;j<ncols-1;++j){
+            double d00=invd[2*(i*nrows+j)] - invd[2*((i+1)*nrows+j)];
+            double d01=invd[2*(i*nrows+j)+1] - invd[2*((i+1)*nrows+j)+1];
+            double d10=invd[2*(i*nrows+j)] - invd[2*(i*nrows+j+1)];
+            double d11=invd[2*(i*nrows+j)+1] - invd[2*(i*nrows+j+1)+1];
+            energy+=d00*d00+d01*d01+d10*d10+d11*d11;
+        }    
+    }
+    energy*=lambda;
+    double *r=residual;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, r+=2){
+            energy+=r[0]+r[0]+r[1]*r[1];
+        }    
+    }
+    delete[] residual;
+    return energy;
+    
+}
 
 int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats){
     const static int numNeighbors=4;
@@ -834,7 +860,7 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                         z[1]-=alpha*alpha*beta*cbeta*zleft[1];
                     }
                     if((ii<nrows-1) && (jj>0)){//bottom-left neighbor
-                        double *zbleft=&invd[2*(ii+1)*ncols+jj-1];
+                        double *zbleft=&invd[2*((ii+1)*ncols+jj-1)];
                         z[0]-=alpha*calpha*beta*cbeta*zbleft[0];
                         z[1]-=alpha*calpha*beta*cbeta*zbleft[1];
                     }
@@ -924,7 +950,6 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
     double meanNorm=0;
     double stdNorm=0;
     int cnt=0;
-    //memcpy(comp, d1, sizeof(double)*nrows*ncols*2);
     memset(comp, 0, sizeof(double)*nrows*ncols*2); 
     for(int i=0;i<nrows;++i){
         for(int j=0;j<ncols;++j, dx+=2, res+=2){
