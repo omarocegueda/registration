@@ -125,9 +125,16 @@ def testEstimateMonomodalDiffeomorphicField2DMultiScale(lambdaParam):
     rcommon.plotDiffeomorphism(displacement, inverse, residual)
 
 def testCircleToCMonomodalDiffeomorphic(lambdaParam):
+    import numpy as np
+    import tensorFieldUtils as tf
+    import matplotlib.pyplot as plt
+    import registrationCommon as rcommon
+    import os
     fname0='data/circle.png'
     #fname0='/home/omar/Desktop/C_trans.png'
     fname1='data/C.png'
+    circleToCDisplacementName='circleToCDisplacement.npy'
+    circleToCDisplacementInverseName='circleToCDisplacementInverse.npy'
     nib_moving=plt.imread(fname0)
     nib_fixed=plt.imread(fname1)
     moving=nib_moving[:,:,0]
@@ -137,24 +144,43 @@ def testCircleToCMonomodalDiffeomorphic(lambdaParam):
     level=3
     maskMoving=moving>0
     maskFixed=fixed>0
-#    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
-#    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(fixed, level, maskFixed)]
     movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, np.ones_like(maskMoving))]
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(fixed, level, np.ones_like(maskFixed))]
     rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
     displacementList=[]
     maxOuterIter=[10,50,100,100,100,100,100,100,100]
-    displacement, inverse=estimateMonomodalDiffeomorphicField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList)
-    directInverse=tf.invert_vector_field(displacement, 1, 1000, 1e-7)
+    if(os.path.exists(circleToCDisplacementName)):
+        displacement=np.load(circleToCDisplacementName)
+        inverse=np.load(circleToCDisplacementInverseName)
+    else:
+        displacement, inverse=estimateMonomodalDiffeomorphicField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList)
+        np.save(circleToCDisplacementName, displacement)
+        np.save(circleToCDisplacementInverseName, inverse)    
+    X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
+    detJacobian=rcommon.computeJacobianField(displacement)
+    plt.figure()
+    plt.imshow(detJacobian)
+    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
+    plt.clabel(CS, inline=1, fontsize=10)
+    plt.title('det(J(displacement))')
+    print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
+    directInverse=tf.invert_vector_field(displacement, 0.5, 1000, 1e-7)
+    detJacobianInverse=rcommon.computeJacobianField(directInverse)
+    plt.figure()
+    plt.imshow(detJacobianInverse)
+    CS=plt.contour(X0,X1,detJacobianInverse, levels=[0.0],colors='w')
+    plt.clabel(CS, inline=1, fontsize=10)
+    plt.title('det(J(displacement^-1))')
+    print 'J^-1 range:', '[', detJacobianInverse.min(), detJacobianInverse.max(),']'
+    #directInverse=rcommon.invert_vector_field_fixed_point(displacement, 1000, 1e-7)
     residual=np.array(tf.compose_vector_fields(displacement, inverse))
     directResidual=np.array(tf.compose_vector_fields(displacement, directInverse))
-    warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
-    rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
-    rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
-#    displacement[...,0]*=(maskMoving + maskFixed)
-#    displacement[...,1]*=(maskMoving + maskFixed)
+#    warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
+#    rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
+#    rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
     rcommon.plotDiffeomorphism(displacement, inverse, residual, 'inv-joint', 7)
     rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 'inv-direct', 7)
+    tf.write_double_buffer(displacement.reshape(-1), 'displacement.bin')
 
 ###############################################################
 ####### Diffeomorphic Multimodal registration - EM (2D)########
@@ -382,12 +408,34 @@ def testInversion(lambdaParam):
     residualExpDirect=np.array(tf.compose_vector_fields(expd, directExpInverse))
     rcommon.plotDiffeomorphism(displacement, inverse, residualJoint, 'D-joint', 7)
     rcommon.plotDiffeomorphism(expd, invexpd, residualExpJoint, 'expD-joint', 7)
-    rcommon.plotDiffeomorphism(displacement, directInverse, residualDirect, 'D-direct', 7)
+    [d,invd,res]=rcommon.plotDiffeomorphism(displacement, directInverse, residualDirect, 'D-direct', 7)
     rcommon.plotDiffeomorphism(expd, directExpInverse, residualExpDirect, 'expD-direct', 7)
+    sp.misc.imsave('circleToC_deformation.png', d)
+    sp.misc.imsave('circleToC_inverse_deformation.png', invd)
+    sp.misc.imsave('circleToC_residual_deformation.png', res)
+
+def testInversion_invertible():
+    displacement_clean=tf.create_invertible_displacement_field(256, 256, 0.5, 8)
+    detJacobian=rcommon.computeJacobianField(displacement_clean)
+    plt.figure()
+    plt.imshow(detJacobian)
+    print 'Range:', detJacobian.min(), detJacobian.max()
+    X1,X0=np.mgrid[0:displacement_clean.shape[0], 0:displacement_clean.shape[1]]
+    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
+    plt.clabel(CS, inline=1, fontsize=10)
+    plt.title('det(J(displacement))')
+    #displacement=displacement_clean+np.random.normal(0.0, 0.0, displacement_clean.shape)
+    displacement=displacement_clean
+    #inverse=rcommon.invert_vector_field_fixed_point(displacement, 100, 1e-7)
+    inverse=tf.invert_vector_field(displacement, 0.1, 100, 1e-7)
+    residual=np.array(tf.compose_vector_fields(displacement_clean, inverse))
+    [d,invd,res]=rcommon.plotDiffeomorphism(displacement, inverse, residual, 'invertible', 7)
     
+
 if __name__=='__main__':
-#    testInversion(5)
-    testCircleToCMonomodalDiffeomorphic(5)
+    #testInversion(5)
+    testInversion_invertible()
+#    testCircleToCMonomodalDiffeomorphic(5)
     #######################################
 #    maxOuterIter=[500,500,500,500,500,500]
 #    runAllArcesExperiments(2000, maxOuterIter)

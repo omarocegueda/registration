@@ -708,23 +708,33 @@ def testInvertVectorField():
 #    plt.title('invexpd');
 #    rcommon.plotDeformationField(residualexpd)
 #    plt.title('residual: expd, invexpd');
-
+    
 def runArcesExperiment(rootDir, lambdaParam, maxOuterIter):
     #---Load displacement field---
     dxName=rootDir+'Vx.dat'
     dyName=rootDir+'Vy.dat'
     dx=np.loadtxt(dxName)
     dy=np.loadtxt(dyName)
-    GT=np.ndarray(shape=dx.shape+(2,), dtype=np.float64)
-    GT[...,0]=dy
-    GT[...,1]=dx
-#    invGT=tf.invert_vector_field(GT, 1, 100, 1e-7)
-#    residual=np.array(tf.compose_vector_fields(GT, invGT))
-#    rcommon.plotDiffeomorphism(GT,invGT,residual)
-#    residual=residual[...,0]**2+residual[...,1]**2
-#    resStats=np.sqrt(residual)
-#    print "Inverse residual:",resStats.mean(), "(",resStats.std(),")"
-#    return
+    GTin=np.ndarray(shape=dx.shape+(2,), dtype=np.float64)
+    GTin[...,0]=dy
+    GTin[...,1]=dx
+    GT=GTin
+    noisy=GT+np.random.normal(0.0, 0.5, GT.shape)
+    #invGT=tf.invert_vector_field(GT, 0.075, 1000, 1e-7)
+    invGT_fp=rcommon.invert_vector_field_fixed_point(noisy, 100, 1e-7)
+    invGT_oo=tf.invert_vector_field(noisy, 2.5, 100, 1e-7)
+    #GT, invExp=tf.vector_field_exponential(GTin)
+    residual_fp=np.array(tf.compose_vector_fields(GT, invGT_fp))
+    residual_oo=np.array(tf.compose_vector_fields(GT, invGT_oo))
+    rcommon.plotDiffeomorphism(GT,invGT_fp,residual_fp,'FP')
+    rcommon.plotDiffeomorphism(GT,invGT_oo,residual_oo,'OO')
+    residual_fp=residual_fp[...,0]**2+residual_fp[...,1]**2
+    resStats_fp=np.sqrt(residual_fp)
+    print "Inverse residual fp:",resStats_fp.mean(), "(",resStats_fp.std(),")"
+    residual_oo=residual_oo[...,0]**2+residual_oo[...,1]**2
+    resStats_oo=np.sqrt(residual_oo)
+    print "Inverse residual fp:",resStats_oo.mean(), "(",resStats_oo.std(),")"
+    return
     #---Load input images---
     fnameT1=rootDir+'t1.jpg'
     fnameT2=rootDir+'t2.jpg'
@@ -804,12 +814,56 @@ def runAllArcesExperiments(lambdaParam, maxOuterIter):
     for rootDir in rootDirs:
         runArcesExperiment(rootDir, lambdaParam, maxOuterIter)
     print 'done.'
+
+def checkInversionResults():
+    import tensorFieldUtils as tf
+    import registrationCommon as rcommon
+    fnameInput='/home/omar/inverseExperiments/displacement.bin'
+    fnameInverse='/home/omar/inverseExperiments/inverse.bin'
+    nrows=256
+    ncols=256
+    numDoubles=2*nrows*ncols
+    inputField=np.array(tf.read_double_buffer(fnameInput, numDoubles)).reshape(nrows,ncols,2)
+    inverseField=np.array(tf.read_double_buffer(fnameInverse, numDoubles)).reshape(nrows,ncols,2)
+    residualField, stats=tf.compose_vector_fields(inputField, inverseField)
+    rcommon.plotDiffeomorphism(inputField,inverseField,residualField,'FP')
+    print 'Max residual:',stats[0], '. Mean:',stats[1],'(', stats[2],')'
+    statsJacobi=np.loadtxt('/home/omar/inverseExperiments/stats_jacobi.txt',dtype=np.float64)
+    statsFixedPoint=np.loadtxt('/home/omar/inverseExperiments/stats_fixedpoint.txt',dtype=np.float64)
+    start=0
+    plt.figure()
+    pJacobi,=plt.plot(statsJacobi[start:,1])
+    pFixedPoint,=plt.plot(statsFixedPoint[start:,1])
+    plt.yscale('log')
+    plt.legend([pJacobi, pFixedPoint], ["Jacobi", "Fixed Point"])
+    plt.title("Mean error")
+    plt.figure()
+    pJacobi,=plt.plot(statsJacobi[start:,0])
+    pFixedPoint,=plt.plot(statsFixedPoint[start:,0])
+    plt.yscale('log')
+    plt.legend([pJacobi, pFixedPoint], ["Jacobi", "Fixed Point"])
+    plt.title("Maximum error")
+    
+
+def createInvertiblefield(m):
+    displacement_clean=tf.create_invertible_displacement_field(256, 256, m, 8)
+    detJacobian=rcommon.computeJacobianField(displacement_clean)
+    plt.figure()
+    plt.imshow(detJacobian)
+    print 'Range:', detJacobian.min(), detJacobian.max()
+    X1,X0=np.mgrid[0:displacement_clean.shape[0], 0:displacement_clean.shape[1]]
+    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
+    plt.clabel(CS, inline=1, fontsize=10)
+    plt.title('det(J(displacement))')
+    tf.write_double_buffer(np.array(displacement_clean).reshape(-1), '/home/omar/inverseExperiments/displacement.bin')
+    
+
 if __name__=="__main__":
     #Parameters for Arce's experiments
-#    maxOuterIter=[500,500,500,500,500,500]
-#    runAllArcesExperiments(300, maxOuterIter)
+    maxOuterIter=[500,500,500,500,500,500]
+    runAllArcesExperiments(300, maxOuterIter)
     #Parameters for circle-to-C experiment:
-    maxOuterIter=[57,114,51,382]
-    testCircleToCMonomodal(3,maxOuterIter)
+#    maxOuterIter=[57,114,51,382]
+#    testCircleToCMonomodal(3,maxOuterIter)
     #testEstimateMultimodalDeformationField2DMultiScale(250, True)
     #testEstimateMultimodalDeformationField3DMultiScale(250, False)    

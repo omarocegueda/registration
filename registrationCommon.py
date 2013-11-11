@@ -278,23 +278,45 @@ def testOverlayImages_nii():
 def plotDiffeomorphism(GT, GTinv, GTres, titlePrefix, delta=4):
     nrows=GT.shape[0]
     ncols=GT.shape[1]
+    X1,X0=np.mgrid[0:GT.shape[0], 0:GT.shape[1]]
     lattice=drawLattice2D((nrows+delta)/(delta+1), (ncols+delta)/(delta+1), delta)
     lattice=lattice[0:nrows,0:ncols]
     gtLattice=warpImage(lattice, GT)
     gtInvLattice=warpImage(lattice, GTinv)
     gtResidual=warpImage(lattice, GTres)
     plt.figure()
-    plt.subplot(1, 3, 1)
+    plt.subplot(2, 3, 1)
     plt.imshow(gtLattice, cmap=plt.cm.gray)
     plt.title(titlePrefix+'[Deformation]')
-    plt.subplot(1, 3, 2)
+    plt.subplot(2, 3, 2)
     plt.imshow(gtInvLattice, cmap=plt.cm.gray)
     plt.title(titlePrefix+'[Inverse]')
-    plt.subplot(1, 3, 3)
+    plt.subplot(2, 3, 3)
     plt.imshow(gtResidual, cmap=plt.cm.gray)
     plt.title(titlePrefix+'[residual]')
-    residualNorm=np.sqrt(np.sum(GTres**2,2))#Data-term energy
+    #plot jacobians and residual norm
+    detJacobian=computeJacobianField(GT)
+    plt.subplot(2, 3, 4)
+    plt.imshow(detJacobian)
+    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
+    plt.clabel(CS, inline=1, fontsize=10)
+    plt.title('det(J(d))')    
+    detJacobianInverse=computeJacobianField(GTinv)
+    plt.subplot(2, 3, 5)
+    plt.imshow(detJacobianInverse)
+    CS=plt.contour(X0,X1,detJacobianInverse,levels=[0.0], colors='b')
+    plt.clabel(CS, inline=1, fontsize=10)
+    plt.title('det(J(d^-1))')    
+    nrm=np.sqrt(np.sum(np.array(GTres)**2,2))
+    plt.subplot(2, 3, 6)
+    plt.imshow(nrm)
+    plt.title('||residual||_2')    
     g00, g01=sp.gradient(GTinv[...,0])
     g10, g11=sp.gradient(GTinv[...,1])
-    priorEnergy=g00**2+g01**2+g10**2+g11**2
-    print titlePrefix,':', residualNorm.mean(), '(',residualNorm.std(),'). Prior:',priorEnergy.mean(),'(',priorEnergy.std(),')' 
+    #priorEnergy=g00**2+g01**2+g10**2+g11**2
+    return [gtLattice, gtInvLattice, gtResidual]
+
+def computeJacobianField(displacement):
+    g00,g01=sp.gradient(displacement[...,0])
+    g10,g11=sp.gradient(displacement[...,1])
+    return g00*g11-g10*g01
