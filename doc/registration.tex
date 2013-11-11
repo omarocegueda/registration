@@ -4,6 +4,7 @@
 \usepackage{subfig}
 \title{\textbf{Image registration}}
 \date{}
+\author{Omar Ocegueda}
 \begin{document}
 
 \maketitle
@@ -388,7 +389,16 @@ where $\delta_{i}(x) = \nu_{i} - I_{m}(x)$. If $\lambda_{2}>0$, the unique solut
 	d_{x} = \left[g_{x}g_{x}^{T}\sum_{i=1}^{K}p_{i}^{2}(x) + \lambda_{2}|\mathcal{N}_{x}|I\right]^{-1} \left[ g_{x}\sum_{i=1}^{K}p_{i}^{2}(x)\delta_{i}(x) + \lambda_{2} \sum_{y\in \mathcal{N}_{x}}d_{y} \right]
 \end{equation}
 
+
+
+
+
+
+
+
+
 \section{Inverse of a displacement field}
+Previous work: \cite{Crum2007}\cite{Chen2008}\cite{Yan2010}. Heinrich et al. \cite{Heinrich2012} \cite{Heinrich2012a} use the fixed point algorithm even in 2012. Li also used it in 2012 \cite{Li2012}\\
 Given a vector field $d:\Omega_{F} \rightarrow \Omega_{M}$, we are interested in approximating another vector field $z:\Omega_{M} \rightarrow \Omega_{F}$, such that $z(x+d(x)) \approx -d(x), \forall x\in \Omega_{F}$. Here, we will approximate such an inverse in the regularized least-squares sense:
 \begin{equation}\label{eq_inv_ls}
 	z^{*} = \arg\min_{z}\sum_{x\in \Omega_{F}}||z(x+d(x)) + d(x)||_{2}^{2} + \lambda\sum_{<v,w>\in \mathcal{C}_{2}}||z(v)-z(w)||_{2}^{2}.
@@ -460,11 +470,15 @@ where
 
 \begin{figure}[ht]
 \centering
-    \subfloat[]{\label{fig:region2}\includegraphics[width=0.5\linewidth]{./images/R1.png}}
+    \subfloat[]{\label{fig:region1}\includegraphics[width=0.5\linewidth]{./images/R1.png}}
     \subfloat[]{\label{fig:region2}\includegraphics[width=0.5\linewidth]{./images/R2.png}}\\
-    \subfloat[]{\label{fig:region2}\includegraphics[width=0.5\linewidth]{./images/R3.png}}
-    \subfloat[]{\label{fig:region2}\includegraphics[width=0.5\linewidth]{./images/R4.png}}
+    \subfloat[]{\label{fig:region3}\includegraphics[width=0.5\linewidth]{./images/R3.png}}
+    \subfloat[]{\label{fig:region4}\includegraphics[width=0.5\linewidth]{./images/R4.png}}
     \caption{An input (warped) point $x+d_{x}$ located at regions 1(a),2(b),3(c) and 4(d), with respect to z. The interpolation coefficients can easily be computed as $(\alpha_{x}, \beta_{x})=(1,1)-\lfloor x+d_{x}\rfloor$. }
     \label{fig:dayIndex}
 \end{figure}
+\bibliographystyle{plain}
+\bibliography{references}
+
+
 \end{document}
