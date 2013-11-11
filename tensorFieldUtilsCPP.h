@@ -23,5 +23,10 @@ void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, in
 double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual);
 
 int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats);
+int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats);
 int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats);
 int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv);
+
+int readDoubleBuffer(char *fname, int nDoubles, double *buffer);
+int writeDoubleBuffer(double *buffer, int nDoubles, char *fname);
+void createInvertibleDisplacementField(int nrows, int ncols, double b, double m, double *dField);

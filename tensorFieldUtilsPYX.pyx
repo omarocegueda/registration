@@ -28,8 +28,12 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
     double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
     int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats)
+    int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats)
     int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats)
     int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv)
+    int readDoubleBuffer(char *fname, int nDoubles, double *buffer)
+    int writeDoubleBuffer(double *buffer, int nDoubles, char *fname)
+    void createInvertibleDisplacementField(int nrows, int ncols, double b, double m, double *dField)
 
 def testFunction(param):
     print 'Testing', param
@@ -215,6 +219,24 @@ cpdef invert_vector_field(double[:,:,:] d, double lambdaParam, int maxIter, doub
     print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
+#cpdef invert_vector_field_fixed_point(double[:,:,:] d, int maxIter, double tolerance):
+#    cdef double[:,:,:] invd=np.zeros_like(d)
+#    sh=d.shape
+#    X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
+#    for it in range(maxIter):
+#        invd[:,:,0], invd[:,:,1]=(-1*ndimage.map_coordinates(d[:,:,0], [X0+invd[...,0], X1+invd[...,1]], prefilter=const_prefilter_map_coordinates),
+#                                    -1*ndimage.map_coordinates(d[:,:,1], [X0+invd[...,0], X1+invd[...,1]], prefilter=const_prefilter_map_coordinates))
+#    return invd
+#    cdef int retVal
+#    cdef int nrows=d.shape[0]
+#    cdef int ncols=d.shape[1]
+#    cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
+#    cdef double[:,:,:] invd=np.zeros_like(d)
+#    retVal=invertVectorFieldFixedPoint(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0], &stats[0])
+#    print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
+#    return invd
+
+
 cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     cdef int nrows=d1.shape[0]
     cdef int ncols=d1.shape[1]
@@ -223,7 +245,7 @@ cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     cdef double[:] stats=cvarray(shape=(3,), itemsize=sizeof(double), format='d')
     retVal=composeVectorFields(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &comp[0,0,0], &stats[0])
     #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
-    return comp
+    return comp, stats
 
 cpdef vector_field_exponential(double[:,:,:] v):
     cdef double[:,:,:] expv = np.zeros_like(v)
@@ -235,3 +257,21 @@ cpdef vector_field_exponential(double[:,:,:] v):
     return expv, invexpv
 
 
+cpdef read_double_buffer(bytes fname, int nDoubles):
+    cdef double[:] buff=np.zeros(shape=(nDoubles,))
+    readDoubleBuffer(fname, nDoubles, &buff[0])
+    return buff
+
+cpdef write_double_buffer(double[:] buff, bytes fname):
+    cdef int nDoubles=buff.shape[0]
+    writeDoubleBuffer(&buff[0], nDoubles, fname)
+
+
+cpdef create_invertible_displacement_field(int nrows, int ncols, double b, double m):
+    '''
+        import tensorFieldUtils as tf
+        GT=tf.create_invertible_displacement_field(256, 256, 0.2, 8)
+    '''
+    cdef double[:,:,:] dField = np.ndarray((nrows, ncols,2), dtype=np.float64)
+    createInvertibleDisplacementField(nrows, ncols, b, m, &dField[0,0,0])
+    return dField

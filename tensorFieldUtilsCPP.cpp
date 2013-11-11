@@ -3,11 +3,13 @@ Created on Fri Sep 20 19:03:32 2013
 
 @author: khayyam
 */
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
 #include "bitsCPP.h"
 #include "tensorFieldUtilsCPP.h"
+
 
 void integrateTensorFieldProductsCPP(double *q, int *dims, double *diff, double *A, double *b){
     int k=dims[3];
@@ -787,13 +789,44 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
     const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
     double *temp=new double[nrows*ncols*2];
     double *denom=new double[nrows*ncols];
+    bool *isDefined=new bool[nrows*ncols];
+    memset(isDefined, 0, sizeof(bool)*nrows*ncols);
     memset(invd, 0, sizeof(double)*nrows*ncols*2);
     double maxChange=tolerance+1;
+    //---check undefined lattice points---
+    double *dx=d;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, dx+=2){
+            double dii=i+dx[0];
+            double djj=j+dx[1];
+            if((dii<0) || (djj<0) || (dii>=nrows-1)||(djj>=ncols-1)){
+                continue;
+            }
+            int ii=floor(dii);
+            int jj=floor(djj);
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                isDefined[ii*ncols+jj]=true;
+            }
+            ++jj;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                isDefined[ii*ncols+jj]=true;
+            }
+            ++ii;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                isDefined[ii*ncols+jj]=true;
+            }
+            --jj;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                isDefined[ii*ncols+jj]=true;
+            }
+        }
+    }
+    //------------------------------------
     int iter;
     for(iter=0;(tolerance*tolerance<maxChange)&&(iter<maxIter);++iter){
         memset(temp, 0, sizeof(double)*nrows*ncols*2);
         memset(denom, 0, sizeof(double)*nrows*ncols);
-        double *dx=d;
+        dx=d;
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=2){
                 for(int k=0;k<numNeighbors;++k){
@@ -805,11 +838,19 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     if((jj<0)||(jj>=ncols)){
                         continue;
                     }
+                    if(!isDefined[ii*ncols+jj]){
+                        continue;
+                    }
                     denom[i*ncols+j]+=lambdaParam;
                     temp[2*(i*ncols+j)]+=lambdaParam*invd[2*(ii*ncols+jj)];
                     temp[2*(i*ncols+j)+1]+=lambdaParam*invd[2*(ii*ncols+jj)+1];
                 }
                 //find top-left coordinates
+                double dii=i+dx[0];
+                double djj=j+dx[1];
+                if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){
+                    continue;
+                }
                 int ii=floor(dx[0]);
                 int jj=floor(dx[1]);
                 double calpha=dx[0]-ii;//by definition these factors are nonnegative
@@ -825,17 +866,17 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     den+=alpha*alpha*beta*beta;
                     z[0]-=alpha*beta*dx[0];
                     z[1]-=alpha*beta*dx[1];
-                    if(jj<ncols-1){//right neighbor
+                    if((jj<ncols-1)&&isDefined[ii*ncols+jj+1]){//right neighbor
                         double *zright=&invd[2*(ii*ncols+jj+1)];
                         z[0]-=alpha*alpha*beta*cbeta*zright[0];
                         z[1]-=alpha*alpha*beta*cbeta*zright[1];
                     }
-                    if(ii<nrows-1){//bottom neighbor
+                    if((ii<nrows-1)&&isDefined[(ii+1)*ncols+jj]){//bottom neighbor
                         double *zbottom=&invd[2*((ii+1)*ncols+jj)];
                         z[0]-=alpha*calpha*beta*beta*zbottom[0];
                         z[1]-=alpha*calpha*beta*beta*zbottom[1];
                     }
-                    if((jj<ncols-1) && (ii<nrows-1)){//bottom right corner
+                    if((jj<ncols-1) && (ii<nrows-1) && isDefined[(ii+1)*ncols+jj+1]){//bottom right corner
                         double *zbright=&invd[2*((ii+1)*ncols+jj+1)];
                         z[0]-=alpha*calpha*beta*cbeta*zbright[0];
                         z[1]-=alpha*calpha*beta*cbeta*zbright[1];
@@ -849,17 +890,17 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     den+=alpha*alpha*cbeta*cbeta;
                     z[0]-=alpha*cbeta*dx[0];
                     z[1]-=alpha*cbeta*dx[1];
-                    if(ii<nrows-1){//bottom neighbor
+                    if((ii<nrows-1)&&isDefined[(ii+1)*ncols+jj]){//bottom neighbor
                         double *zbottom=&invd[2*((ii+1)*ncols+jj)];
                         z[0]-=alpha*calpha*cbeta*cbeta*zbottom[0];
                         z[1]-=alpha*calpha*cbeta*cbeta*zbottom[1];
                     }
-                    if(jj>0){//left neighbor
+                    if((jj>0)&&isDefined[ii*ncols+jj-1]){//left neighbor
                         double *zleft=&invd[2*(ii*ncols+jj-1)];
                         z[0]-=alpha*alpha*beta*cbeta*zleft[0];
                         z[1]-=alpha*alpha*beta*cbeta*zleft[1];
                     }
-                    if((ii<nrows-1) && (jj>0)){//bottom-left neighbor
+                    if((ii<nrows-1) && (jj>0)&&isDefined[(ii+1)*ncols+jj-1]){//bottom-left neighbor
                         double *zbleft=&invd[2*((ii+1)*ncols+jj-1)];
                         z[0]-=alpha*calpha*beta*cbeta*zbleft[0];
                         z[1]-=alpha*calpha*beta*cbeta*zbleft[1];
@@ -873,17 +914,17 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     den+=calpha*calpha*cbeta*cbeta;
                     z[0]-=calpha*cbeta*dx[0];
                     z[1]-=calpha*cbeta*dx[1];
-                    if(ii>0){//top neighbor
+                    if((ii>0)&&isDefined[(ii-1)*ncols+jj]){//top neighbor
                         double *ztop=&invd[2*((ii-1)*ncols+jj)];
                         z[0]-=alpha*calpha*cbeta*cbeta*ztop[0];
                         z[1]-=alpha*calpha*cbeta*cbeta*ztop[1];
                     }
-                    if(jj>0){//left neighbor
+                    if((jj>0)&&isDefined[ii*ncols+jj-1]){//left neighbor
                         double *zleft=&invd[2*(ii*ncols+jj-1)];
                         z[0]-=calpha*calpha*beta*cbeta*zleft[0];
                         z[1]-=calpha*calpha*beta*cbeta*zleft[1];
                     }
-                    if((ii>0)&&(jj>0)){//top-left neighbor
+                    if((ii>0)&&(jj>0)&&isDefined[(ii-1)*ncols+jj-1]){//top-left neighbor
                         double *ztleft=&invd[2*((ii-1)*ncols+jj-1)];
                         z[0]-=alpha*calpha*beta*cbeta*ztleft[0];
                         z[1]-=alpha*calpha*beta*cbeta*ztleft[1];
@@ -897,17 +938,17 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     den+=calpha*calpha*beta*beta;
                     z[0]-=calpha*beta*dx[0];
                     z[1]-=calpha*beta*dx[1];
-                    if(ii>0){//top neighbor
+                    if((ii>0)&&isDefined[(ii-1)*ncols+jj]){//top neighbor
                         double *ztop=&invd[2*((ii-1)*ncols+jj)];
                         z[0]-=alpha*calpha*beta*beta*ztop[0];
                         z[1]-=alpha*calpha*beta*beta*ztop[1];
                     }
-                    if(jj<ncols-1){//right neighbor
+                    if((jj<ncols-1)&&isDefined[ii*ncols+jj+1]){//right neighbor
                         double *zright=&invd[2*(ii*ncols+jj+1)];
                         z[0]-=calpha*calpha*beta*cbeta*zright[0];
                         z[1]-=calpha*calpha*beta*cbeta*zright[1];
                     }
-                    if((ii>0)&&(jj<ncols-1)){//top-right neighbor
+                    if((ii>0)&&(jj<ncols-1)&&isDefined[(ii-1)*ncols+jj+1]){//top-right neighbor
                         double *ztright=&invd[2*((ii-1)*ncols+jj+1)];
                         z[0]-=alpha*calpha*beta*cbeta*ztright[0];
                         z[1]-=alpha*calpha*beta*cbeta*ztright[1];
@@ -922,6 +963,11 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
         maxChange=0;
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, id+=2, tmp+=2, den++){
+                if(!isDefined[i*ncols+j]){
+                    id[0]=0;
+                    id[1]=0;
+                    continue;
+                }
                 tmp[0]/=(*den);
                 tmp[1]/=(*den);
                 double nrm=(tmp[0]-id[0])*(tmp[0]-id[0])+(tmp[1]-id[1])*(tmp[1]-id[1]);
@@ -935,6 +981,7 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
     }//for iter
     delete[] temp;
     delete[] denom;
+    delete[] isDefined;
     stats[0]=sqrt(maxChange);
     stats[1]=iter;
     return 0;
@@ -1010,8 +1057,32 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
     return 0;
 }
 
+int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats){
+    double error=1+tolerance;
+    double *temp[2];
+    temp[0]=new double[nrows*ncols*2];
+    temp[1]=invd;
+    memset(temp[0], 0, sizeof(double)*2*nrows*ncols);
+    int nsites=2*nrows*ncols;
+    int iter;
+    for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
+        composeVectorFields(temp[iter&1], d, nrows, ncols, temp[1-(iter&1)], stats);
+        double *p=temp[1-(iter&1)];
+        for(int i=0;i<nsites;++i,++p){
+            *p*=-1;
+        }
+        composeVectorFields(d, temp[1-(iter&1)], nrows, ncols, temp[1-(iter&1)], stats);
+        error=stats[1];
+    }
+    if(iter&1){//then the last computation was stored at temp[0]
+        memcpy(invd, temp[0], sizeof(double)*2*nrows*ncols);
+    }
+    delete[] temp[0];
+    return 0;
+}
+
 int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv){
-    double EXP_EPSILON=0.1;//such that the vector field exponential is approx the identity
+    double EXP_EPSILON=0.01;//such that the vector field exponential is approx the identity
     //---compute the maximum norm---
     double stats[3];
     int nsites=nrows*ncols;
@@ -1034,7 +1105,7 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
     //---base case---
     if(n<1){
         memcpy(expv, v, sizeof(double)*2*nsites);
-        invertVectorField(v, nrows, ncols, 1, 20, 1e-4, invexpv, stats);
+        invertVectorField(v, nrows, ncols, 0.5, 100, 1e-4, invexpv, stats);
         return 0;
     }
     //---prepare memory buffers---
@@ -1062,3 +1133,32 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
 }
 
 
+int writeDoubleBuffer(double *buffer, int nDoubles, char *fname){
+    FILE *F=fopen(fname, "wb");
+    fwrite(buffer, sizeof(double), nDoubles, F);
+    fclose(F);
+    return 0;
+}
+
+int readDoubleBuffer(char *fname, int nDoubles, double *buffer){
+    FILE *F=fopen(fname, "rb");
+    fread(buffer, sizeof(double), nDoubles, F);
+    fclose(F);
+    return 0;
+}
+
+
+void createInvertibleDisplacementField(int nrows, int ncols, double b, double m, double *dField){
+    int midRow=nrows/2;
+    int midCol=ncols/2;
+    double *d=dField;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, d+=2){
+            int ii=i-midRow;
+            int jj=j-midCol;
+            double theta=atan2(ii,jj);
+            d[0]=ii*(1.0/(1+b*cos(m*theta))-1.0);
+            d[1]=jj*(1.0/(1+b*cos(m*theta))-1.0);
+        }
+    }
+}
