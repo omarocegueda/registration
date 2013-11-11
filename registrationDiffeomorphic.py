@@ -131,7 +131,7 @@ def testCircleToCMonomodalDiffeomorphic(lambdaParam):
     import registrationCommon as rcommon
     import os
     fname0='data/circle.png'
-    #fname0='/home/omar/Desktop/C_trans.png'
+    #fname0='data/C_trans.png'
     fname1='data/C.png'
     circleToCDisplacementName='circleToCDisplacement.npy'
     circleToCDisplacementInverseName='circleToCDisplacementInverse.npy'

@@ -162,9 +162,9 @@ def testEstimateMonomodalDeformationField2DMultiScale(lambdaParam):
     print 'Max global displacement: ', maxNorm
 
 def testCircleToCMonomodal(lambdaParam, maxOuterIter):
-    fname0='/home/omar/Desktop/circle.png'
-    #fname0='/home/omar/Desktop/C_trans.png'
-    fname1='/home/omar/Desktop/C.png'
+    fname0='data/circle.png'
+    #fname0='data/C_trans.png'
+    fname1='data/C.png'
     nib_moving=plt.imread(fname0)
     nib_fixed=plt.imread(fname1)
     moving=nib_moving[:,:,0]
@@ -475,9 +475,9 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic):
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
 def testCircleToCMultimodal(lambdaParam):
-    fnameMoving='/home/omar/Desktop/circle.png'
-    #fnameMoving='/home/omar/Desktop/C_trans.png'
-    fnameFixed='/home/omar/Desktop/C.png'
+    fnameMoving='data/circle.png'
+    #fnameMoving='data/C_trans.png'
+    fnameFixed='data/C.png'
     nib_moving=plt.imread(fnameMoving)
     nib_fixed=plt.imread(fnameFixed)
     moving=nib_moving[:,:,0]
@@ -818,8 +818,8 @@ def runAllArcesExperiments(lambdaParam, maxOuterIter):
 def checkInversionResults():
     import tensorFieldUtils as tf
     import registrationCommon as rcommon
-    fnameInput='/home/omar/inverseExperiments/displacement.bin'
-    fnameInverse='/home/omar/inverseExperiments/inverse.bin'
+    fnameInput='../inverse/experiments/displacement.bin'
+    fnameInverse='../inverse/experiments/inverse.bin'
     nrows=256
     ncols=256
     numDoubles=2*nrows*ncols
@@ -828,8 +828,8 @@ def checkInversionResults():
     residualField, stats=tf.compose_vector_fields(inputField, inverseField)
     rcommon.plotDiffeomorphism(inputField,inverseField,residualField,'FP')
     print 'Max residual:',stats[0], '. Mean:',stats[1],'(', stats[2],')'
-    statsJacobi=np.loadtxt('/home/omar/inverseExperiments/stats_jacobi.txt',dtype=np.float64)
-    statsFixedPoint=np.loadtxt('/home/omar/inverseExperiments/stats_fixedpoint.txt',dtype=np.float64)
+    statsJacobi=np.loadtxt('../inverse/experiments/stats_jacobi.txt',dtype=np.float64)
+    statsFixedPoint=np.loadtxt('../inverse/experiments/stats_fixedpoint.txt',dtype=np.float64)
     start=0
     plt.figure()
     pJacobi,=plt.plot(statsJacobi[start:,1])
@@ -855,7 +855,7 @@ def createInvertiblefield(m):
     CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
     plt.clabel(CS, inline=1, fontsize=10)
     plt.title('det(J(displacement))')
-    tf.write_double_buffer(np.array(displacement_clean).reshape(-1), '/home/omar/inverseExperiments/displacement.bin')
+    tf.write_double_buffer(np.array(displacement_clean).reshape(-1), '../inverse/experiments/displacement.bin')
     
 
 if __name__=="__main__":
