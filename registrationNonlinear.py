@@ -815,19 +815,29 @@ def runAllArcesExperiments(lambdaParam, maxOuterIter):
         runArcesExperiment(rootDir, lambdaParam, maxOuterIter)
     print 'done.'
 
-def checkInversionResults():
+def checkInversionResults(suffix):
     import tensorFieldUtils as tf
     import registrationCommon as rcommon
-    fnameInput='../inverse/experiments/displacement.bin'
-    fnameInverse='../inverse/experiments/inverse.bin'
+    root='../inverse/experiments/'
+    fnameInput=root+'displacement_clean.bin'
+    fnameInverse=root+'inverse_'+suffix+'.bin'
     nrows=256
     ncols=256
     numDoubles=2*nrows*ncols
     inputField=np.array(tf.read_double_buffer(fnameInput, numDoubles)).reshape(nrows,ncols,2)
     inverseField=np.array(tf.read_double_buffer(fnameInverse, numDoubles)).reshape(nrows,ncols,2)
     residualField, stats=tf.compose_vector_fields(inputField, inverseField)
-    rcommon.plotDiffeomorphism(inputField,inverseField,residualField,'FP')
+    dLattice, dInvLattice, resLattice, detJacobian=rcommon.plotDiffeomorphism(inputField,inverseField,residualField,suffix)
+    plt.imsave(root+'dLattice.png', dLattice, cmap=plt.cm.gray)
+    plt.imsave(root+'dInvLattice_'+suffix+'.png', dInvLattice, cmap=plt.cm.gray)
+    plt.imsave(root+'resLattice_'+suffix+'.png', resLattice, cmap=plt.cm.gray)
+    plt.imsave(root+'jacobian.png', detJacobian, cmap=plt.cm.gray)
+    noisyField=inputField=np.array(tf.read_double_buffer(root+'displacement.bin', numDoubles)).reshape(nrows,ncols,2)
+    deformedNoisy=rcommon.plotDeformedLattice(noisyField)
+    plt.imsave(root+'dLatticeNoisy.png', deformedNoisy, cmap=plt.cm.gray)
     print 'Max residual:',stats[0], '. Mean:',stats[1],'(', stats[2],')'
+
+def plotInversionGraphs():
     statsJacobi=np.loadtxt('../inverse/experiments/stats_jacobi.txt',dtype=np.float64)
     statsFixedPoint=np.loadtxt('../inverse/experiments/stats_fixedpoint.txt',dtype=np.float64)
     start=0
@@ -843,19 +853,23 @@ def checkInversionResults():
     plt.yscale('log')
     plt.legend([pJacobi, pFixedPoint], ["Jacobi", "Fixed Point"])
     plt.title("Maximum error")
-    
 
-def createInvertiblefield(m):
+def createInvertiblefield(m, sigma):
     displacement_clean=tf.create_invertible_displacement_field(256, 256, m, 8)
-    detJacobian=rcommon.computeJacobianField(displacement_clean)
+    if sigma>0:
+        displacement=displacement_clean+np.random.normal(0.0, sigma, displacement_clean.shape)
+    else:
+        displacement=displacement_clean
+    detJacobian=rcommon.computeJacobianField(displacement)
     plt.figure()
     plt.imshow(detJacobian)
     print 'Range:', detJacobian.min(), detJacobian.max()
-    X1,X0=np.mgrid[0:displacement_clean.shape[0], 0:displacement_clean.shape[1]]
+    X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
     CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
     plt.clabel(CS, inline=1, fontsize=10)
     plt.title('det(J(displacement))')
-    tf.write_double_buffer(np.array(displacement_clean).reshape(-1), '../inverse/experiments/displacement.bin')
+    tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement.bin')
+    tf.write_double_buffer(np.array(displacement_clean).reshape(-1), '../inverse/experiments/displacement_clean.bin')
     
 
 if __name__=="__main__":

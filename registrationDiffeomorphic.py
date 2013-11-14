@@ -402,17 +402,18 @@ def testInversion(lambdaParam):
     print 'vector field inversion'
     directExpInverse=tf.invert_vector_field(expd, 1.0, 10000, 1e-7)
     ###Now compare inversions###
-    residualJoint=np.array(tf.compose_vector_fields(displacement, inverse))
-    residualDirect=np.array(tf.compose_vector_fields(displacement, directInverse))
-    residualExpJoint=np.array(tf.compose_vector_fields(expd, invexpd))
-    residualExpDirect=np.array(tf.compose_vector_fields(expd, directExpInverse))
-    rcommon.plotDiffeomorphism(displacement, inverse, residualJoint, 'D-joint', 7)
-    rcommon.plotDiffeomorphism(expd, invexpd, residualExpJoint, 'expD-joint', 7)
-    [d,invd,res]=rcommon.plotDiffeomorphism(displacement, directInverse, residualDirect, 'D-direct', 7)
-    rcommon.plotDiffeomorphism(expd, directExpInverse, residualExpDirect, 'expD-direct', 7)
+    residualJoint=np.array(tf.compose_vector_fields(displacement, inverse)[0])
+    residualDirect=np.array(tf.compose_vector_fields(displacement, directInverse)[0])
+    residualExpJoint=np.array(tf.compose_vector_fields(expd, invexpd)[0])
+    residualExpDirect=np.array(tf.compose_vector_fields(expd, directExpInverse)[0])
+    rcommon.plotDiffeomorphism(displacement, inverse, residualJoint, 'D-joint')
+    rcommon.plotDiffeomorphism(expd, invexpd, residualExpJoint, 'expD-joint')
+    d,invd,res,jacobian=rcommon.plotDiffeomorphism(displacement, directInverse, residualDirect, 'D-direct')
+    rcommon.plotDiffeomorphism(expd, directExpInverse, residualExpDirect, 'expD-direct')
     sp.misc.imsave('circleToC_deformation.png', d)
     sp.misc.imsave('circleToC_inverse_deformation.png', invd)
     sp.misc.imsave('circleToC_residual_deformation.png', res)
+    tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement.bin')
 
 def testInversion_invertible():
     displacement_clean=tf.create_invertible_displacement_field(256, 256, 0.5, 8)

@@ -783,52 +783,31 @@ double computeInverseEnergy(double *d, double *invd, int nrows, int ncols, doubl
     
 }
 
-int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats){
+int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats){
     const static int numNeighbors=4;
     const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
     const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
+    const static int nRow[]={ 0, 0, 1, 1};
+    const static int nCol[]={ 0, 1, 0, 1};
+    double gamma[4];
+    double gamma2[4];
     double *temp=new double[nrows*ncols*2];
+    double *residual=new double[nrows*ncols*2];
     double *denom=new double[nrows*ncols];
-    bool *isDefined=new bool[nrows*ncols];
-    memset(isDefined, 0, sizeof(bool)*nrows*ncols);
-    memset(invd, 0, sizeof(double)*nrows*ncols*2);
+    memset(inv, 0, sizeof(double)*nrows*ncols*2);
     double maxChange=tolerance+1;
-    //---check undefined lattice points---
-    double *dx=d;
-    for(int i=0;i<nrows;++i){
-        for(int j=0;j<ncols;++j, dx+=2){
-            double dii=i+dx[0];
-            double djj=j+dx[1];
-            if((dii<0) || (djj<0) || (dii>=nrows-1)||(djj>=ncols-1)){
-                continue;
-            }
-            int ii=floor(dii);
-            int jj=floor(djj);
-            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                isDefined[ii*ncols+jj]=true;
-            }
-            ++jj;
-            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                isDefined[ii*ncols+jj]=true;
-            }
-            ++ii;
-            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                isDefined[ii*ncols+jj]=true;
-            }
-            --jj;
-            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                isDefined[ii*ncols+jj]=true;
-            }
-        }
-    }
-    //------------------------------------
     int iter;
+    double substats[3];
     for(iter=0;(tolerance*tolerance<maxChange)&&(iter<maxIter);++iter){
         memset(temp, 0, sizeof(double)*nrows*ncols*2);
         memset(denom, 0, sizeof(double)*nrows*ncols);
-        dx=d;
+        //---interpolate the current approximation and accumulate with the forward field---
+        composeVectorFields(forward, inv, nrows, ncols, residual, substats);
+        double *r=residual;
+        double *f=forward;
         for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=2){
+            for(int j=0;j<ncols;++j,r+=2, f+=2){
+                //--accumulate all regularization terms--
                 for(int k=0;k<numNeighbors;++k){
                     int ii=i+dRow[k];
                     if((ii<0)||(ii>=nrows)){
@@ -838,7 +817,319 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     if((jj<0)||(jj>=ncols)){
                         continue;
                     }
-                    if(!isDefined[ii*ncols+jj]){
+                    denom[i*ncols+j]+=lambdaParam;
+                    temp[2*(i*ncols+j)]+=lambdaParam*inv[2*(ii*ncols+jj)];
+                    temp[2*(i*ncols+j)+1]+=lambdaParam*inv[2*(ii*ncols+jj)+1];
+                }
+                //find the variables that are affected by this input point, and their interpolation coefficients
+                double dii=i+f[0];
+                double djj=j+f[1];
+                if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int ii=floor(f[0]);
+                int jj=floor(f[1]);
+                double calpha=f[0]-ii;
+                double cbeta=f[1]-jj;
+                ii+=i;
+                jj+=j;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                //---finally accumulate the affected terms---
+                gamma[0]=alpha*beta;//top left
+                gamma[1]=alpha*cbeta;//top right
+                gamma[2]=calpha*beta;//bottom left
+                gamma[3]=calpha*cbeta;//bottom right
+                for(int k=0;k<4;++k){
+                    int iii=ii+nRow[k];
+                    int jjj=jj+nCol[k];
+                    if((iii<0)||(jjj<0)||(iii>=nrows)||(jjj>=ncols)){
+                        continue;
+                    }
+                    gamma2[k]=gamma[k]*gamma[k];
+                    temp[2*(iii*ncols+jjj)]+=inv[2*(iii*ncols+jjj)]*gamma2[k] - r[0]*gamma[k];
+                    temp[2*(iii*ncols+jjj)+1]+=inv[2*(iii*ncols+jjj)+1]*gamma2[k] - r[1]*gamma[k];
+                    denom[iii*ncols+jjj]+=gamma2[k];
+                }//for k
+            }//for j
+        }//for i
+        //now execute the Jacobi iteration
+        double *id=inv;
+        double *tmp=temp;
+        double *den=denom;
+        maxChange=0;
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, id+=2, tmp+=2, den++){
+                tmp[0]/=(*den);
+                tmp[1]/=(*den);
+                double nrm=(tmp[0]-id[0])*(tmp[0]-id[0])+(tmp[1]-id[1])*(tmp[1]-id[1]);
+                if(maxChange<nrm){
+                    maxChange=nrm;
+                }
+                id[0]=tmp[0];
+                id[1]=tmp[1];
+            }
+        }
+    }//for iter
+    delete[] temp;
+    delete[] denom;
+    delete[] residual;
+    stats[0]=sqrt(maxChange);
+    stats[1]=iter;
+    return 0;
+}
+//==================================================================================================
+//==================================================================================================
+//=====================================Yan's algorithm begins=======================================
+//==================================================================================================
+//==================================================================================================
+//==================================================================================================
+inline bool checkIsFinite(double *error, int nrows, int ncols, int r, int c){
+    if((r<0)||(c<0)||(r>=nrows)||(c>=ncols)){
+        return false;
+    }
+    if(isInfinite(error[r*ncols+c])){
+        return false;
+    }
+    return true;
+}
+
+void findNearesFinite(double *error, int nrows, int ncols, int r, int c, int &rr, int &cc){
+    int ring=1;
+    bool found=false;
+    while(true){
+        rr=r-ring-1;
+        cc=c-1;
+        for(int k=0;k<=ring;++k){//top-right side of the diamond
+            ++rr;
+            ++cc;
+            if(checkIsFinite(error, nrows, ncols, rr, cc)){
+                return;
+            }
+        }
+        for(int k=0;k<ring;++k){//bottom-right side of the diamond
+            ++rr;
+            --cc;
+            if(checkIsFinite(error, nrows, ncols, rr, cc)){
+                return;
+            }
+        }
+        for(int k=0;k<ring;++k){//bottom-left side of the diamond
+            --rr;
+            --cc;
+            if(checkIsFinite(error, nrows, ncols, rr, cc)){
+                return;
+            }
+        }
+        for(int k=0;k<ring-1;++k){//top-left side of the diamond
+            --rr;
+            ++cc;
+            if(checkIsFinite(error, nrows, ncols, rr, cc)){
+                return;
+            }
+        }
+        ++ring;
+    }
+
+}
+
+void interpolateDisplacementFieldAt(double *forward, int nrows, int ncols, double pr, double pc, double &fr, double &fc){
+    if((pr<0) || (pc<0) || (pr>nrows-1) || (pc>ncols-1)){
+        fr=0;
+        fc=0;
+        return;
+    }
+    int i=floor(pr);
+    int j=floor(pc);
+    double alphac=pr-i;
+    double betac=pc-j;
+    double alpha=1.0-alphac;
+    double beta=1.0-betac;
+    double *ff=&forward[2*(i*ncols+j)];
+    fr=alpha*beta*ff[0];
+    fc=alpha*beta*ff[1];
+    ++j;
+    if(j<ncols){
+        ff=&forward[2*(i*ncols+j)];
+        fr+=alpha*betac*ff[0];
+        fc+=alpha*betac*ff[1];
+    }
+    ++i;
+    if((i<nrows)&&(j<ncols)){
+        ff=&forward[2*(i*ncols+j)];
+        fr+=alphac*betac*ff[0];
+        fc+=alphac*betac*ff[1];
+    }
+    --j;
+    if(i<nrows){
+        ff=&forward[2*(i*ncols+j)];
+        fr+=alphac*beta*ff[0];
+        fc+=alphac*beta*ff[1];
+    }
+}
+
+int invertVectorFieldYan(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats){
+    const int numNeighbors=4;
+    const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
+    const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
+    const static int nRow[]={ 0, 0, 1, 1};
+    const static int nCol[]={ 0, 1, 0, 1};
+    // Step 0: initialize delta, MAXLOOP and inverse computing error
+    const int MAXLOOP=6;
+    double *error=new double[nrows*ncols];
+    for(int i=nrows*ncols-1;i>=0;--i){
+        error[i]=INF64;
+    }
+    //Step 1a: Map points from p in R, assign e(q) for points q in S which are immediately adjacent to f(p) if assignment reduces e(q)
+    double *f=forward;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, f+=2){//p=(i,j)
+            double dii=i+f[0];//this is f(p)
+            double djj=j+f[1];
+            if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){//no one is affected
+                continue;
+            }
+            //find the top left index and the interpolation coefficients
+            int ii=floor(f[0]);
+            int jj=floor(f[1]);
+            ii+=i;
+            jj+=j;
+            //assign all grid points immediately adjacent to f(p)
+            for(int k=0;k<4;++k){
+                int iii=ii+nRow[k];
+                int jjj=jj+nCol[k];
+                if((iii<0)||(jjj<0)||(iii>=nrows)||(jjj>=ncols)){
+                    continue;
+                }
+                double dr=dii-iii;
+                double dc=djj-jjj;//q=(iii,jjj)
+                double opt=dr*dr+dc*dc;//||q-f(p)||^2
+                if(opt<error[iii*ncols+jjj]){
+                    double *dq=&inv[2*(iii*ncols+jjj)];
+                    dq[0]=i-iii;
+                    dq[1]=j-jjj;//then q+inv(q)=(iii,jjj)+dq = (i,j)=p
+                    error[iii*ncols+jjj]=opt;
+                }
+
+            }
+        }
+    }
+    // Step 1b: map unmapped points in S via nearest neighbor
+    double *dq=inv;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j,dq+=2){//q=(i,j)
+            if(!isInfinite(error[i*ncols+j])){
+                continue;
+            }
+            //find nearest neighbor q’ in S with finite e(q’)
+            int ii,jj;
+            findNearesFinite(error, nrows, ncols, i, j, ii, jj);
+            double *dqprime=&inv[2*(ii*ncols+jj)];//(ii,jj) is assigned, (i,j) is not
+            dq[0]=ii-i+dqprime[0];
+            dq[1]=jj-j+dqprime[1];
+            double fr,fc;
+            interpolateDisplacementFieldAt(forward, nrows, ncols, i+dq[0], j+dq[1], fr, fc);
+            double dr=dq[0]+fr;
+            double dc=dq[1]+fc;
+            error[i*ncols+j]=dr*dr+dc*dc;
+        }
+    }
+    // Step 2a: Search around points with e(q) > tolerance in S
+    double *e=error;
+    dq=inv;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j,++e, dq+=2){//q=(i,j)
+            double cr=i+dq[0];//g(q)=(cr,cc)
+            double cc=j+dq[1];
+            int iter=0;
+            double stepSize=*e;
+            while((*e > tolerance)&&(iter<MAXLOOP)){
+                for(int ii=-1;ii<=1;ii+=2){
+                    for(int jj=-1;jj<=1;jj+=2){
+                        double vr=cr+ii*stepSize*0.5;
+                        double vc=cc+jj*stepSize*0.5;//vertex of the box:
+                        double fvr, fvc;
+                        interpolateDisplacementFieldAt(forward, nrows, ncols, vr, vc, fvr, fvc);
+                        double dr=vr+fvr-i;
+                        double dc=vc+fvc-j;
+                        double opt=dr*dr+dc*dc;
+                        if(opt<*e){
+                            dq[0]=vr-i;
+                            dq[1]=vc-j;
+                            *e=opt;
+                        }
+                    }
+                }
+                ++iter;
+                stepSize*=0.5;
+            }
+        }
+    }
+    // Step 2b: Systematic search around active grid points (adjacent points with low errors) instead of around the points themselves
+    /*bool finished=false;
+    int iter=0;
+    while((!finished) && (iter<MAXLOOP)){
+        ++iter;
+        e=error;
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j,++e){//q=(i,j)
+                if(*e>=tolerance){
+                    continue;
+                }
+                for(int k=0;k<numNeighbors;++k){
+                    int ii=i+dRow[k];
+                    int jj=j+dCol[k];
+                    if(error[ii*ncols+jj]>tolerance){//qprime= (ii,jj)
+                        double stepSize=sqrt(2.0);
+                        for(int ii=-1;ii<=1;ii+=2){
+                            for(int jj=-1;jj<=1;jj+=2){
+                                double vr=cr+ii*stepSize*0.5;
+                                double vc=cc+jj*stepSize*0.5;//vertex of the box:
+                            }
+                        }
+                        
+                    }
+                }
+                
+                
+            }
+        }
+    }*/
+    delete[] error;
+}
+
+
+//==================================================================================================
+//==================================================================================================
+//=====================================Yan's algorithm ends=========================================
+//==================================================================================================
+//==================================================================================================
+//==================================================================================================
+
+
+int invertVectorField_old(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats){
+    const static int numNeighbors=4;
+    const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
+    const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
+    double *temp=new double[nrows*ncols*2];
+    double *denom=new double[nrows*ncols];
+    memset(invd, 0, sizeof(double)*nrows*ncols*2);
+    double maxChange=tolerance+1;
+    int iter;
+    for(iter=0;(tolerance*tolerance<maxChange)&&(iter<maxIter);++iter){
+        memset(temp, 0, sizeof(double)*nrows*ncols*2);
+        memset(denom, 0, sizeof(double)*nrows*ncols);
+        double *dx=d;
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=2){
+                for(int k=0;k<numNeighbors;++k){
+                    int ii=i+dRow[k];
+                    if((ii<0)||(ii>=nrows)){
+                        continue;
+                    }
+                    int jj=j+dCol[k];
+                    if((jj<0)||(jj>=ncols)){
                         continue;
                     }
                     denom[i*ncols+j]+=lambdaParam;
@@ -866,17 +1157,17 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     den+=alpha*alpha*beta*beta;
                     z[0]-=alpha*beta*dx[0];
                     z[1]-=alpha*beta*dx[1];
-                    if((jj<ncols-1)&&isDefined[ii*ncols+jj+1]){//right neighbor
+                    if((jj<ncols-1)){//right neighbor
                         double *zright=&invd[2*(ii*ncols+jj+1)];
                         z[0]-=alpha*alpha*beta*cbeta*zright[0];
                         z[1]-=alpha*alpha*beta*cbeta*zright[1];
                     }
-                    if((ii<nrows-1)&&isDefined[(ii+1)*ncols+jj]){//bottom neighbor
+                    if((ii<nrows-1)){//bottom neighbor
                         double *zbottom=&invd[2*((ii+1)*ncols+jj)];
                         z[0]-=alpha*calpha*beta*beta*zbottom[0];
                         z[1]-=alpha*calpha*beta*beta*zbottom[1];
                     }
-                    if((jj<ncols-1) && (ii<nrows-1) && isDefined[(ii+1)*ncols+jj+1]){//bottom right corner
+                    if((jj<ncols-1) && (ii<nrows-1)){//bottom right corner
                         double *zbright=&invd[2*((ii+1)*ncols+jj+1)];
                         z[0]-=alpha*calpha*beta*cbeta*zbright[0];
                         z[1]-=alpha*calpha*beta*cbeta*zbright[1];
@@ -890,17 +1181,17 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     den+=alpha*alpha*cbeta*cbeta;
                     z[0]-=alpha*cbeta*dx[0];
                     z[1]-=alpha*cbeta*dx[1];
-                    if((ii<nrows-1)&&isDefined[(ii+1)*ncols+jj]){//bottom neighbor
+                    if((ii<nrows-1)){//bottom neighbor
                         double *zbottom=&invd[2*((ii+1)*ncols+jj)];
                         z[0]-=alpha*calpha*cbeta*cbeta*zbottom[0];
                         z[1]-=alpha*calpha*cbeta*cbeta*zbottom[1];
                     }
-                    if((jj>0)&&isDefined[ii*ncols+jj-1]){//left neighbor
+                    if((jj>0)){//left neighbor
                         double *zleft=&invd[2*(ii*ncols+jj-1)];
                         z[0]-=alpha*alpha*beta*cbeta*zleft[0];
                         z[1]-=alpha*alpha*beta*cbeta*zleft[1];
                     }
-                    if((ii<nrows-1) && (jj>0)&&isDefined[(ii+1)*ncols+jj-1]){//bottom-left neighbor
+                    if((ii<nrows-1) && (jj>0)){//bottom-left neighbor
                         double *zbleft=&invd[2*((ii+1)*ncols+jj-1)];
                         z[0]-=alpha*calpha*beta*cbeta*zbleft[0];
                         z[1]-=alpha*calpha*beta*cbeta*zbleft[1];
@@ -914,17 +1205,17 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     den+=calpha*calpha*cbeta*cbeta;
                     z[0]-=calpha*cbeta*dx[0];
                     z[1]-=calpha*cbeta*dx[1];
-                    if((ii>0)&&isDefined[(ii-1)*ncols+jj]){//top neighbor
+                    if((ii>0)){//top neighbor
                         double *ztop=&invd[2*((ii-1)*ncols+jj)];
                         z[0]-=alpha*calpha*cbeta*cbeta*ztop[0];
                         z[1]-=alpha*calpha*cbeta*cbeta*ztop[1];
                     }
-                    if((jj>0)&&isDefined[ii*ncols+jj-1]){//left neighbor
+                    if((jj>0)){//left neighbor
                         double *zleft=&invd[2*(ii*ncols+jj-1)];
                         z[0]-=calpha*calpha*beta*cbeta*zleft[0];
                         z[1]-=calpha*calpha*beta*cbeta*zleft[1];
                     }
-                    if((ii>0)&&(jj>0)&&isDefined[(ii-1)*ncols+jj-1]){//top-left neighbor
+                    if((ii>0)){//top-left neighbor
                         double *ztleft=&invd[2*((ii-1)*ncols+jj-1)];
                         z[0]-=alpha*calpha*beta*cbeta*ztleft[0];
                         z[1]-=alpha*calpha*beta*cbeta*ztleft[1];
@@ -938,17 +1229,17 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
                     den+=calpha*calpha*beta*beta;
                     z[0]-=calpha*beta*dx[0];
                     z[1]-=calpha*beta*dx[1];
-                    if((ii>0)&&isDefined[(ii-1)*ncols+jj]){//top neighbor
+                    if((ii>0)){//top neighbor
                         double *ztop=&invd[2*((ii-1)*ncols+jj)];
                         z[0]-=alpha*calpha*beta*beta*ztop[0];
                         z[1]-=alpha*calpha*beta*beta*ztop[1];
                     }
-                    if((jj<ncols-1)&&isDefined[ii*ncols+jj+1]){//right neighbor
+                    if((jj<ncols-1)){//right neighbor
                         double *zright=&invd[2*(ii*ncols+jj+1)];
                         z[0]-=calpha*calpha*beta*cbeta*zright[0];
                         z[1]-=calpha*calpha*beta*cbeta*zright[1];
                     }
-                    if((ii>0)&&(jj<ncols-1)&&isDefined[(ii-1)*ncols+jj+1]){//top-right neighbor
+                    if((ii>0)&&(jj<ncols-1)){//top-right neighbor
                         double *ztright=&invd[2*((ii-1)*ncols+jj+1)];
                         z[0]-=alpha*calpha*beta*cbeta*ztright[0];
                         z[1]-=alpha*calpha*beta*cbeta*ztright[1];
@@ -963,11 +1254,6 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
         maxChange=0;
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, id+=2, tmp+=2, den++){
-                if(!isDefined[i*ncols+j]){
-                    id[0]=0;
-                    id[1]=0;
-                    continue;
-                }
                 tmp[0]/=(*den);
                 tmp[1]/=(*den);
                 double nrm=(tmp[0]-id[0])*(tmp[0]-id[0])+(tmp[1]-id[1])*(tmp[1]-id[1]);
@@ -981,7 +1267,6 @@ int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int m
     }//for iter
     delete[] temp;
     delete[] denom;
-    delete[] isDefined;
     stats[0]=sqrt(maxChange);
     stats[1]=iter;
     return 0;
