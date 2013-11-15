@@ -30,3 +30,4 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
 int readDoubleBuffer(char *fname, int nDoubles, double *buffer);
 int writeDoubleBuffer(double *buffer, int nDoubles, char *fname);
 void createInvertibleDisplacementField(int nrows, int ncols, double b, double m, double *dField);
+int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, double tolerance, double *inv);

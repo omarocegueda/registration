@@ -897,7 +897,6 @@ inline bool checkIsFinite(double *error, int nrows, int ncols, int r, int c){
 
 void findNearesFinite(double *error, int nrows, int ncols, int r, int c, int &rr, int &cc){
     int ring=1;
-    bool found=false;
     while(true){
         rr=r-ring-1;
         cc=c-1;
@@ -969,14 +968,13 @@ void interpolateDisplacementFieldAt(double *forward, int nrows, int ncols, doubl
     }
 }
 
-int invertVectorFieldYan(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats){
+int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, double tolerance, double *inv){
     const int numNeighbors=4;
     const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
     const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
     const static int nRow[]={ 0, 0, 1, 1};
     const static int nCol[]={ 0, 1, 0, 1};
     // Step 0: initialize delta, MAXLOOP and inverse computing error
-    const int MAXLOOP=6;
     double *error=new double[nrows*ncols];
     for(int i=nrows*ncols-1;i>=0;--i){
         error[i]=INF64;
@@ -984,34 +982,31 @@ int invertVectorFieldYan(double *forward, int nrows, int ncols, double lambdaPar
     //Step 1a: Map points from p in R, assign e(q) for points q in S which are immediately adjacent to f(p) if assignment reduces e(q)
     double *f=forward;
     for(int i=0;i<nrows;++i){
-        for(int j=0;j<ncols;++j, f+=2){//p=(i,j)
-            double dii=i+f[0];//this is f(p)
-            double djj=j+f[1];
+        for(int j=0;j<ncols;++j, f+=2){//p=(i,j) in R
+            double dii=i+f[0];
+            double djj=j+f[1];//(dii, djj) = f(p)
             if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){//no one is affected
                 continue;
             }
             //find the top left index and the interpolation coefficients
-            int ii=floor(f[0]);
-            int jj=floor(f[1]);
-            ii+=i;
-            jj+=j;
+            int ii=floor(dii);
+            int jj=floor(djj);
             //assign all grid points immediately adjacent to f(p)
             for(int k=0;k<4;++k){
                 int iii=ii+nRow[k];
-                int jjj=jj+nCol[k];
+                int jjj=jj+nCol[k];//(iii, jjj)=q is a surrounding point
                 if((iii<0)||(jjj<0)||(iii>=nrows)||(jjj>=ncols)){
-                    continue;
+                    continue;//the point is outside the lattice
                 }
                 double dr=dii-iii;
-                double dc=djj-jjj;//q=(iii,jjj)
-                double opt=dr*dr+dc*dc;//||q-f(p)||^2
-                if(opt<error[iii*ncols+jjj]){
+                double dc=djj-jjj;//(dr,dc) = f(p) - q
+                double opt=sqrt(dr*dr+dc*dc);//||q-f(p)||
+                if(opt<error[iii*ncols+jjj]){//if(||q-f(p)||^2 < e(q))
                     double *dq=&inv[2*(iii*ncols+jjj)];
                     dq[0]=i-iii;
-                    dq[1]=j-jjj;//then q+inv(q)=(iii,jjj)+dq = (i,j)=p
+                    dq[1]=j-jjj;//g(q)=p  <<==>>  q+inv[q] = p <<==>> inv[q]=p-q
                     error[iii*ncols+jjj]=opt;
                 }
-
             }
         }
     }
@@ -1024,39 +1019,39 @@ int invertVectorFieldYan(double *forward, int nrows, int ncols, double lambdaPar
             }
             //find nearest neighbor q’ in S with finite e(q’)
             int ii,jj;
-            findNearesFinite(error, nrows, ncols, i, j, ii, jj);
-            double *dqprime=&inv[2*(ii*ncols+jj)];//(ii,jj) is assigned, (i,j) is not
-            dq[0]=ii-i+dqprime[0];
-            dq[1]=jj-j+dqprime[1];
+            findNearesFinite(error, nrows, ncols, i, j, ii, jj);//(ii, jj)=q'
+            double *dqprime=&inv[2*(ii*ncols+jj)];
+            dq[0]=ii+dqprime[0]-i;
+            dq[1]=jj+dqprime[1]-j;//g(q)=g(q') <<==>> q+inv[q] = q'+inv[q']  <<==>>  inv[q]=q'+inv[q']-q
             double fr,fc;
-            interpolateDisplacementFieldAt(forward, nrows, ncols, i+dq[0], j+dq[1], fr, fc);
-            double dr=dq[0]+fr;
-            double dc=dq[1]+fc;
-            error[i*ncols+j]=dr*dr+dc*dc;
+            interpolateDisplacementFieldAt(forward, nrows, ncols, ii+dqprime[0], jj+dqprime[1], fr, fc);//(ii+dqprime[0], jj+dqprime[1])+(fr,fc) = f(g(q')) 
+            double dr=ii+dqprime[0]+fr-i;
+            double dc=jj+dqprime[1]+fc-j;//(dr, dc)=f(g(q'))-q
+            error[i*ncols+j]=sqrt(dr*dr+dc*dc);
         }
     }
     // Step 2a: Search around points with e(q) > tolerance in S
     double *e=error;
     dq=inv;
     for(int i=0;i<nrows;++i){
-        for(int j=0;j<ncols;++j,++e, dq+=2){//q=(i,j)
-            double cr=i+dq[0];//g(q)=(cr,cc)
-            double cc=j+dq[1];
-            int iter=0;
+        for(int j=0;j<ncols;++j,++e, dq+=2){//q=(i,j) in S
             double stepSize=*e;
-            while((*e > tolerance)&&(iter<MAXLOOP)){
-                for(int ii=-1;ii<=1;ii+=2){
-                    for(int jj=-1;jj<=1;jj+=2){
-                        double vr=cr+ii*stepSize*0.5;
-                        double vc=cc+jj*stepSize*0.5;//vertex of the box:
+            double cr=i+dq[0];
+            double cc=j+dq[1];//(cr,cc) = g(q)
+            int iter=0;
+            while((*e > tolerance)&&(iter<maxloop)){
+                for(int signRow=-1;signRow<=1;signRow+=2){
+                    for(int signCol=-1;signCol<=1;signCol+=2){
+                        double vr=cr+signRow*stepSize*0.5;
+                        double vc=cc+signCol*stepSize*0.5;// p'=(vr,vc) (corner of he box centered at g(q))
                         double fvr, fvc;
-                        interpolateDisplacementFieldAt(forward, nrows, ncols, vr, vc, fvr, fvc);
-                        double dr=vr+fvr-i;
-                        double dc=vc+fvc-j;
-                        double opt=dr*dr+dc*dc;
+                        interpolateDisplacementFieldAt(forward, nrows, ncols, vr, vc, fvr, fvc);//f(p') = (vr+fvr, vc+fvc)
+                        double dr=i-vr-fvr;
+                        double dc=j-vc-fvc;//q-f(p') = (i,j) - (vr+fvr, vc+fvc)
+                        double opt=sqrt(dr*dr+dc*dc);
                         if(opt<*e){
                             dq[0]=vr-i;
-                            dq[1]=vc-j;
+                            dq[1]=vc-j;//g(q)=p'  <<==>> q+inv[q] = p'  <<==>> inv[q] = p'-q
                             *e=opt;
                         }
                     }
@@ -1067,36 +1062,69 @@ int invertVectorFieldYan(double *forward, int nrows, int ncols, double lambdaPar
         }
     }
     // Step 2b: Systematic search around active grid points (adjacent points with low errors) instead of around the points themselves
-    /*bool finished=false;
+    bool finished=false;
     int iter=0;
-    while((!finished) && (iter<MAXLOOP)){
+    while((!finished) && (iter<maxloop)){
         ++iter;
         e=error;
+        dq=inv;
         for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j,++e){//q=(i,j)
+            for(int j=0;j<ncols;++j,++e, dq+=2){//q=(i,j)
                 if(*e>=tolerance){
                     continue;
                 }
-                for(int k=0;k<numNeighbors;++k){
+                //now error[q]<tolerance
+                for(int k=0;k<numNeighbors;++k){//look for adjacent vertices
                     int ii=i+dRow[k];
                     int jj=j+dCol[k];
-                    if(error[ii*ncols+jj]>tolerance){//qprime= (ii,jj)
-                        double stepSize=sqrt(2.0);
-                        for(int ii=-1;ii<=1;ii+=2){
-                            for(int jj=-1;jj<=1;jj+=2){
-                                double vr=cr+ii*stepSize*0.5;
-                                double vc=cc+jj*stepSize*0.5;//vertex of the box:
-                            }
-                        }
-                        
+                    if((ii<0)||(jj<0)||(i>=nrows)||(j>=ncols)){
+                        continue;//q' is outside of the lattice
                     }
-                }
-                
-                
+                    if(error[ii*ncols+jj]<=tolerance){//q'= (ii,jj)
+                        continue;
+                    }
+                    //now error[q']>tolerance
+                    double stepSize=sqrt(2.0);
+                    for(int innerIter=0;innerIter<maxloop;++innerIter){
+                        double cr=i+dq[0];
+                        double cc=j+dq[1];//g(q)=(cr,cc)
+                        for(int signRow=-1;signRow<=1;signRow+=2){
+                            for(int signCol=-1;signCol<=1;signCol+=2){
+                                double vr=cr+signRow*stepSize*0.5;
+                                double vc=cc+signCol*stepSize*0.5;//(vr,vc)=p' (corner of the box )
+                                double fvr, fvc;
+                                interpolateDisplacementFieldAt(forward, nrows, ncols, vr, vc, fvr, fvc);//f(p') = (vr+fvr, vc+fvc)
+                                //find the lattice points q'' surrounding f(p')=(fvr, fvc)
+                                //find the top left index and the interpolation coefficients
+                                int ii=floor(vr+fvr);
+                                int jj=floor(vc+fvc);
+                                //assign all grid points immediately adjacent to f(p)
+                                for(int k=0;k<4;++k){
+                                    int iii=ii+nRow[k];
+                                    int jjj=jj+nCol[k];//(iii, jjj) is a corner q'' surrounding f(p')
+                                    if((iii<0)||(jjj<0)||(iii>=nrows)||(jjj>=ncols)){
+                                        continue;//the corner does not exist
+                                    }
+                                    double dr=iii-(vr+fvr);
+                                    double dc=jjj-(vc+fvc);//(dr, dc) = q''-f(p')
+                                    double opt=sqrt(dr*dr+dc*dc);//||q''-f(p')||^2
+                                    if(opt<error[iii*ncols+jjj]){
+                                        double *dqbiprime=&inv[2*(iii*ncols+jjj)];
+                                        dqbiprime[0]=vr-iii;
+                                        dqbiprime[1]=vc-jjj;//g(q'')=p' <<==>> q''+inv[q''] = p'  <<==>> inv[q'']=p'-q''
+                                        error[iii*ncols+jjj]=opt;
+                                    }
+                                }//for each q'' surrounding f(p')
+                            }
+                        }//for each vertex p' of the box G(g(q))
+                    }//while innerIter<maxloop
+                    
+                }//foreach point q' adjacent to q such that e(q')>tolerance
             }
-        }
-    }*/
+        }//foreach grid point q in S
+    }
     delete[] error;
+    return 0;
 }
 
 

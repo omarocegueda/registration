@@ -34,6 +34,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int readDoubleBuffer(char *fname, int nDoubles, double *buffer)
     int writeDoubleBuffer(double *buffer, int nDoubles, char *fname)
     void createInvertibleDisplacementField(int nrows, int ncols, double b, double m, double *dField)
+    int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, double tolerance, double *inv)
 
 def testFunction(param):
     print 'Testing', param
@@ -217,6 +218,14 @@ cpdef invert_vector_field(double[:,:,:] d, double lambdaParam, int maxIter, doub
     cdef double[:,:,:] invd=np.zeros_like(d)
     retVal=invertVectorField(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0], &stats[0])
     print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
+    return invd
+
+cpdef invert_vector_field_Yan(double[:,:,:] d, int maxIter, double tolerance):
+    cdef int retVal
+    cdef int nrows=d.shape[0]
+    cdef int ncols=d.shape[1]
+    cdef double[:,:,:] invd=np.zeros_like(d)
+    retVal=invertVectorFieldYan(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0])
     return invd
 
 #cpdef invert_vector_field_fixed_point(double[:,:,:] d, int maxIter, double tolerance):
