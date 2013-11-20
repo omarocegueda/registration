@@ -35,6 +35,9 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int writeDoubleBuffer(double *buffer, int nDoubles, char *fname)
     void createInvertibleDisplacementField(int nrows, int ncols, double b, double m, double *dField)
     int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, double tolerance, double *inv)
+    void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *counts)
+    int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols, double *sol)
+    int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp)
 
 def testFunction(param):
     print 'Testing', param
@@ -256,6 +259,22 @@ cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
     return comp, stats
 
+cpdef vector_field_interpolation(double[:,:,:] d1, double[:,:,:] d2):
+    cdef int nrows=d1.shape[0]
+    cdef int ncols=d1.shape[1]
+    cdef double[:,:,:] sol=np.zeros_like(d1)
+    cdef int retVal
+    retVal=vectorFieldInterpolation(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &sol[0,0,0])
+    return sol
+
+cpdef vector_field_adjoint_interpolation(double[:,:,:] d1, double[:,:,:] d2):
+    cdef int nrows=d1.shape[0]
+    cdef int ncols=d1.shape[1]
+    cdef double[:,:,:] sol=np.zeros_like(d1)
+    cdef int retVal
+    retVal=vectorFieldAdjointInterpolation(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &sol[0,0,0])
+    return sol
+
 cpdef vector_field_exponential(double[:,:,:] v):
     cdef double[:,:,:] expv = np.zeros_like(v)
     cdef double[:,:,:] invexpv = np.zeros_like(v)
@@ -284,3 +303,10 @@ cpdef create_invertible_displacement_field(int nrows, int ncols, double b, doubl
     cdef double[:,:,:] dField = np.ndarray((nrows, ncols,2), dtype=np.float64)
     createInvertibleDisplacementField(nrows, ncols, b, m, &dField[0,0,0])
     return dField
+
+cpdef count_supporting_data_per_pixel(double[:,:,:] forward):
+    cdef int nrows=forward.shape[0]
+    cdef int ncols=forward.shape[1]
+    cdef int[:,:] counts=np.zeros(shape=(nrows, ncols), dtype=np.int32)
+    countSupportingDataPerPixel(&forward[0,0,0], nrows, ncols, &counts[0,0])
+    return counts

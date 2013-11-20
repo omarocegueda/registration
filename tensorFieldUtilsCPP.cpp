@@ -1301,7 +1301,7 @@ int invertVectorField_old(double *d, int nrows, int ncols, double lambdaParam, i
 }
 
 /*
-    Computes comp(x)=d2(d1(x)) (i.e. applies first d1, then d2 to the result)
+    Computes comp(x)=d2(d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
 */
 int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats){
     double *dx=d1;
@@ -1368,6 +1368,104 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
     stats[1]=sqrt(meanNorm);
     stats[2]=sqrt(stdNorm/cnt - meanNorm*meanNorm);
     return 0;
+}
+
+/*
+    Interpolates the vector field d2 at d1: d2(d1(x)) (i.e. applies first d1, then d2 to the result)
+*/
+int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp){
+    double *dx=d1;
+    double *res=comp;
+    memset(comp, 0, sizeof(double)*nrows*ncols*2); 
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, dx+=2, res+=2){
+            double dii=i+dx[0];
+            double djj=j+dx[1];
+            if((dii<0)||(djj<0)||(dii>nrows-1)||(djj>ncols-1)){
+                continue;
+            }
+            int ii=floor(dii);
+            int jj=floor(djj);
+            double calpha=dii-ii;//by definition these factors are nonnegative
+            double cbeta=djj-jj;
+            double alpha=1-calpha;
+            double beta=1-cbeta;
+            //---top-left
+            double *z=&d2[2*(ii*ncols+jj)];
+            res[0]+=alpha*beta*z[0];
+            res[1]+=alpha*beta*z[1];
+            //---top-right
+            ++jj;
+            if(jj<ncols){
+                z=&d2[2*(ii*ncols+jj)];
+                res[0]+=alpha*cbeta*z[0];
+                res[1]+=alpha*cbeta*z[1];
+            }
+            //---bottom-right
+            ++ii;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                z=&d2[2*(ii*ncols+jj)];
+                res[0]+=calpha*cbeta*z[0];
+                res[1]+=calpha*cbeta*z[1];
+            }
+            //---bottom-left
+            --jj;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                z=&d2[2*(ii*ncols+jj)];
+                res[0]+=calpha*beta*z[0];
+                res[1]+=calpha*beta*z[1];
+            }
+        }
+    }
+    return 0;
+}
+
+int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols, double *sol){
+    double *dx=d1;
+    double *z=d2;
+    memset(sol, 0, sizeof(double)*nrows*ncols*2); 
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, dx+=2, z+=2){
+            double dii=i+dx[0];
+            double djj=j+dx[1];
+            if((dii<0)||(djj<0)||(dii>nrows-1)||(djj>ncols-1)){
+                continue;
+            }
+            int ii=floor(dii);
+            int jj=floor(djj);
+            double calpha=dii-ii;//by definition these factors are nonnegative
+            double cbeta=djj-jj;
+            double alpha=1-calpha;
+            double beta=1-cbeta;
+            //top left
+            double *res=&sol[2*(ii*ncols+jj)];
+            res[0]+=alpha*beta*z[0];
+            res[1]+=alpha*beta*z[1];
+            //---top-right
+            ++jj;
+            if(jj<ncols){
+                double *res=&sol[2*(ii*ncols+jj)];
+                res[0]+=alpha*cbeta*z[0];
+                res[1]+=alpha*cbeta*z[1];
+            }
+            //---bottom-right
+            ++ii;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                double *res=&sol[2*(ii*ncols+jj)];
+                res[0]+=calpha*cbeta*z[0];
+                res[1]+=calpha*cbeta*z[1];
+            }
+            //---bottom-left
+            --jj;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                double *res=&sol[2*(ii*ncols+jj)];
+                res[0]+=calpha*beta*z[0];
+                res[1]+=calpha*beta*z[1];
+            }
+        }
+    }
+    return 0;
+    
 }
 
 int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats){
@@ -1472,6 +1570,37 @@ void createInvertibleDisplacementField(int nrows, int ncols, double b, double m,
             double theta=atan2(ii,jj);
             d[0]=ii*(1.0/(1+b*cos(m*theta))-1.0);
             d[1]=jj*(1.0/(1+b*cos(m*theta))-1.0);
+        }
+    }
+}
+
+
+void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *counts){
+    memset(counts, 0, sizeof(int)*nrows*ncols);
+    double *f=forward;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, f+=2){
+            double di=i+f[0];
+            double dj=j+f[1];
+            if(di<0 || dj<0 || di>nrows-1 || dj>ncols-1){
+                continue;
+            }
+            int ii=floor(i+f[0]);
+            int jj=floor(j+f[1]);
+            counts[ii*ncols+jj]++;
+            ++jj;
+            if(jj<ncols){
+                counts[ii*ncols+jj]++;
+            }
+            ++ii;
+            if(jj<ncols && ii<nrows){
+                counts[ii*ncols+jj]++;
+            }
+            --jj;
+            if(ii<nrows){
+                counts[ii*ncols+jj]++;
+            }
+            
         }
     }
 }

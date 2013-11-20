@@ -414,6 +414,7 @@ def testInversion(lambdaParam):
     sp.misc.imsave('circleToC_inverse_deformation.png', invd)
     sp.misc.imsave('circleToC_residual_deformation.png', res)
     tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement.bin')
+    tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement_clean.bin')
 
 def testInversion_invertible():
     displacement_clean=tf.create_invertible_displacement_field(256, 256, 0.5, 8)

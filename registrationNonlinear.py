@@ -840,19 +840,30 @@ def checkInversionResults(suffix):
 def plotInversionGraphs():
     statsJacobi=np.loadtxt('../inverse/experiments/stats_jacobi.txt',dtype=np.float64)
     statsFixedPoint=np.loadtxt('../inverse/experiments/stats_fixedpoint.txt',dtype=np.float64)
+    statsYan=np.loadtxt('../inverse/experiments/stats_yan.txt',dtype=np.float64)
     start=0
-    plt.figure()
-    pJacobi,=plt.plot(statsJacobi[start:,1])
-    pFixedPoint,=plt.plot(statsFixedPoint[start:,1])
+    fig=plt.figure(facecolor='white', figsize=(10, 5))
+    #fig.set_figheight(350)
+    #fig.set_figwidth(700)
+    pJacobi,=plt.plot(statsJacobi[start:,1],'k--')
+    pFixedPoint,=plt.plot(statsFixedPoint[start:,1],'k-')
+    pYan,=plt.plot(statsYan[start:,1], 'k:')
     plt.yscale('log')
-    plt.legend([pJacobi, pFixedPoint], ["Jacobi", "Fixed Point"])
+    plt.legend([pJacobi, pFixedPoint, pYan], ["Jacobi", "Fixed Point", "Yan's"])
     plt.title("Mean error")
-    plt.figure()
+    plt.xlabel("Iterations")
+    plt.ylabel("Error")
+    fig=plt.figure(facecolor='white', figsize=(10, 5))
+    #fig.set_figheight(350)
+    #fig.set_figwidth(700)
     pJacobi,=plt.plot(statsJacobi[start:,0])
     pFixedPoint,=plt.plot(statsFixedPoint[start:,0])
+    pYan,=plt.plot(statsYan[start:,0])
     plt.yscale('log')
-    plt.legend([pJacobi, pFixedPoint], ["Jacobi", "Fixed Point"])
+    plt.legend([pJacobi, pFixedPoint, pYan], ["Jacobi", "Fixed Point", "Yan"])
     plt.title("Maximum error")
+    plt.xlabel("Iterations")
+    plt.ylabel("Error")
 
 def createInvertiblefield(m, sigma):
     displacement_clean=tf.create_invertible_displacement_field(256, 256, m, 8)
@@ -870,8 +881,38 @@ def createInvertiblefield(m, sigma):
     plt.title('det(J(displacement))')
     tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement.bin')
     tf.write_double_buffer(np.array(displacement_clean).reshape(-1), '../inverse/experiments/displacement_clean.bin')
-    
+    counts=np.array(tf.count_supporting_data_per_pixel(displacement))
+    plt.figure()
+    plt.imshow(counts>0, cmap=plt.cm.gray)
 
+def exportCircleToCDeformation():
+    circleToCDisplacementName='circleToCDisplacement.npy'
+    circleToCDisplacementInverseName='circleToCDisplacementInverse.npy'
+    if(os.path.exists(circleToCDisplacementName)):
+        displacement=np.load(circleToCDisplacementName)
+        inverse=np.load(circleToCDisplacementInverseName)
+    else:
+        print 'Displacement field not found. Run diffeomorphic registration again.'
+        return
+    residualJoint=np.array(tf.compose_vector_fields(displacement, inverse)[0])
+    rcommon.plotDiffeomorphism(displacement, inverse, residualJoint, 'D-joint')
+    tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement.bin')
+    tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement_clean.bin')
+    counts=np.array(tf.count_supporting_data_per_pixel(displacement))
+    plt.figure()
+    plt.imshow(counts>0, cmap=plt.cm.gray)
+
+def testInterpolationAdjoint():
+    displacement=tf.create_invertible_displacement_field(128, 128, 0.2, 8)
+    inverse_clean=tf.invert_vector_field(displacement, 0.075, 100, 1e-7)
+    #############
+    inverseA=inverse_clean+np.random.normal(0.0, 1.0, inverse_clean.shape)
+    inverseB=inverse_clean+np.random.normal(0.0, 1.0, inverse_clean.shape)
+    #############
+    residualInterpolation=vector_field_interpolation(displacement, inverseA)#This is A(inverseA)
+    residualAdjoint=vector_field_adjoint_interpolation(displacement, inverseB)#This is A*(inverseB)
+    #now compare  <A(inverseA), inverseB> with <inverseA, A*(inverseB)>
+    
 if __name__=="__main__":
     #Parameters for Arce's experiments
     maxOuterIter=[500,500,500,500,500,500]

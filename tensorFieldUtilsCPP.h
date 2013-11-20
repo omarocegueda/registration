@@ -31,3 +31,7 @@ int readDoubleBuffer(char *fname, int nDoubles, double *buffer);
 int writeDoubleBuffer(double *buffer, int nDoubles, char *fname);
 void createInvertibleDisplacementField(int nrows, int ncols, double b, double m, double *dField);
 int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, double tolerance, double *inv);
+
+void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *counts);
+int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols, double *sol);
+int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp);
