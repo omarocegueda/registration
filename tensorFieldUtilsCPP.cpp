@@ -1609,9 +1609,9 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
     double *sr=new double[nsites];
     double *sc=new double[nsites];
     double L=8;
-    double sigma=1.0/sqrt(L);
+    double sigma=1.0/L;
     double tau=sigma;
-    double theta=0;
+    double theta=0.8;
     double error=1+tolerance;
     int iter=0;
     memset(sbarr, 0, sizeof(double)*nrows*ncols);//initialize the inverse field
@@ -1624,8 +1624,8 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
     memset(pcc, 0, sizeof(double)*nrows*ncols);
     memset(qr, 0, sizeof(double)*nrows*ncols);
     memset(qc, 0, sizeof(double)*nrows*ncols);
-    double denq=1.0+sigma*lambdaParam;
-    FILE *F=fopen("TVL2iterations.txt", "w");
+    double factorq=lambdaParam/(lambdaParam+sigma);
+    //FILE *F=fopen("TVL2iterations.txt", "w");
     while((tolerance<error) && (iter<=maxIter)){
         ++iter;
         //update the dual p-variables
@@ -1650,8 +1650,8 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
         //update the dual q-variables
         vectorFieldInterpolation(fr, fc, sbarr, sbarc, nrows, ncols, tmpr, tmpc);
         for(int i=nsites-1;i>=0;--i){
-            qr[i]=(qr[i]+sigma*(tmpr[i]-lambdaParam*fr[i]))/denq;
-            qc[i]=(qc[i]+sigma*(tmpc[i]-lambdaParam*fc[i]))/denq;
+            qr[i]=(qr[i]+sigma*(tmpr[i]+fr[i]))*factorq;
+            qc[i]=(qc[i]+sigma*(tmpc[i]+fc[i]))*factorq;
         }
         //update primal variables and step
         vectorFieldAdjointInterpolation(fr, fc, qr, qc, nrows, ncols, tmpr, tmpc);
@@ -1675,22 +1675,22 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
         }
         //----compute error----
         double newError=0;
-        computeGradient(sr, nrows, ncols, tmpr, tmpc);
-        computeGradient(sc, nrows, ncols, tmpr2, tmpc2);
-        for(int i=0;i<nsites;++i){
-            newError+=sqrt(tmpr[i]*tmpr[i]+tmpc[i]*tmpc[i]+tmpr2[i]*tmpr2[i]+tmpc2[i]*tmpc2[i]);
-        }
-        newError*=lambdaParam;
         vectorFieldInterpolation(fr, fc, sr, sc, nrows, ncols, tmpr, tmpc);
         for(int i=0;i<nsites;++i){
             double dr=tmpr[i]+fr[i];
             double dc=tmpc[i]+fc[i];
             newError+=dr*dr+dc*dc;
         }
-        fprintf(F, "%d: %e\n", iter, newError);
+        newError*=lambdaParam;
+        computeGradient(sr, nrows, ncols, tmpr, tmpc);
+        computeGradient(sc, nrows, ncols, tmpr2, tmpc2);
+        for(int i=0;i<nsites;++i){
+            newError+=sqrt(tmpr[i]*tmpr[i]+tmpc[i]*tmpc[i]+tmpr2[i]*tmpr2[i]+tmpc2[i]*tmpc2[i]);
+        }
+        //fprintf(F, "%d: %e\n", iter, newError);
         error=fabs(error-newError);
     }
-    fclose(F);
+    //fclose(F);
     double *g=inv;
     for(int i=0;i<nsites;++i, g+=2){
         g[0]=sr[i];
