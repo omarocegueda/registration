@@ -35,3 +35,4 @@ int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, dou
 void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *counts);
 int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols, double *sol);
 int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp);
+int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv);

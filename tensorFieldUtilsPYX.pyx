@@ -38,6 +38,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *counts)
     int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols, double *sol)
     int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp)
+    int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv)
 
 def testFunction(param):
     print 'Testing', param
@@ -222,6 +223,15 @@ cpdef invert_vector_field(double[:,:,:] d, double lambdaParam, int maxIter, doub
     retVal=invertVectorField(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0], &stats[0])
     print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
     return invd
+
+cpdef invert_vector_field_tv_l2(double[:,:,:] d, double lambdaParam, int maxIter, double tolerance):
+    cdef int retVal
+    cdef int nrows=d.shape[0]
+    cdef int ncols=d.shape[1]
+    cdef double[:,:,:] invd=np.zeros_like(d)
+    retVal=invertVectorField_TV_L2(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0]);
+    return invd
+
 
 cpdef invert_vector_field_Yan(double[:,:,:] d, int maxIter, double tolerance):
     cdef int retVal

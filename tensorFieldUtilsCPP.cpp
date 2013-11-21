@@ -8,6 +8,7 @@ Created on Fri Sep 20 19:03:32 2013
 #include <math.h>
 #include <stdlib.h>
 #include "bitsCPP.h"
+#include "derivatives.h"
 #include "tensorFieldUtilsCPP.h"
 
 
@@ -1372,6 +1373,7 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
 
 /*
     Interpolates the vector field d2 at d1: d2(d1(x)) (i.e. applies first d1, then d2 to the result)
+    Seen as a linear operator, it is defined by d1 and the input vector is d2
 */
 int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp){
     double *dx=d1;
@@ -1420,6 +1422,66 @@ int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, doubl
     return 0;
 }
 
+/*
+    Vector field interpolation taking as input the displacements from two separate arrays
+*/
+int vectorFieldInterpolation(double *d1r, double *d1c, double *d2r, double *d2c, int nrows, int ncols, double *compr, double *compc){
+    double *dr=d1r;
+    double *dc=d1c;
+    double *resr=compr;
+    double *resc=compc;
+    memset(compr, 0, sizeof(double)*nrows*ncols); 
+    memset(compc, 0, sizeof(double)*nrows*ncols); 
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, ++dr, ++dc, ++resr, ++resc){
+            double dii=i+*dr;
+            double djj=j+*dc;
+            if((dii<0)||(djj<0)||(dii>nrows-1)||(djj>ncols-1)){
+                continue;
+            }
+            int ii=floor(dii);
+            int jj=floor(djj);
+            double calpha=dii-ii;//by definition these factors are nonnegative
+            double cbeta=djj-jj;
+            double alpha=1-calpha;
+            double beta=1-cbeta;
+            //---top-left
+            double *zr=&d2r[ii*ncols+jj];
+            double *zc=&d2c[ii*ncols+jj];
+            (*resr)+=alpha*beta*(*zr);
+            (*resc)+=alpha*beta*(*zc);
+            //---top-right
+            ++jj;
+            if(jj<ncols){
+                zr=&d2r[ii*ncols+jj];
+                zc=&d2c[ii*ncols+jj];
+                (*resr)+=alpha*cbeta*(*zr);
+                (*resc)+=alpha*cbeta*(*zc);
+            }
+            //---bottom-right
+            ++ii;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                zr=&d2r[ii*ncols+jj];
+                zc=&d2c[ii*ncols+jj];
+                (*resr)+=calpha*cbeta*(*zr);
+                (*resc)+=calpha*cbeta*(*zc);
+            }
+            //---bottom-left
+            --jj;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                zr=&d2r[ii*ncols+jj];
+                zc=&d2c[ii*ncols+jj];
+                (*resr)+=calpha*beta*(*zr);
+                (*resc)+=calpha*beta*(*zc);
+            }
+        }
+    }
+    return 0;
+}
+
+
+//Computes the Adjoint transformation associated to the interpolation transformation defined by d1, applied to d2.
+//i.e. d1 defines the transformation and d2 is the input vector
 int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols, double *sol){
     double *dx=d1;
     double *z=d2;
@@ -1465,8 +1527,194 @@ int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols
         }
     }
     return 0;
-    
 }
+
+/*
+    Vector field adjoint interpolation taking as input the displacements from two separate arrays
+*/
+int vectorFieldAdjointInterpolation(double *d1r, double *d1c, double *d2r, double *d2c, int nrows, int ncols, double *solr, double *solc){
+    double *dr=d1r;
+    double *dc=d1c;
+    double *zr=d2r;
+    double *zc=d2c;
+    memset(solr, 0, sizeof(double)*nrows*ncols); 
+    memset(solc, 0, sizeof(double)*nrows*ncols); 
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, ++dr, ++dc, ++zr, ++zc){
+            double dii=i+(*dr);
+            double djj=j+(*dc);
+            if((dii<0)||(djj<0)||(dii>nrows-1)||(djj>ncols-1)){
+                continue;
+            }
+            int ii=floor(dii);
+            int jj=floor(djj);
+            double calpha=dii-ii;//by definition these factors are nonnegative
+            double cbeta=djj-jj;
+            double alpha=1-calpha;
+            double beta=1-cbeta;
+            //top left
+            double *resr=&solr[ii*ncols+jj];
+            double *resc=&solc[ii*ncols+jj];
+            (*resr)+=alpha*beta*(*zr);
+            (*resc)+=alpha*beta*(*zc);
+            //---top-right
+            ++jj;
+            if(jj<ncols){
+                resr=&solr[ii*ncols+jj];
+                resc=&solc[ii*ncols+jj];
+                (*resr)+=alpha*cbeta*(*zr);
+                (*resc)+=alpha*cbeta*(*zc);
+            }
+            //---bottom-right
+            ++ii;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                resr=&solr[ii*ncols+jj];
+                resc=&solc[ii*ncols+jj];
+                (*resr)+=calpha*cbeta*(*zr);
+                (*resc)+=calpha*cbeta*(*zc);
+            }
+            //---bottom-left
+            --jj;
+            if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                resr=&solr[ii*ncols+jj];
+                resc=&solc[ii*ncols+jj];
+                (*resr)+=calpha*beta*(*zr);
+                (*resc)+=calpha*beta*(*zc);
+            }
+        }
+    }
+    return 0;
+}
+
+int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv){
+    int nsites=nrows*ncols;
+    double *fr=new double[nsites];
+    double *fc=new double[nsites];
+    for(int i=0;i<nsites;++i){
+        fr[i]=forward[2*i];
+        fc[i]=forward[2*i+1];
+    }
+    double *tmpr=new double[nsites];
+    double *tmpc=new double[nsites];
+    double *tmpr2=new double[nsites];
+    double *tmpc2=new double[nsites];
+    double *prr=new double[nsites];
+    double *prc=new double[nsites];
+    double *pcr=new double[nsites];
+    double *pcc=new double[nsites];
+    double *qr=new double[nsites];
+    double *qc=new double[nsites];
+    double *sbarr=new double[nsites];
+    double *sbarc=new double[nsites];
+    double *sr=new double[nsites];
+    double *sc=new double[nsites];
+    double L=8;
+    double sigma=1.0/sqrt(L);
+    double tau=sigma;
+    double theta=0;
+    double error=1+tolerance;
+    int iter=0;
+    memset(sbarr, 0, sizeof(double)*nrows*ncols);//initialize the inverse field
+    memset(sbarc, 0, sizeof(double)*nrows*ncols);
+    memset(sr, 0, sizeof(double)*nrows*ncols);//initialize the inverse field
+    memset(sc, 0, sizeof(double)*nrows*ncols);
+    memset(prr, 0, sizeof(double)*nrows*ncols);//initialize the dual Jacobian
+    memset(prc, 0, sizeof(double)*nrows*ncols);
+    memset(pcr, 0, sizeof(double)*nrows*ncols);
+    memset(pcc, 0, sizeof(double)*nrows*ncols);
+    memset(qr, 0, sizeof(double)*nrows*ncols);
+    memset(qc, 0, sizeof(double)*nrows*ncols);
+    double denq=1.0+sigma*lambdaParam;
+    FILE *F=fopen("TVL2iterations.txt", "w");
+    while((tolerance<error) && (iter<=maxIter)){
+        ++iter;
+        //update the dual p-variables
+        computeGradient(sbarr, nrows, ncols, tmpr, tmpc);
+        for(int i=nsites-1;i>=0;--i){
+            prr[i]+=sigma*tmpr[i];
+            prc[i]+=sigma*tmpc[i];
+        }
+        computeGradient(sbarc, nrows, ncols, tmpr, tmpc);
+        for(int i=nsites-1;i>=0;--i){
+            pcr[i]+=sigma*tmpr[i];
+            pcc[i]+=sigma*tmpc[i];
+            double nrm=(prr[i]*prr[i])+(prc[i]*prc[i])+(pcr[i]*pcr[i])+(pcc[i]*pcc[i]);
+            if(nrm>1){
+                nrm=sqrt(nrm);
+                prr[i]/=nrm;
+                prc[i]/=nrm;
+                pcr[i]/=nrm;
+                pcc[i]/=nrm;
+            }
+        }
+        //update the dual q-variables
+        vectorFieldInterpolation(fr, fc, sbarr, sbarc, nrows, ncols, tmpr, tmpc);
+        for(int i=nsites-1;i>=0;--i){
+            qr[i]=(qr[i]+sigma*(tmpr[i]-lambdaParam*fr[i]))/denq;
+            qc[i]=(qc[i]+sigma*(tmpc[i]-lambdaParam*fc[i]))/denq;
+        }
+        //update primal variables and step
+        vectorFieldAdjointInterpolation(fr, fc, qr, qc, nrows, ncols, tmpr, tmpc);
+        for(int i=nsites-1;i>=0;--i){
+            sbarr[i]=-theta*sr[i];//save -theta times the previous value of s
+            sbarc[i]=-theta*sc[i];
+            sr[i]-=tau*tmpr[i];
+            sc[i]-=tau*tmpc[i];
+            
+        }
+        computeDivergence(prr, prc, nrows, ncols, tmpr);
+        computeDivergence(pcr, pcc, nrows, ncols, tmpc);
+        for(int i=nsites-1;i>=0;--i){
+            sr[i]+=tau*tmpr[i];
+            sc[i]+=tau*tmpc[i];
+        }
+        //finish comuting the s-bar step
+        for(int i=nsites-1;i>=0;--i){
+            sbarr[i]+=(1.0+theta)*sr[i];
+            sbarc[i]+=(1.0+theta)*sc[i];
+        }
+        //----compute error----
+        double newError=0;
+        computeGradient(sr, nrows, ncols, tmpr, tmpc);
+        computeGradient(sc, nrows, ncols, tmpr2, tmpc2);
+        for(int i=0;i<nsites;++i){
+            newError+=sqrt(tmpr[i]*tmpr[i]+tmpc[i]*tmpc[i]+tmpr2[i]*tmpr2[i]+tmpc2[i]*tmpc2[i]);
+        }
+        newError*=lambdaParam;
+        vectorFieldInterpolation(fr, fc, sr, sc, nrows, ncols, tmpr, tmpc);
+        for(int i=0;i<nsites;++i){
+            double dr=tmpr[i]+fr[i];
+            double dc=tmpc[i]+fc[i];
+            newError+=dr*dr+dc*dc;
+        }
+        fprintf(F, "%d: %e\n", iter, newError);
+        error=fabs(error-newError);
+    }
+    fclose(F);
+    double *g=inv;
+    for(int i=0;i<nsites;++i, g+=2){
+        g[0]=sr[i];
+        g[1]=sc[i];
+    }
+    delete[] tmpr;
+    delete[] tmpc;
+    delete[] tmpr2;
+    delete[] tmpc2;
+    delete[] fr;
+    delete[] fc;
+    delete[] prr;
+    delete[] prc;
+    delete[] pcr;
+    delete[] pcc;
+    delete[] qr;
+    delete[] qc;
+    delete[] sbarr;
+    delete[] sbarc;
+    delete[] sr;
+    delete[] sc;
+    return 0;
+}
+
 
 int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats){
     double error=1+tolerance;

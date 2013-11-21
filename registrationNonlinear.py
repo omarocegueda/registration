@@ -906,13 +906,26 @@ def testInterpolationAdjoint():
     displacement=tf.create_invertible_displacement_field(128, 128, 0.2, 8)
     inverse_clean=tf.invert_vector_field(displacement, 0.075, 100, 1e-7)
     #############
-    inverseA=inverse_clean+np.random.normal(0.0, 1.0, inverse_clean.shape)
-    inverseB=inverse_clean+np.random.normal(0.0, 1.0, inverse_clean.shape)
+    inverseA=inverse_clean+np.random.normal(0.0, 15.0, inverse_clean.shape)
+    inverseB=inverse_clean+np.random.normal(0.0, 15.0, inverse_clean.shape)
     #############
-    residualInterpolation=vector_field_interpolation(displacement, inverseA)#This is A(inverseA)
-    residualAdjoint=vector_field_adjoint_interpolation(displacement, inverseB)#This is A*(inverseB)
+    residualInterpolation=np.array(tf.vector_field_interpolation(displacement, inverseA))#This is A(inverseA)
+    residualAdjoint=np.array(tf.vector_field_adjoint_interpolation(displacement, inverseB))#This is A*(inverseB)
     #now compare  <A(inverseA), inverseB> with <inverseA, A*(inverseB)>
-    
+    prodInterpolation=(residualInterpolation[...]*inverseB[...]).sum()
+    prodAdjoint=(residualAdjoint[...]*inverseA[...]).sum()
+    print (inverseB-inverseA).mean(), (inverseB-inverseA).std()
+    print (residualInterpolation-residualAdjoint).mean(), (residualInterpolation-residualAdjoint).std()
+    print (inverseB-residualAdjoint).mean(), (inverseB-residualAdjoint).std()
+    print (inverseA-residualInterpolation).mean(), (inverseA-residualInterpolation).std()
+    print prodInterpolation, prodAdjoint    
+
+def testInverseTVL2(maxIter=10, tolerance=1e-7, m=0.2, lambdaParam=0.15):
+    displacement=np.array(tf.create_invertible_displacement_field(256, 256, m, 8))
+    inverse=np.array(tf.invert_vector_field_tv_l2(displacement, lambdaParam, maxIter, tolerance))
+    residual=np.array(tf.compose_vector_fields(displacement, inverse)[0])
+    rcommon.plotDiffeomorphism(displacement, inverse, residual, 'TV-L2')
+
 if __name__=="__main__":
     #Parameters for Arce's experiments
     maxOuterIter=[500,500,500,500,500,500]
