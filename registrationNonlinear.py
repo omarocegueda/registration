@@ -926,6 +926,34 @@ def testInverseTVL2(maxIter=10, tolerance=1e-7, m=0.2, lambdaParam=0.15):
     residual=np.array(tf.compose_vector_fields(displacement, inverse)[0])
     rcommon.plotDiffeomorphism(displacement, inverse, residual, 'TV-L2')
 
+def reviewRegistrationResults():
+    fixedFName='data/ANTS/b0_brain.nii.gz'
+    movingFName='data/ANTS/t1_brain_on_upsamp_b0_brain.nii.gz'
+    nib_fixed=nib.load(fixedFName)
+    nib_moving=nib.load(movingFName)
+    fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    moving=nib_moving.get_data().squeeze().astype(np.float64)
+    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+    moving=(moving-moving.min())/(moving.max()-moving.min())
+    #generate and show pyramids
+    pyramidMaxLevel=3
+    maskMoving=np.ones_like(moving)
+    maskFixed=np.ones_like(fixed)
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, pyramidMaxLevel, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, pyramidMaxLevel, maskFixed)]
+    rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
+    #load displacement fields
+    displacementFName='data/ANTS/t1_brain_nonlin_transformWarp.nii.gz'
+    displacementInverseFName='data/ANTS/t1_brain_nonlin_transformInverseWarp.nii.gz'
+    nib_displacement = nib.load(displacementFName)
+    nib_displacementInverse = nib.load(displacementInverseFName)
+    displacement=nib_displacement.get_data().squeeze().astype(np.float64)
+    displacementInverse=nib_displacementInverse.get_data().squeeze().astype(np.float64)
+    #apply displacement
+    warped=rcommon.warpVolume(moving, displacement)
+    maskWarped=np.ones_like(warped)
+    warpedPyramid=[img for img in rcommon.pyramid_gaussian_3D(warped, pyramidMaxLevel, maskWarped)]
+
 if __name__=="__main__":
     #Parameters for Arce's experiments
     maxOuterIter=[500,500,500,500,500,500]
