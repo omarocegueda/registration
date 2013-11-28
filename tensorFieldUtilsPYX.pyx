@@ -39,6 +39,15 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols, double *sol)
     int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp)
     int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv)
+    void consecutiveLabelMap(int *v, int n, int *out)
+    int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp)
+    int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv)
+
+def consecutive_label_map(int[:,:,:] v):
+    cdef int n=v.shape[0]*v.shape[1]*v.shape[2]
+    cdef int[:,:,:] out=cvarray(shape=(v.shape[0], v.shape[1], v.shape[2]), itemsize=sizeof(int), format="i")
+    consecutiveLabelMap(&v[0,0,0], n, &out[0,0,0])
+    return out
 
 def testFunction(param):
     print 'Testing', param
@@ -269,6 +278,16 @@ cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
     return comp, stats
 
+cpdef compose_vector_fields3D(double[:,:,:,:] d1, double[:,:,:,:] d2):
+    cdef int nslices=d1.shape[0]
+    cdef int nrows=d1.shape[1]
+    cdef int ncols=d1.shape[2]
+    cdef double[:,:,:,:] comp=np.zeros_like(d1)
+    cdef int retVal
+    retVal=composeVectorFields3D(&d1[0,0,0,0], &d2[0,0,0,0], nslices, nrows, ncols, &comp[0,0,0,0])
+    #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
+    return comp
+
 cpdef vector_field_interpolation(double[:,:,:] d1, double[:,:,:] d2):
     cdef int nrows=d1.shape[0]
     cdef int ncols=d1.shape[1]
@@ -292,6 +311,16 @@ cpdef vector_field_exponential(double[:,:,:] v):
     cdef int nrows=v.shape[0]
     cdef int ncols=v.shape[1]
     retVal=vectorFieldExponential(&v[0,0,0], nrows, ncols, &expv[0,0,0], &invexpv[0,0,0])
+    return expv, invexpv
+
+cpdef vector_field_exponential3D(double[:,:,:,:] v):
+    cdef double[:,:,:,:] expv = np.zeros_like(v)
+    cdef double[:,:,:,:] invexpv = np.zeros_like(v)
+    cdef int retVal
+    cdef int nslices=v.shape[0]
+    cdef int nrows=v.shape[1]
+    cdef int ncols=v.shape[2]
+    retVal=vectorFieldExponential3D(&v[0,0,0,0], nslices, nrows, ncols, &expv[0,0,0,0], &invexpv[0,0,0,0])
     return expv, invexpv
 
 

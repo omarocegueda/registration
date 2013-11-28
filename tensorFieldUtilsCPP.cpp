@@ -7,10 +7,12 @@ Created on Fri Sep 20 19:03:32 2013
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
+#include <set>
+#include <map>
 #include "bitsCPP.h"
 #include "derivatives.h"
 #include "tensorFieldUtilsCPP.h"
-
+using namespace std;
 
 void integrateTensorFieldProductsCPP(double *q, int *dims, double *diff, double *A, double *b){
     int k=dims[3];
@@ -880,6 +882,130 @@ int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam,
     stats[1]=iter;
     return 0;
 }
+
+
+
+int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats){
+    const static int numNeighbors=6;
+    const static int dSlice[]   ={ 0, 0, 0, 0, 1, -1};
+    const static int dRow[]     ={-1, 0, 1,  0, 0, 0};
+    const static int dCol[]     ={ 0, 1, 0, -1, 0, 0};
+    const static int nSlice[]   ={0, 0, 0, 0, 1, 1, 1, 1};
+    const static int nRow[]     ={0, 0, 1, 1, 0, 0, 1, 1};
+    const static int nCol[]     ={0, 1, 0, 1, 0, 1, 0, 1};
+    double gamma[8];
+    double gamma2[8];
+    int nsites=nslices*nrows*ncols;
+    int sliceSize=nrows*ncols;
+    double *temp=new double[nsites*3];
+    double *residual=new double[nsites*3];
+    double *denom=new double[nsites];
+    memset(inv, 0, sizeof(double)*nsites*3);
+    double maxChange=tolerance+1;
+    int iter;
+    for(iter=0;(tolerance*tolerance<maxChange)&&(iter<maxIter);++iter){
+        memset(temp, 0, sizeof(double)*nsites*3);
+        memset(denom, 0, sizeof(double)*nsites);
+        //---interpolate the current approximation and accumulate with the forward field---
+        composeVectorFields3D(forward, inv, nslices, nrows, ncols, residual);
+        double *r=residual;
+        double *f=forward;
+        for(int k=0;k<nslices;++k){
+            for(int i=0;i<nrows;++i){
+                for(int j=0;j<ncols;++j,r+=3, f+=3){
+                    //--accumulate all regularization terms--
+                    for(int q=0;q<numNeighbors;++q){
+                        int kk=k+dSlice[q];
+                        if((kk<0)||(kk>=nslices)){
+                            continue;
+                        }
+                        int ii=i+dRow[q];
+                        if((ii<0)||(ii>=nrows)){
+                            continue;
+                        }
+                        int jj=j+dCol[q];
+                        if((jj<0)||(jj>=ncols)){
+                            continue;
+                        }
+                        denom[k*sliceSize+i*ncols+j]+=lambdaParam;
+                        temp[3*(k*sliceSize+i*ncols+j)]+=lambdaParam*inv[3*(kk*sliceSize+ii*ncols+jj)];
+                        temp[3*(k*sliceSize+i*ncols+j)+1]+=lambdaParam*inv[3*(kk*sliceSize+ii*ncols+jj)+1];
+                        temp[3*(k*sliceSize+i*ncols+j)+2]+=lambdaParam*inv[3*(kk*sliceSize+ii*ncols+jj)+2];
+                    }
+                    //find the variables that are affected by this input point, and their interpolation coefficients
+                    double dkk=k+f[0];
+                    double dii=i+f[1];
+                    double djj=j+f[2];
+                    if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                        continue;
+                    }
+                    //find the top left index and the interpolation coefficients
+                    int kk=floor(f[0]);
+                    int ii=floor(f[1]);
+                    int jj=floor(f[2]);
+                    double cgamma=f[0]-kk;
+                    double calpha=f[1]-ii;
+                    double cbeta=f[2]-jj;
+                    ii+=i;
+                    jj+=j;
+                    kk+=k;
+                    double alpha=1-calpha;
+                    double beta=1-cbeta;
+                    double gammaScalar=1-cgamma;
+                    //---finally accumulate the affected terms---
+                    gamma[0]=alpha*beta*gammaScalar;//top left same slice
+                    gamma[1]=alpha*cbeta*gammaScalar;//top right same slice
+                    gamma[2]=calpha*beta*gammaScalar;//bottom left same slice
+                    gamma[3]=calpha*cbeta*gammaScalar;//bottom right same slice
+                    gamma[4]=alpha*beta*cgamma;//top left next slice
+                    gamma[5]=alpha*cbeta*cgamma;//top right next slice
+                    gamma[6]=calpha*beta*cgamma;//bottom left next slice
+                    gamma[7]=calpha*cbeta*cgamma;//bottom right next slice
+                    for(int q=0;q<8;++q){
+                        int iii=ii+nRow[q];
+                        int jjj=jj+nCol[q];
+                        int kkk=kk+nSlice[q];
+                        if((iii<0)||(jjj<0)||(kkk<0)||(iii>=nrows)||(jjj>=ncols)||(kkk>=nslices)){
+                            continue;
+                        }
+                        gamma2[q]=gamma[q]*gamma[q];
+                        temp[3*(kkk*sliceSize+iii*ncols+jjj)]+=inv[3*(kkk*sliceSize+iii*ncols+jjj)]*gamma2[q] - r[0]*gamma[q];
+                        temp[3*(kkk*sliceSize+iii*ncols+jjj)+1]+=inv[3*(kkk*sliceSize+iii*ncols+jjj)+1]*gamma2[q] - r[1]*gamma[q];
+                        temp[3*(kkk*sliceSize+iii*ncols+jjj)+2]+=inv[3*(kkk*sliceSize+iii*ncols+jjj)+2]*gamma2[q] - r[2]*gamma[q];
+                        denom[kkk*sliceSize+iii*ncols+jjj]+=gamma2[q];
+                    }//for q
+                }//for j
+            }//for i
+        }//for k
+        //now execute the Jacobi iteration
+        double *id=inv;
+        double *tmp=temp;
+        double *den=denom;
+        maxChange=0;
+        for(int k=0;k<nslices;++k){
+            for(int i=0;i<nrows;++i){
+                for(int j=0;j<ncols;++j, id+=3, tmp+=3, den++){
+                    tmp[0]/=(*den);
+                    tmp[1]/=(*den);
+                    tmp[2]/=(*den);
+                    double nrm=(tmp[0]-id[0])*(tmp[0]-id[0])+(tmp[1]-id[1])*(tmp[1]-id[1])+(tmp[2]-id[2])*(tmp[2]-id[2]);
+                    if(maxChange<nrm){
+                        maxChange=nrm;
+                    }
+                    id[0]=tmp[0];
+                    id[1]=tmp[1];
+                    id[2]=tmp[2];
+                }
+            }
+        }
+    }//for iter
+    delete[] temp;
+    delete[] denom;
+    delete[] residual;
+    stats[0]=sqrt(maxChange);
+    stats[1]=iter;
+    return 0;
+}
 //==================================================================================================
 //==================================================================================================
 //=====================================Yan's algorithm begins=======================================
@@ -1371,6 +1497,103 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
     return 0;
 }
 
+
+/*
+    Computes comp(x)=d2(d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
+*/
+int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp){
+    int sliceSize=nrows*ncols;
+    double *dx=d1;
+    double *res=comp;
+    memset(comp, 0, sizeof(double)*nrows*ncols*3); 
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=3, res+=3){
+                int kk=floor(dx[0]);
+                int ii=floor(dx[1]);
+                int jj=floor(dx[2]);
+                double cgamma=dx[0]-kk;
+                double calpha=dx[1]-ii;//by definition these factors are nonnegative
+                double cbeta=dx[2]-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                //---top-left
+                ii+=i;
+                jj+=j;
+                kk+=k;
+                if((ii<0)||(jj<0)||(kk<0)||(ii>=nrows)||(jj>=ncols)||(kk>=nslices)){
+                    continue;
+                }
+                res[0]=dx[0];
+                res[1]=dx[1];
+                res[2]=dx[2];
+                double *z=&d2[3*(kk*sliceSize+ii*ncols+jj)];
+                res[0]+=alpha*beta*gamma*z[0];
+                res[1]+=alpha*beta*gamma*z[1];
+                res[2]+=alpha*beta*gamma*z[2];
+                //---top-right
+                ++jj;
+                if(jj<ncols){
+                    z=&d2[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=alpha*cbeta*gamma*z[0];
+                    res[1]+=alpha*cbeta*gamma*z[1];
+                    res[2]+=alpha*cbeta*gamma*z[2];
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&d2[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=calpha*cbeta*gamma*z[0];
+                    res[1]+=calpha*cbeta*gamma*z[1];
+                    res[2]+=calpha*cbeta*gamma*z[2];
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&d2[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=calpha*beta*gamma*z[0];
+                    res[1]+=calpha*beta*gamma*z[1];
+                    res[2]+=calpha*beta*gamma*z[2];
+                }
+                ++kk;
+                if(kk<nslices){
+                    --ii;
+                    z=&d2[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=alpha*beta*cgamma*z[0];
+                    res[1]+=alpha*beta*cgamma*z[1];
+                    res[2]+=alpha*beta*cgamma*z[2];
+                    ++jj;
+                    if(jj<ncols){
+                        z=&d2[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=alpha*cbeta*cgamma*z[0];
+                        res[1]+=alpha*cbeta*cgamma*z[1];
+                        res[2]+=alpha*cbeta*cgamma*z[2];
+                    }
+                    //---bottom-right
+                    ++ii;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                        z=&d2[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=calpha*cbeta*cgamma*z[0];
+                        res[1]+=calpha*cbeta*cgamma*z[1];
+                        res[2]+=calpha*cbeta*cgamma*z[2];
+                    }
+                    //---bottom-left
+                    --jj;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                        z=&d2[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=calpha*beta*cgamma*z[0];
+                        res[1]+=calpha*beta*cgamma*z[1];
+                        res[2]+=calpha*beta*cgamma*z[2];
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+
 /*
     Interpolates the vector field d2 at d1: d2(d1(x)) (i.e. applies first d1, then d2 to the result)
     Seen as a linear operator, it is defined by d1 and the input vector is d2
@@ -1791,6 +2014,57 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
     return 0;
 }
 
+int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv){
+    double EXP_EPSILON=0.01;//such that the vector field exponential is approx the identity
+    //---compute the maximum norm---
+    double stats[3];
+    int nsites=nslices*nrows*ncols;
+    double maxNorm=0;
+    double *d=v;
+    for(int i=0;i<nsites;++i, d+=3){
+        double nn=d[0]*d[0]+d[1]*d[1]+d[2]*d[2];
+        if(maxNorm<nn){
+            maxNorm=nn;
+        }
+    }
+    maxNorm=sqrt(maxNorm);
+    int n=0;
+    double factor=1.0;
+    while(EXP_EPSILON<maxNorm){
+        maxNorm*=0.5;
+        factor*=0.5;
+        ++n;
+    }
+    //---base case---
+    if(n<1){
+        memcpy(expv, v, sizeof(double)*3*nsites);
+        invertVectorField3D(v, nslices, nrows, ncols, 0.5, 100, 1e-4, invexpv, stats);
+        return 0;
+    }
+    //---prepare memory buffers---
+    double *tmp[2]={NULL, NULL};
+    tmp[n%2]=new double[nsites*3];
+    tmp[1-n%2]=expv;
+    //---perform binary exponentiation: exponential---
+    for(int i=3*nsites-1;i>=0;--i){
+        tmp[1][i]=v[i]*factor;
+    }
+    for(int i=1;i<=n;++i){
+        composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)]);
+    }
+    //---perform binary exponentiation: inverse---
+    tmp[1-n%2]=invexpv;
+    for(int i=3*nsites-1;i>=0;--i){
+        tmp[0][i]=v[i]*factor;
+    }
+    invertVectorField3D(tmp[0], nslices, nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
+    for(int i=1;i<=n;++i){
+        composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)]);
+    }
+    delete[] tmp[n%2];
+    return 0;
+}
+
 
 int writeDoubleBuffer(double *buffer, int nDoubles, char *fname){
     FILE *F=fopen(fname, "wb");
@@ -1852,3 +2126,21 @@ void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *cou
         }
     }
 }
+
+
+void consecutiveLabelMap(int *v, int n, int *out){
+    set<int> labs;
+    for(int i=0;i<n;++i){
+        labs.insert(v[i]);
+    }
+    map<int, int> M;
+    int nlabs=0;
+    for(set<int>::iterator it=labs.begin(); it!=labs.end();++it){
+        M[*it]=nlabs;
+        ++nlabs;
+    }
+    for(int i=0;i<n;++i){
+        out[i]=M[v[i]];
+    }
+}
+

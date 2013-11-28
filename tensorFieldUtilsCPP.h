@@ -36,3 +36,7 @@ void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *cou
 int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols, double *sol);
 int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp);
 int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv);
+
+void consecutiveLabelMap(int *v, int n, int *out);
+int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp);
+int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv);

@@ -926,33 +926,145 @@ def testInverseTVL2(maxIter=10, tolerance=1e-7, m=0.2, lambdaParam=0.15):
     residual=np.array(tf.compose_vector_fields(displacement, inverse)[0])
     rcommon.plotDiffeomorphism(displacement, inverse, residual, 'TV-L2')
 
+    
+
 def reviewRegistrationResults():
-    fixedFName='data/ANTS/b0_brain.nii.gz'
-    movingFName='data/ANTS/t1_brain_on_upsamp_b0_brain.nii.gz'
+    import numpy as np
+    import nibabel as nib
+    import registrationCommon as rcommon
+    prefix='data/ANTS/GOOD/'
+    fixedFName=prefix+'b0_brain.nii.gz'
+    movingFName=prefix+'t1_brain_on_upsamp_b0_brain.nii.gz'
+    warpedFName=prefix+'t1_brain_on_upsamp_b0_brain_warped.nii.gz'
     nib_fixed=nib.load(fixedFName)
     nib_moving=nib.load(movingFName)
+    nib_warped=nib.load(warpedFName)
     fixed=nib_fixed.get_data().squeeze().astype(np.float64)
     moving=nib_moving.get_data().squeeze().astype(np.float64)
-    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    moving=(moving-moving.min())/(moving.max()-moving.min())
+    warped=nib_warped.get_data().squeeze().astype(np.float64)
     #generate and show pyramids
     pyramidMaxLevel=3
     maskMoving=np.ones_like(moving)
     maskFixed=np.ones_like(fixed)
-    movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, pyramidMaxLevel, maskMoving)]
+    maskWarped=np.ones_like(warped)
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, pyramidMaxLevel, maskFixed)]
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, pyramidMaxLevel, maskMoving)]
+    warpedPyramid=[img for img in rcommon.pyramid_gaussian_3D(warped, pyramidMaxLevel, maskWarped)]
     rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
+    rcommon.plotOverlaidPyramids3DCoronal(warpedPyramid, fixedPyramid)
     #load displacement fields
-    displacementFName='data/ANTS/t1_brain_nonlin_transformWarp.nii.gz'
-    displacementInverseFName='data/ANTS/t1_brain_nonlin_transformInverseWarp.nii.gz'
+    displacementFName=prefix+'t1_brain_nonlin_transformWarp.nii.gz'
+    #displacementInverseFName=prefix+'t1_brain_nonlin_transformInverseWarp.nii.gz'
     nib_displacement = nib.load(displacementFName)
-    nib_displacementInverse = nib.load(displacementInverseFName)
+    #nib_displacementInverse = nib.load(displacementInverseFName)
     displacement=nib_displacement.get_data().squeeze().astype(np.float64)
-    displacementInverse=nib_displacementInverse.get_data().squeeze().astype(np.float64)
-    #apply displacement
-    warped=rcommon.warpVolume(moving, displacement)
+    #displacementInverse=nib_displacementInverse.get_data().squeeze().astype(np.float64)
+    #apply displacement and show overlaid volumes
+    warped=rcommon.warpVolume(moving, displacement, nib_moving.get_affine(), nib_displacement.get_affine())
     maskWarped=np.ones_like(warped)
     warpedPyramid=[img for img in rcommon.pyramid_gaussian_3D(warped, pyramidMaxLevel, maskWarped)]
+    rcommon.plotOverlaidPyramids3DCoronal(warpedPyramid, fixedPyramid)
+
+
+def showOverlaidVolumes(fixedFName, movingFName):
+    '''
+    showOverlaidVolumes('/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz', '/opt/registration/data/affineRegistered/templateT1ToIBSR01T1.nii.gz')
+    showOverlaidVolumes('/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz', '/opt/registration/data/affineRegistered/templateT1ToIBSR02T1.nii.gz')
+    showOverlaidVolumes('/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_seg_ana.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_seg_ana.nii.gz')
+    '''
+    import numpy as np
+    import nibabel as nib
+    import registrationCommon as rcommon
+    nib_fixed=nib.load(fixedFName)
+    nib_moving=nib.load(movingFName)
+    fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    moving=nib_moving.get_data().squeeze().astype(np.float64)
+    sf=np.array(fixed.shape)//2
+    sm=np.array(moving.shape)//2
+    rcommon.overlayImages(fixed[sf[0],:,:], moving[sm[0],:,:])
+    rcommon.overlayImages(fixed[:,sf[1],:], moving[:,sm[1],:])
+    rcommon.overlayImages(fixed[:,:,sf[2]], moving[:,:,sm[2]])
+
+def buildRegistrationScript():
+    ibsrPath='/opt/registration/data/t1/IBSR18/'
+    templateFName='/opt/registration/data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz'
+    destinationPath='/opt/registration/data/affineRegistered/'
+    with open("affineRegScript.sh","w") as f:
+        for i in range(18):
+            if(i<10):
+                stri='0'+str(i+1)
+            else:
+                stri=str(i+1)
+            fixedName=ibsrPath+'IBSR_'+stri+'/IBSR_'+stri+'_ana_strip.nii.gz'
+            movingName=templateFName
+            transformationName=destinationPath+'templateT1ToIBSR'+stri+'T1'
+            warpedName=destinationPath+'templateT1ToIBSR'+stri+'T1.nii.gz'
+            regCommand='ANTS 3 -m MI['+fixedName+', '+movingName+', 1, 32] -i 0 -o '+transformationName
+            warpCommand='WarpImageMultiTransform 3 '+movingName+' '+warpedName+' -R '+fixedName+' '+transformationName+'Affine.txt'
+            f.write(regCommand+'\n')
+            f.write(warpCommand+'\n')
+
+def testBrainwebSegmentation():
+    #-------Fuzzy
+    csfName='data/phantom_1.0mm_normal_csf.rawb'
+    gryName='data/phantom_1.0mm_normal_gry.rawb'
+    whtName='data/phantom_1.0mm_normal_wht.rawb'
+    ns=181
+    nr=217
+    nc=181
+    csf=np.fromfile(csfName, dtype=np.ubyte).reshape(ns,nr,nc)
+    gry=np.fromfile(gryName, dtype=np.ubyte).reshape(ns,nr,nc)
+    wht=np.fromfile(whtName, dtype=np.ubyte).reshape(ns,nr,nc)
+    csf=csf.astype(np.float64)
+    gry=gry.astype(np.float64)
+    wht=wht.astype(np.float64)
+    colorImage=np.zeros(shape=(ns, nr, nc, 3), dtype=np.int8)
+    colorImage[...,0]=rcommon.renormalizeImage(csf)
+    colorImage[...,1]=rcommon.renormalizeImage(gry)
+    colorImage[...,2]=rcommon.renormalizeImage(wht)
+    imgA=colorImage[ns/2, :, :, :]
+    imgB=colorImage[:, nr/2, :, :]
+    imgC=colorImage[:, :, ns/2, :]
+    plt.figure()
+    plt.subplot(1,3,1)
+    plt.imshow(imgA)
+    plt.subplot(1,3,2)
+    plt.imshow(imgB)
+    plt.subplot(1,3,3)
+    plt.imshow(imgC)
+    #-------discrete
+    discreteName='data/phantom_1.0mm_normal_crisp.rawb'
+    discrete=np.fromfile(discreteName, dtype=np.ubyte).reshape(ns,nr,nc)
+    colorImage[...]=0
+    for i in range(8):
+        colorImage[discrete==i,:]=rcommon.getColor(i)
+    plt.figure()
+    plt.subplot(1,3,1)
+    plt.imshow(imgA)
+    plt.subplot(1,3,2)
+    plt.imshow(imgB)
+    plt.subplot(1,3,3)
+    plt.imshow(imgC)
+    #-------rois
+    discreteName='data/t1/IBSR18/IBSR_01/IBSR_01_seg_ana.nii.gz'
+    nib_discrete=nib.load(discreteName)
+    discrete=nib_discrete.get_data().squeeze().astype(np.int32)
+    discrete=np.array(tf.consecutive_label_map(discrete))
+    ns, nr, nc=discrete.shape
+    colorImage=np.zeros(shape=discrete.shape+(3,), dtype=np.int8)
+    for i in range(35):
+        colorImage[discrete==i,:]=rcommon.getColor(i)
+    imgA=colorImage[ns/2, :, :, :]
+    imgB=colorImage[:, nr/2, :, :]
+    imgC=colorImage[:, :, ns/2, :]
+    plt.figure()
+    plt.subplot(1,3,1)
+    plt.imshow(imgA)
+    plt.subplot(1,3,2)
+    plt.imshow(imgB)
+    plt.subplot(1,3,3)
+    plt.imshow(imgC)
+
 
 if __name__=="__main__":
     #Parameters for Arce's experiments

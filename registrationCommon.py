@@ -110,10 +110,23 @@ def warpImage(image, displacement):
     warped=ndimage.map_coordinates(image, [X0+displacement[...,0], X1+displacement[...,1]], prefilter=const_prefilter_map_coordinates)
     return warped
 
-def warpVolume(volume, displacement):
+def warpVolume(volume, displacement, volAffine=None, dispAffine=None):
     sh=volume.shape
     X0,X1,X2=np.mgrid[0:sh[0], 0:sh[1], 0:sh[2]]
-    warped=ndimage.map_coordinates(volume, [X0+displacement[...,0], X1+displacement[...,1], X2+displacement[...,2]], prefilter=const_prefilter_map_coordinates)
+    if(dispAffine!=None):
+        X0, X1, X2=(dispAffine[0,0]*X0 + dispAffine[0,1]*X1 + dispAffine[0,2]*X2 + dispAffine[0,3]+displacement[...,0],
+                    dispAffine[1,0]*X0 + dispAffine[1,1]*X1 + dispAffine[1,2]*X2 + dispAffine[1,3]+displacement[...,1],
+                    dispAffine[2,0]*X0 + dispAffine[2,1]*X1 + dispAffine[2,2]*X2 + dispAffine[2,3]+displacement[...,2])
+    else:
+        X0+=displacement[...,0]
+        X1+=displacement[...,1]
+        X2+=displacement[...,2]
+    if(volAffine!=None):
+        volInverse=np.linalg.inv(volAffine)
+        X0, X1, X2=(volInverse[0,0]*X0 + volInverse[0,1]*X1 + volInverse[0,2]*X2 + volInverse[0,3],
+                    volInverse[1,0]*X0 + volInverse[1,1]*X1 + volInverse[1,2]*X2 + volInverse[1,3],
+                    volInverse[2,0]*X0 + volInverse[2,1]*X1 + volInverse[2,2]*X2 + volInverse[2,3])
+    warped=ndimage.map_coordinates(volume, [X0, X1, X2], prefilter=const_prefilter_map_coordinates)
     return warped
 
 def plotDeformationField(d):
@@ -248,7 +261,15 @@ def overlayImages(img0, img1, createFig=True):
     fig=None
     if(createFig):
         fig=plt.figure()
+    plt.subplot(1,3,1)
+    plt.imshow(img0, cmap=plt.cm.gray)
+    plt.title('Img0 (red)')
+    plt.subplot(1,3,2)
     plt.imshow(colorImage)
+    plt.title('Overlay')
+    plt.subplot(1,3,3)
+    plt.imshow(img1, cmap=plt.cm.gray)
+    plt.title('Img1 (green)')
     return fig
 
 def testOverlayImages_raw():
@@ -262,6 +283,12 @@ def testOverlayImages_raw():
     right=np.fromfile(rightName, dtype=np.ubyte).reshape(ns,nr,nc)
     right=right.astype(np.float64)
     overlayImages(left[90], right[90])
+
+def getColor(label):
+    r=label%2
+    g=(label/2)%2
+    b=(label/4)%2
+    return np.array([r,g,b])    
 
 def testOverlayImages_nii():
     leftName='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
