@@ -40,3 +40,6 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
 void consecutiveLabelMap(int *v, int n, int *out);
 int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp);
 int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv);
+
+int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols);
+int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped);

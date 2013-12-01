@@ -221,21 +221,21 @@ def estimateNewMonomodalDeformationField3D(moving, fixed, lambdaParam, maxIter, 
     print "Iter: ",innerIter, "Max lateral displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
     return displacement
 
-def estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, level=0, displacementList=None):
+def estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None):
     n=len(movingPyramid)
     if(level==(n-1)):
-        displacement=estimateNewMonomodalDeformationField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, None)
+        displacement=estimateNewMonomodalDeformationField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], None)
         if(displacementList!=None):
             displacementList.insert(0,displacement)
         return displacement
-    subDisplacement=estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, level+1, displacementList)
+    subDisplacement=estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
     sh=movingPyramid[level].shape
     X0,X1,X2=np.mgrid[0:sh[0], 0:sh[1], 0:sh[2]]*0.5
     upsampled=np.empty(shape=(movingPyramid[level].shape)+(3,), dtype=np.float64)
     upsampled[:,:,:,0]=ndimage.map_coordinates(subDisplacement[:,:,:,0], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,:,1]=ndimage.map_coordinates(subDisplacement[:,:,:,1], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
     upsampled[:,:,:,2]=ndimage.map_coordinates(subDisplacement[:,:,:,2], [X0, X1, X2], prefilter=const_prefilter_map_coordinates)*2
-    newDisplacement=estimateNewMonomodalDeformationField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, upsampled)
+    newDisplacement=estimateNewMonomodalDeformationField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], upsampled)
     newDisplacement+=upsampled
     if(displacementList!=None):
         displacementList.insert(0, newDisplacement)
@@ -246,27 +246,60 @@ def registerNonlinearMonomodal3D(moving, fixed, lambdaParam, levels):
     maskFixed=fixed>0
     movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, levels, maskMoving)]
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, levels, maskFixed)]
-    displacement=estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, 0, None)
+    maxOuterIter=[10,50,100,100,100,100,100,100,100]
+    displacement=estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, None)
     warped=rcommon.warpVolume(movingPyramid[0], displacement)
     return displacement, warped
 
-def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
-    fname0='IBSR_01_to_02.nii.gz'
-    fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
-    nib_moving = nib.load(fname0)
-    nib_fixed = nib.load(fname1)
-    moving=nib_moving.get_data().squeeze()
+
+def displayRegistrationResult():
+    fnameMoving='data/affineRegistered/templateT1ToIBSR01T1.nii.gz'
+    fnameFixed='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
+    nib_fixed = nib.load(fnameFixed)
     fixed=nib_fixed.get_data().squeeze()
-    level=5
+    nib_moving = nib.load(fnameMoving)
+    moving=nib_moving.get_data().squeeze()
+    fnameDisplacement='displacement_templateT1ToIBSR01T1.npy'
+    fnameWarped='warped_templateT1ToIBSR01T1.npy'
+    displacement=np.load(fnameDisplacement)
+    warped=np.load(fnameWarped)
+    sh=moving.shape
+    shown=warped
+    f=rcommon.overlayImages(shown[:,sh[1]//4,:], fixed[:,sh[1]//4,:])
+    f=rcommon.overlayImages(shown[:,sh[1]//2,:], fixed[:,sh[1]//2,:])
+    f=rcommon.overlayImages(shown[:,3*sh[1]//4,:], fixed[:,3*sh[1]//4,:])
+    f=rcommon.overlayImages(shown[sh[0]//4,:,:], fixed[sh[0]//4,:,:])
+    f=rcommon.overlayImages(shown[sh[0]//2,:,:], fixed[sh[0]//2,:,:])
+    f=rcommon.overlayImages(shown[3*sh[0]//4,:,:], fixed[3*sh[0]//4,:,:])
+    f=rcommon.overlayImages(shown[:,:,sh[2]//4], fixed[:,:,sh[2]//4])
+    f=rcommon.overlayImages(shown[:,:,sh[2]//2], fixed[:,:,sh[2]//2])
+    f=rcommon.overlayImages(shown[:,:,3*sh[2]//4], fixed[:,:,3*sh[2]//4])
+
+def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
+    #fname0='IBSR_01_to_02.nii.gz'
+    #fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
+    fnameMoving='data/affineRegistered/templateT1ToIBSR01T1.nii.gz'
+    fnameFixed='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
+    nib_moving = nib.load(fnameMoving)
+    nib_fixed = nib.load(fnameFixed)
+    moving=nib_moving.get_data().squeeze().astype(np.float64)
+    fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    moving=(moving-moving.min())/(moving.max()-moving.min())
+    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+    level=3
     maskMoving=moving>0
     maskFixed=fixed>0
     movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, maskMoving)]
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, level, maskFixed)]
     rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
+    maxOuterIter=[100,100,100,100,100,100,100,100,100]
     displacementList=[]
-    displacement=estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam,0,displacementList)
+    displacement=estimateMonomodalDeformationField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList)
     warpPyramid=[rcommon.warpVolume(movingPyramid[i], displacementList[i]) for i in range(level+1)]
-    rcommon.plotOverlaidPyramids3DCoronal(warpPyramid, fixedPyramid)
+    ####save results###
+    np.save('displacement_templateT1ToIBSR01T1.npy', displacement)
+    np.save('warped_templateT1ToIBSR01T1.npy', warpPyramid[0])
+    ###################
     sh=movingPyramid[0].shape
     rcommon.overlayImages(warpPyramid[0][:,sh[1]//4,:], fixedPyramid[0][:,sh[1]//4,:])
     rcommon.overlayImages(warpPyramid[0][:,sh[1]//2,:], fixedPyramid[0][:,sh[1]//2,:])
@@ -286,7 +319,6 @@ def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
     #figure()
     #imshow(nrm[:,sh[1]//2,:])
     print 'Max global displacement: ', maxNorm
-    return displacementList, warpPyramid
 
 ###############################################################
 ####### Non-linear Multimodal registration - EM (2D)###########
@@ -1067,9 +1099,10 @@ def testBrainwebSegmentation():
 
 
 if __name__=="__main__":
+    testEstimateMonomodalDeformationField3DMultiScale(250)
     #Parameters for Arce's experiments
-    maxOuterIter=[500,500,500,500,500,500]
-    runAllArcesExperiments(300, maxOuterIter)
+    #maxOuterIter=[500,500,500,500,500,500]
+    #runAllArcesExperiments(300, maxOuterIter)
     #Parameters for circle-to-C experiment:
 #    maxOuterIter=[57,114,51,382]
 #    testCircleToCMonomodal(3,maxOuterIter)

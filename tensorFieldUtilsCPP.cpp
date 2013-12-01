@@ -1263,170 +1263,6 @@ int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, dou
 //==================================================================================================
 
 
-int invertVectorField_old(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats){
-    const static int numNeighbors=4;
-    const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
-    const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
-    double *temp=new double[nrows*ncols*2];
-    double *denom=new double[nrows*ncols];
-    memset(invd, 0, sizeof(double)*nrows*ncols*2);
-    double maxChange=tolerance+1;
-    int iter;
-    for(iter=0;(tolerance*tolerance<maxChange)&&(iter<maxIter);++iter){
-        memset(temp, 0, sizeof(double)*nrows*ncols*2);
-        memset(denom, 0, sizeof(double)*nrows*ncols);
-        double *dx=d;
-        for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=2){
-                for(int k=0;k<numNeighbors;++k){
-                    int ii=i+dRow[k];
-                    if((ii<0)||(ii>=nrows)){
-                        continue;
-                    }
-                    int jj=j+dCol[k];
-                    if((jj<0)||(jj>=ncols)){
-                        continue;
-                    }
-                    denom[i*ncols+j]+=lambdaParam;
-                    temp[2*(i*ncols+j)]+=lambdaParam*invd[2*(ii*ncols+jj)];
-                    temp[2*(i*ncols+j)+1]+=lambdaParam*invd[2*(ii*ncols+jj)+1];
-                }
-                //find top-left coordinates
-                double dii=i+dx[0];
-                double djj=j+dx[1];
-                if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){
-                    continue;
-                }
-                int ii=floor(dx[0]);
-                int jj=floor(dx[1]);
-                double calpha=dx[0]-ii;//by definition these factors are nonnegative
-                double cbeta=dx[1]-jj;
-                ii+=i;
-                jj+=j;
-                double alpha=1-calpha;
-                double beta=1-cbeta;
-                //top-left corner (x+dx is located at region 1 w.r.t site [ii,jj])
-                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                    double *z=&temp[2*(ii*ncols+jj)];
-                    double &den=denom[ii*ncols+jj];
-                    den+=alpha*alpha*beta*beta;
-                    z[0]-=alpha*beta*dx[0];
-                    z[1]-=alpha*beta*dx[1];
-                    if((jj<ncols-1)){//right neighbor
-                        double *zright=&invd[2*(ii*ncols+jj+1)];
-                        z[0]-=alpha*alpha*beta*cbeta*zright[0];
-                        z[1]-=alpha*alpha*beta*cbeta*zright[1];
-                    }
-                    if((ii<nrows-1)){//bottom neighbor
-                        double *zbottom=&invd[2*((ii+1)*ncols+jj)];
-                        z[0]-=alpha*calpha*beta*beta*zbottom[0];
-                        z[1]-=alpha*calpha*beta*beta*zbottom[1];
-                    }
-                    if((jj<ncols-1) && (ii<nrows-1)){//bottom right corner
-                        double *zbright=&invd[2*((ii+1)*ncols+jj+1)];
-                        z[0]-=alpha*calpha*beta*cbeta*zbright[0];
-                        z[1]-=alpha*calpha*beta*cbeta*zbright[1];
-                    }
-                }
-                ++jj;
-                //top-right corner (x+dx is located at region 2 w.r.t site [ii,jj])
-                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                    double *z=&temp[2*(ii*ncols+jj)];
-                    double &den=denom[ii*ncols+jj];
-                    den+=alpha*alpha*cbeta*cbeta;
-                    z[0]-=alpha*cbeta*dx[0];
-                    z[1]-=alpha*cbeta*dx[1];
-                    if((ii<nrows-1)){//bottom neighbor
-                        double *zbottom=&invd[2*((ii+1)*ncols+jj)];
-                        z[0]-=alpha*calpha*cbeta*cbeta*zbottom[0];
-                        z[1]-=alpha*calpha*cbeta*cbeta*zbottom[1];
-                    }
-                    if((jj>0)){//left neighbor
-                        double *zleft=&invd[2*(ii*ncols+jj-1)];
-                        z[0]-=alpha*alpha*beta*cbeta*zleft[0];
-                        z[1]-=alpha*alpha*beta*cbeta*zleft[1];
-                    }
-                    if((ii<nrows-1) && (jj>0)){//bottom-left neighbor
-                        double *zbleft=&invd[2*((ii+1)*ncols+jj-1)];
-                        z[0]-=alpha*calpha*beta*cbeta*zbleft[0];
-                        z[1]-=alpha*calpha*beta*cbeta*zbleft[1];
-                    }
-                }
-                ++ii;
-                //bottom-right corner (x+dx is located at region 4 w.r.t site [ii,jj])
-                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                    double *z=&temp[2*(ii*ncols+jj)];
-                    double &den=denom[ii*ncols+jj];
-                    den+=calpha*calpha*cbeta*cbeta;
-                    z[0]-=calpha*cbeta*dx[0];
-                    z[1]-=calpha*cbeta*dx[1];
-                    if((ii>0)){//top neighbor
-                        double *ztop=&invd[2*((ii-1)*ncols+jj)];
-                        z[0]-=alpha*calpha*cbeta*cbeta*ztop[0];
-                        z[1]-=alpha*calpha*cbeta*cbeta*ztop[1];
-                    }
-                    if((jj>0)){//left neighbor
-                        double *zleft=&invd[2*(ii*ncols+jj-1)];
-                        z[0]-=calpha*calpha*beta*cbeta*zleft[0];
-                        z[1]-=calpha*calpha*beta*cbeta*zleft[1];
-                    }
-                    if((ii>0)){//top-left neighbor
-                        double *ztleft=&invd[2*((ii-1)*ncols+jj-1)];
-                        z[0]-=alpha*calpha*beta*cbeta*ztleft[0];
-                        z[1]-=alpha*calpha*beta*cbeta*ztleft[1];
-                    }
-                }
-                --jj;
-                //bottom-left corner (x+dx is located at region 3 w.r.t site [ii,jj])
-                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                    double *z=&temp[2*(ii*ncols+jj)];
-                    double &den=denom[ii*ncols+jj];
-                    den+=calpha*calpha*beta*beta;
-                    z[0]-=calpha*beta*dx[0];
-                    z[1]-=calpha*beta*dx[1];
-                    if((ii>0)){//top neighbor
-                        double *ztop=&invd[2*((ii-1)*ncols+jj)];
-                        z[0]-=alpha*calpha*beta*beta*ztop[0];
-                        z[1]-=alpha*calpha*beta*beta*ztop[1];
-                    }
-                    if((jj<ncols-1)){//right neighbor
-                        double *zright=&invd[2*(ii*ncols+jj+1)];
-                        z[0]-=calpha*calpha*beta*cbeta*zright[0];
-                        z[1]-=calpha*calpha*beta*cbeta*zright[1];
-                    }
-                    if((ii>0)&&(jj<ncols-1)){//top-right neighbor
-                        double *ztright=&invd[2*((ii-1)*ncols+jj+1)];
-                        z[0]-=alpha*calpha*beta*cbeta*ztright[0];
-                        z[1]-=alpha*calpha*beta*cbeta*ztright[1];
-                    }//if
-                }///if
-            }//for ncols
-        }//for nrows
-        //update the inverse
-        double *id=invd;
-        double *tmp=temp;
-        double *den=denom;
-        maxChange=0;
-        for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, id+=2, tmp+=2, den++){
-                tmp[0]/=(*den);
-                tmp[1]/=(*den);
-                double nrm=(tmp[0]-id[0])*(tmp[0]-id[0])+(tmp[1]-id[1])*(tmp[1]-id[1]);
-                if(maxChange<nrm){
-                    maxChange=nrm;
-                }
-                id[0]=tmp[0];
-                id[1]=tmp[1];
-            }
-        }
-    }//for iter
-    delete[] temp;
-    delete[] denom;
-    stats[0]=sqrt(maxChange);
-    stats[1]=iter;
-    return 0;
-}
-
 /*
     Computes comp(x)=d2(d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
 */
@@ -1505,7 +1341,7 @@ int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int nc
     int sliceSize=nrows*ncols;
     double *dx=d1;
     double *res=comp;
-    memset(comp, 0, sizeof(double)*nrows*ncols*3); 
+    memset(comp, 0, sizeof(double)*nslices*sliceSize*3); 
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=3, res+=3){
@@ -1593,6 +1429,174 @@ int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int nc
     return 0;
 }
 
+/*
+    It assumes that up was already allocated: (nslices)x(nrows)x(ncols)x3
+    nslices, nrows, ncols are the dimensions of the upsampled field
+*/
+int upsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, double *up, int ns, int nr, int nc){
+    int sliceSize=nrows*ncols;
+    double dx[3];
+    double *res=up;
+    memset(up, 0, sizeof(double)*ns*nr*nc);
+    for(int k=0;k<ns;++k){
+        for(int i=0;i<nr;++i){
+            for(int j=0;j<nc;++j, res+=3){
+                dx[0]=(k&1)?0.5*k:k/2;
+                dx[1]=(i&1)?0.5*i:i/2;
+                dx[2]=(j&1)?0.5*j:j/2;
+                if((dx[0]<0) || (dx[1]<0) || (dx[0]<0) || (dx[1]>nrows-1)||(dx[2]>ncols-1)||(dx[0]>nslices-1)){//no one is affected
+                    continue;
+                }
+                int kk=floor(dx[0]);
+                int ii=floor(dx[1]);
+                int jj=floor(dx[2]);
+                double cgamma=dx[0]-kk;
+                double calpha=dx[1]-ii;//by definition these factors are nonnegative
+                double cbeta=dx[2]-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                //---top-left
+                double *z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                res[0]+=alpha*beta*gamma*z[0];
+                res[1]+=alpha*beta*gamma*z[1];
+                res[2]+=alpha*beta*gamma*z[2];
+                //---top-right
+                ++jj;
+                if(jj<ncols){
+                    z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=alpha*cbeta*gamma*z[0];
+                    res[1]+=alpha*cbeta*gamma*z[1];
+                    res[2]+=alpha*cbeta*gamma*z[2];
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=calpha*cbeta*gamma*z[0];
+                    res[1]+=calpha*cbeta*gamma*z[1];
+                    res[2]+=calpha*cbeta*gamma*z[2];
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=calpha*beta*gamma*z[0];
+                    res[1]+=calpha*beta*gamma*z[1];
+                    res[2]+=calpha*beta*gamma*z[2];
+                }
+                ++kk;
+                if(kk<nslices){
+                    --ii;
+                    z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=alpha*beta*cgamma*z[0];
+                    res[1]+=alpha*beta*cgamma*z[1];
+                    res[2]+=alpha*beta*cgamma*z[2];
+                    ++jj;
+                    if(jj<ncols){
+                        z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=alpha*cbeta*cgamma*z[0];
+                        res[1]+=alpha*cbeta*cgamma*z[1];
+                        res[2]+=alpha*cbeta*cgamma*z[2];
+                    }
+                    //---bottom-right
+                    ++ii;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                        z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=calpha*cbeta*cgamma*z[0];
+                        res[1]+=calpha*cbeta*cgamma*z[1];
+                        res[2]+=calpha*cbeta*cgamma*z[2];
+                    }
+                    //---bottom-left
+                    --jj;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                        z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=calpha*beta*cgamma*z[0];
+                        res[1]+=calpha*beta*cgamma*z[1];
+                        res[2]+=calpha*beta*cgamma*z[2];
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+
+int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped){
+    int sliceSize=nrows*ncols;
+    double *dx=d1;
+    double *res=warped;
+    memset(warped, 0, sizeof(double)*nslices*sliceSize); 
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=3, ++res){
+                double dkk=k+dx[0];
+                double dii=i+dx[1];
+                double djj=j+dx[2];
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int kk=floor(dkk);
+                int ii=floor(dii);
+                int jj=floor(djj);
+                double cgamma=dkk-kk;
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                //---top-left
+                (*res)=0;
+                double *z=&volume[kk*sliceSize+ii*ncols+jj];
+                res[0]+=alpha*beta*gamma*(*z);
+                //---top-right
+                ++jj;
+                if(jj<ncols){
+                    z=&volume[kk*sliceSize+ii*ncols+jj];
+                    (*res)+=alpha*cbeta*gamma*(*z);
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&volume[kk*sliceSize+ii*ncols+jj];
+                    (*res)+=calpha*cbeta*gamma*(*z);
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&volume[kk*sliceSize+ii*ncols+jj];
+                    (*res)+=calpha*beta*gamma*(*z);
+                }
+                ++kk;
+                if(kk<nslices){
+                    --ii;
+                    z=&volume[kk*sliceSize+ii*ncols+jj];
+                    (*res)+=alpha*beta*cgamma*(*z);
+                    ++jj;
+                    if(jj<ncols){
+                        z=&volume[kk*sliceSize+ii*ncols+jj];
+                        (*res)+=alpha*cbeta*cgamma*(*z);
+                    }
+                    //---bottom-right
+                    ++ii;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                        z=&volume[kk*sliceSize+ii*ncols+jj];
+                        (*res)+=calpha*cbeta*cgamma*(*z);
+                    }
+                    //---bottom-left
+                    --jj;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                        z=&volume[kk*sliceSize+ii*ncols+jj];
+                        (*res)+=calpha*beta*cgamma*(*z);
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
 
 /*
     Interpolates the vector field d2 at d1: d2(d1(x)) (i.e. applies first d1, then d2 to the result)

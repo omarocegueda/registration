@@ -42,6 +42,8 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void consecutiveLabelMap(int *v, int n, int *out)
     int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp)
     int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv)
+    int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
+    int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped)
 
 def consecutive_label_map(int[:,:,:] v):
     cdef int n=v.shape[0]*v.shape[1]*v.shape[2]
@@ -211,7 +213,7 @@ cpdef computeMaskedVolumeClassStatsProbsCYTHON(int[:,:] mask, double[:,:] img, d
     cdef double[:] variances=np.zeros(shape=(nclasses, ), dtype=np.double)
     computeMaskedVolumeClassStatsProbsCPP(&mask[0,0], &img[0,0], &dims[0], nclasses, &probs[0,0,0], &means[0], &variances[0])
     return means, variances
-    
+
 cpdef integrateMaskedWeightedTensorFieldProductsProbsCYTHON(int[:,:] mask, double[:,:,:] q, double[:,:] diff, int nclasses, double[:,:,:] probs, double[:] weights):
     cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
     dims[0]=q.shape[0]
@@ -266,7 +268,6 @@ cpdef invert_vector_field_Yan(double[:,:,:] d, int maxIter, double tolerance):
 #    retVal=invertVectorFieldFixedPoint(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0], &stats[0])
 #    print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
 #    return invd
-
 
 cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     cdef int nrows=d1.shape[0]
@@ -323,7 +324,6 @@ cpdef vector_field_exponential3D(double[:,:,:,:] v):
     retVal=vectorFieldExponential3D(&v[0,0,0,0], nslices, nrows, ncols, &expv[0,0,0,0], &invexpv[0,0,0,0])
     return expv, invexpv
 
-
 cpdef read_double_buffer(bytes fname, int nDoubles):
     cdef double[:] buff=np.zeros(shape=(nDoubles,))
     readDoubleBuffer(fname, nDoubles, &buff[0])
@@ -332,7 +332,6 @@ cpdef read_double_buffer(bytes fname, int nDoubles):
 cpdef write_double_buffer(double[:] buff, bytes fname):
     cdef int nDoubles=buff.shape[0]
     writeDoubleBuffer(&buff[0], nDoubles, fname)
-
 
 cpdef create_invertible_displacement_field(int nrows, int ncols, double b, double m):
     '''
@@ -349,3 +348,22 @@ cpdef count_supporting_data_per_pixel(double[:,:,:] forward):
     cdef int[:,:] counts=np.zeros(shape=(nrows, ncols), dtype=np.int32)
     countSupportingDataPerPixel(&forward[0,0,0], nrows, ncols, &counts[0,0])
     return counts
+
+def upsample_displacement_field3D(double[:,:,:,:] field, int[:] targetShape):
+    cdef int ns=field.shape[0]
+    cdef int nr=field.shape[1]
+    cdef int nc=field.shape[2]
+    cdef int nslices=targetShape[0]
+    cdef int nrows=targetShape[1]
+    cdef int ncols=targetShape[2]
+    cdef double[:,:,:,:] up = np.ndarray((nslices, nrows, ncols,3), dtype=np.float64)
+    upsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &up[0,0,0,0],nslices, nrows, ncols);
+    return up
+
+def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement):
+    cdef int nslices=volume.shape[0]
+    cdef int nrows=volume.shape[1]
+    cdef int ncols=volume.shape[2]
+    cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
+    warpVolume(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
+    return warped
