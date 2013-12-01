@@ -44,6 +44,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv)
     int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
     int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped)
+    int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats)
 
 def consecutive_label_map(int[:,:,:] v):
     cdef int n=v.shape[0]*v.shape[1]*v.shape[2]
@@ -367,3 +368,14 @@ def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement):
     cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
     warpVolume(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
     return warped
+
+def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, double tolerance):
+    cdef int retVal
+    cdef int nslices=d.shape[0]
+    cdef int nrows=d.shape[1]
+    cdef int ncols=d.shape[2]
+    cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
+    cdef double[:,:,:,:] invd=np.zeros_like(d)
+    retVal=invertVectorField3D(&d[0,0,0,0], nslices, nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0,0], &stats[0])
+    print 'Max step:', stats[0], 'Last iteration:', int(stats[1])
+    return invd

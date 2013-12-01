@@ -43,3 +43,4 @@ int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, doubl
 
 int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols);
 int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped);
+int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats);
