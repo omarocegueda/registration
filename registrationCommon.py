@@ -9,10 +9,19 @@ import scipy as sp
 from scipy import ndimage
 import matplotlib.pyplot as plt
 import nibabel as nib
+import os
 ###############################################################
 ##########################  Common  ###########################
 ###############################################################
 const_prefilter_map_coordinates=False
+
+def getBaseFileName(fname):
+    base=os.path.basename(fname)
+    noExt=os.path.splitext(base)[0]
+    while(noExt!=base):
+        base=noExt
+        noExt=os.path.splitext(base)[0]
+    return noExt
 
 def getDistribution(img1, img2):
     sh=img1.shape

@@ -7,6 +7,7 @@ from scipy import ndimage
 import registrationCommon as rcommon
 from registrationCommon import const_prefilter_map_coordinates
 import os
+import sys
 ###############################################################
 ####### Non-linear Monomodal registration - EM (2D)############
 ###############################################################
@@ -398,9 +399,12 @@ def estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid
         displacementList.insert(0, newDisplacement)
     return newDisplacement
 
-def testEstimateMultimodalDiffeomorphicField3DMultiScale(lambdaParam):
-    fnameMoving='data/affineRegistered/templateT1ToIBSR01T1.nii.gz'
-    fnameFixed='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
+def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed, lambdaParam):
+    '''
+        python registrationDiffeomorphic.py 'data/affineRegistered/templateT1ToIBSR01T1.nii.gz' 'data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz' 10.0
+        testEstimateMultimodalDiffeomorphicField3DMultiScale('data/affineRegistered/templateT1ToIBSR01T1.nii.gz', 'data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
+    '''
+    print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
     moving = nib.load(fnameMoving)
     fixed= nib.load(fnameFixed)
     moving=moving.get_data().squeeze().astype(np.float64)
@@ -415,11 +419,13 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(lambdaParam):
     rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
     #maxOuterIter=[100,100,100,100,100,100,100,100,100]
     #maxOuterIter=[3,3,3,3,3,3,3,3,3]
-    #maxOuterIter=[10,20,50,100, 100, 100]
+    maxOuterIter=[10,20,50,100, 100, 100]
     displacement=estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,None)
     warped=tf.warp_volume(movingPyramid[0], displacement)
-    np.save('displacement_templateT1ToIBSR01T1_diffMulti.npy', displacement)
-    np.save('warped_templateT1ToIBSR01T1_diffMulti.npy', warped)
+    baseMoving=rcommon.getBaseFileName(fnameMoving)
+    baseFixed=rcommon.getBaseFileName(fnameFixed)
+    np.save('dispDiff_'+baseMoving+'_'+baseFixed+'.npy', displacement)
+    np.save('warpedDiff_'+baseMoving+'_'+baseFixed+'.npy', warped)
 
 
 
@@ -689,8 +695,11 @@ def testInversion_invertible():
     
 
 if __name__=='__main__':
+    moving=sys.argv[1]
+    fixed=sys.argv[2]
+    lambdaParam=np.float(sys.argv[3])
     #testEstimateMonomodalDiffeomorphicField3DMultiScale(0.1)
-    testEstimateMultimodalDiffeomorphicField3DMultiScale(10.0)
+    testEstimateMultimodalDiffeomorphicField3DMultiScale(moving, fixed, lambdaParam)
     #testInversion(5)
     #testInversion_invertible()
 #    testCircleToCMonomodalDiffeomorphic(5)
