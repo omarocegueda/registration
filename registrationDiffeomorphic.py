@@ -343,6 +343,7 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         outerIter+=1
         if(reportProgress):
             print 'Iter:',outerIter,'/',maxOuterIter
+            sys.stdout.flush()
         #---E step---
         warped=np.array(tf.warp_volume(moving, totalDisplacement))
         movingMask=((moving>0)*1.0)*((fixed>0)*1.0)
@@ -378,6 +379,7 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         if((maxDisplacement<outerTolerance)or(outerIter>=maxOuterIter)):
             finished=True
     print "Iter: ",outerIter, "Mean displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
+    sys.stdout.flush()
     if(previousDisplacement!=None):
         return totalDisplacement-previousDisplacement
     return totalDisplacement
@@ -405,6 +407,7 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
         testEstimateMultimodalDiffeomorphicField3DMultiScale('data/affineRegistered/templateT1ToIBSR01T1.nii.gz', 'data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
     '''
     print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
+    sys.stdout.flush()
     moving = nib.load(fnameMoving)
     fixed= nib.load(fnameFixed)
     moving=moving.get_data().squeeze().astype(np.float64)
