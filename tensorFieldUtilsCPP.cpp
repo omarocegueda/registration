@@ -1622,6 +1622,9 @@ int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, 
                 int kk=floor(dkk);
                 int ii=floor(dii);
                 int jj=floor(djj);
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(dkk>=nslices)){//no one is affected
+                    continue;
+                }
                 double cgamma=dkk-kk;
                 double calpha=dii-ii;//by definition these factors are nonnegative
                 double cbeta=djj-jj;
