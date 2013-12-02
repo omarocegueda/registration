@@ -354,7 +354,7 @@ def computeJacobianField(displacement):
 def saveDeformedLattice3D(dname):
     '''
         saveDeformedLattice3D('displacement_templateT1ToIBSR01T1_diff.npy')
-        saveDeformedLattice3D('displacement_templateT1ToIBSR01T1_diff.npy')
+        saveDeformedLattice3D('displacement_templateT1ToIBSR01T1_diffMulti.npy')
     '''
     import nibabel as nib
     import tensorFieldUtils as tf

@@ -1599,6 +1599,49 @@ int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, do
 }
 
 /*
+    Warp volume using Nearest Neighbor interpolation
+*/
+int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped){
+    int sliceSize=nrows*ncols;
+    double *dx=d1;
+    double *res=warped;
+    memset(warped, 0, sizeof(double)*nslices*sliceSize); 
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=3, ++res){
+                double dkk=k+dx[0];
+                double dii=i+dx[1];
+                double djj=j+dx[2];
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int kk=floor(dkk);
+                int ii=floor(dii);
+                int jj=floor(djj);
+                double cgamma=dkk-kk;
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                if(gamma<cgamma){
+                    ++kk;
+                }
+                if(alpha<calpha){
+                    ++ii;
+                }
+                if(beta<cbeta){
+                    ++jj;
+                }
+                (*res)=volume[kk*sliceSize + ii*ncols + jj];
+            }
+        }
+    }
+    return 0;
+}
+
+/*
     Interpolates the vector field d2 at d1: d2(d1(x)) (i.e. applies first d1, then d2 to the result)
     Seen as a linear operator, it is defined by d1 and the input vector is d2
 */
@@ -2042,7 +2085,9 @@ int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, doubl
     //---base case---
     if(n<1){
         memcpy(expv, v, sizeof(double)*3*nsites);
-        invertVectorField3D(v, nslices, nrows, ncols, 0.5, 100, 1e-4, invexpv, stats);
+        if(invexpv!=NULL){
+            invertVectorField3D(v, nslices, nrows, ncols, 0.5, 100, 1e-4, invexpv, stats);
+        }
         return 0;
     }
     //---prepare memory buffers---
@@ -2057,13 +2102,15 @@ int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, doubl
         composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)]);
     }
     //---perform binary exponentiation: inverse---
-    tmp[1-n%2]=invexpv;
-    for(int i=3*nsites-1;i>=0;--i){
-        tmp[0][i]=v[i]*factor;
-    }
-    invertVectorField3D(tmp[0], nslices, nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
-    for(int i=1;i<=n;++i){
-        composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)]);
+    if(invexpv!=NULL){
+        tmp[1-n%2]=invexpv;
+        for(int i=3*nsites-1;i>=0;--i){
+            tmp[0][i]=v[i]*factor;
+        }
+        invertVectorField3D(tmp[0], nslices, nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
+        for(int i=1;i<=n;++i){
+            composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)]);
+        }
     }
     delete[] tmp[n%2];
     return 0;

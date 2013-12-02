@@ -8,6 +8,7 @@ Created on Thu Sep 19 15:38:56 2013
 """
 from cython.view cimport memoryview
 from cython.view cimport array as cvarray
+from cpython cimport bool
 import numpy as np
 
 cdef extern from "tensorFieldUtilsCPP.h":
@@ -44,6 +45,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv)
     int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
     int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped)
+    int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped)
     int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats)
 
 def consecutive_label_map(int[:,:,:] v):
@@ -315,14 +317,19 @@ cpdef vector_field_exponential(double[:,:,:] v):
     retVal=vectorFieldExponential(&v[0,0,0], nrows, ncols, &expv[0,0,0], &invexpv[0,0,0])
     return expv, invexpv
 
-cpdef vector_field_exponential3D(double[:,:,:,:] v):
+cpdef vector_field_exponential3D(double[:,:,:,:] v, bool computeInverse):
     cdef double[:,:,:,:] expv = np.zeros_like(v)
-    cdef double[:,:,:,:] invexpv = np.zeros_like(v)
+    cdef double[:,:,:,:] invexpv=None
+    if(computeInverse):
+        invexpv = np.zeros_like(v)
     cdef int retVal
     cdef int nslices=v.shape[0]
     cdef int nrows=v.shape[1]
     cdef int ncols=v.shape[2]
-    retVal=vectorFieldExponential3D(&v[0,0,0,0], nslices, nrows, ncols, &expv[0,0,0,0], &invexpv[0,0,0,0])
+    if(computeInverse):
+        retVal=vectorFieldExponential3D(&v[0,0,0,0], nslices, nrows, ncols, &expv[0,0,0,0], &invexpv[0,0,0,0])
+    else:
+        retVal=vectorFieldExponential3D(&v[0,0,0,0], nslices, nrows, ncols, &expv[0,0,0,0], NULL)
     return expv, invexpv
 
 cpdef read_double_buffer(bytes fname, int nDoubles):
@@ -367,6 +374,14 @@ def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement):
     cdef int ncols=volume.shape[2]
     cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
     warpVolume(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
+    return warped
+
+def warp_volumeNN(double[:,:,:] volume, double[:,:,:,:] displacement):
+    cdef int nslices=volume.shape[0]
+    cdef int nrows=volume.shape[1]
+    cdef int ncols=volume.shape[2]
+    cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
+    warpVolumeNN(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
     return warped
 
 def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, double tolerance):
