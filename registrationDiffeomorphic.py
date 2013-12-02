@@ -416,7 +416,7 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     maskFixed=fixed>0
     movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, maskMoving)]
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, level, maskFixed)]
-    rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
+    #rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
     #maxOuterIter=[100,100,100,100,100,100,100,100,100]
     #maxOuterIter=[3,3,3,3,3,3,3,3,3]
     maxOuterIter=[10,20,50,100, 100, 100]
