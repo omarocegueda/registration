@@ -827,12 +827,12 @@ int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam,
                 //find the variables that are affected by this input point, and their interpolation coefficients
                 double dii=i+f[0];
                 double djj=j+f[1];
-                if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){//no one is affected
-                    continue;
-                }
                 //find the top left index and the interpolation coefficients
                 int ii=floor(f[0]);
                 int jj=floor(f[1]);
+                if((ii<0) || (jj<0) || (ii>=nrows)||(jj>=ncols)){//no one is affected
+                    continue;
+                }
                 double calpha=f[0]-ii;
                 double cbeta=f[1]-jj;
                 ii+=i;
@@ -936,13 +936,13 @@ int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, doub
                     double dkk=k+f[0];
                     double dii=i+f[1];
                     double djj=j+f[2];
-                    if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
-                        continue;
-                    }
                     //find the top left index and the interpolation coefficients
                     int kk=floor(f[0]);
                     int ii=floor(f[1]);
                     int jj=floor(f[2]);
+                    if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                        continue;
+                    }
                     double cgamma=f[0]-kk;
                     double calpha=f[1]-ii;
                     double cbeta=f[2]-jj;
@@ -1061,13 +1061,13 @@ void findNearesFinite(double *error, int nrows, int ncols, int r, int c, int &rr
 }
 
 void interpolateDisplacementFieldAt(double *forward, int nrows, int ncols, double pr, double pc, double &fr, double &fc){
-    if((pr<0) || (pc<0) || (pr>nrows-1) || (pc>ncols-1)){
+    int i=floor(pr);
+    int j=floor(pc);
+    if((i<0) || (j<0) || (i>=nrows) || (j>=ncols)){
         fr=0;
         fc=0;
         return;
     }
-    int i=floor(pr);
-    int j=floor(pc);
     double alphac=pr-i;
     double betac=pc-j;
     double alpha=1.0-alphac;
@@ -1112,12 +1112,12 @@ int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, dou
         for(int j=0;j<ncols;++j, f+=2){//p=(i,j) in R
             double dii=i+f[0];
             double djj=j+f[1];//(dii, djj) = f(p)
-            if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){//no one is affected
-                continue;
-            }
             //find the top left index and the interpolation coefficients
             int ii=floor(dii);
             int jj=floor(djj);
+            if((ii<0) || (jj<0) || (ii>=nrows)||(jj>=ncols)){//no one is affected
+                continue;
+            }
             //assign all grid points immediately adjacent to f(p)
             for(int k=0;k<4;++k){
                 int iii=ii+nRow[k];
@@ -1444,12 +1444,12 @@ int upsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, d
                 dx[0]=(k&1)?0.5*k:k/2;
                 dx[1]=(i&1)?0.5*i:i/2;
                 dx[2]=(j&1)?0.5*j:j/2;
-                if((dx[0]<0) || (dx[1]<0) || (dx[0]<0) || (dx[1]>nrows-1)||(dx[2]>ncols-1)||(dx[0]>nslices-1)){//no one is affected
-                    continue;
-                }
                 int kk=floor(dx[0]);
                 int ii=floor(dx[1]);
                 int jj=floor(dx[2]);
+                if((kk<0) || (ii<0) || (jj<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                    continue;
+                }
                 double cgamma=dx[0]-kk;
                 double calpha=dx[1]-ii;//by definition these factors are nonnegative
                 double cbeta=dx[2]-jj;
@@ -1534,14 +1534,11 @@ int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, do
                 double dkk=k+dx[0];
                 double dii=i+dx[1];
                 double djj=j+dx[2];
-                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
-                    continue;
-                }
                 //find the top left index and the interpolation coefficients
                 int kk=floor(dkk);
                 int ii=floor(dii);
                 int jj=floor(djj);
-                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(dkk>=nslices)){//no one is affected
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
                     continue;
                 }
                 double cgamma=dkk-kk;
@@ -1615,14 +1612,11 @@ int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, 
                 double dkk=k+dx[0];
                 double dii=i+dx[1];
                 double djj=j+dx[2];
-                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
-                    continue;
-                }
                 //find the top left index and the interpolation coefficients
                 int kk=floor(dkk);
                 int ii=floor(dii);
                 int jj=floor(djj);
-                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(dkk>=nslices)){//no one is affected
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
                     continue;
                 }
                 double cgamma=dkk-kk;
@@ -1659,11 +1653,11 @@ int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, doubl
         for(int j=0;j<ncols;++j, dx+=2, res+=2){
             double dii=i+dx[0];
             double djj=j+dx[1];
-            if((dii<0)||(djj<0)||(dii>nrows-1)||(djj>ncols-1)){
-                continue;
-            }
             int ii=floor(dii);
             int jj=floor(djj);
+            if((ii<0)||(jj<0)||(ii>=nrows)||(jj>=ncols)){
+                continue;
+            }
             double calpha=dii-ii;//by definition these factors are nonnegative
             double cbeta=djj-jj;
             double alpha=1-calpha;
@@ -1712,11 +1706,11 @@ int vectorFieldInterpolation(double *d1r, double *d1c, double *d2r, double *d2c,
         for(int j=0;j<ncols;++j, ++dr, ++dc, ++resr, ++resc){
             double dii=i+*dr;
             double djj=j+*dc;
-            if((dii<0)||(djj<0)||(dii>nrows-1)||(djj>ncols-1)){
-                continue;
-            }
             int ii=floor(dii);
             int jj=floor(djj);
+            if((ii<0)||(jj<0)||(ii>=nrows)||(jj>=ncols)){
+                continue;
+            }
             double calpha=dii-ii;//by definition these factors are nonnegative
             double cbeta=djj-jj;
             double alpha=1-calpha;
@@ -1766,11 +1760,11 @@ int vectorFieldAdjointInterpolation(double *d1, double *d2, int nrows, int ncols
         for(int j=0;j<ncols;++j, dx+=2, z+=2){
             double dii=i+dx[0];
             double djj=j+dx[1];
-            if((dii<0)||(djj<0)||(dii>nrows-1)||(djj>ncols-1)){
-                continue;
-            }
             int ii=floor(dii);
             int jj=floor(djj);
+            if((ii<0)||(jj<0)||(ii>=nrows)||(jj>=ncols)){
+                continue;
+            }
             double calpha=dii-ii;//by definition these factors are nonnegative
             double cbeta=djj-jj;
             double alpha=1-calpha;
@@ -1819,11 +1813,11 @@ int vectorFieldAdjointInterpolation(double *d1r, double *d1c, double *d2r, doubl
         for(int j=0;j<ncols;++j, ++dr, ++dc, ++zr, ++zc){
             double dii=i+(*dr);
             double djj=j+(*dc);
-            if((dii<0)||(djj<0)||(dii>nrows-1)||(djj>ncols-1)){
-                continue;
-            }
             int ii=floor(dii);
             int jj=floor(djj);
+            if((ii<0)||(jj<0)||(ii>=nrows)||(jj>=ncols)){
+                continue;
+            }
             double calpha=dii-ii;//by definition these factors are nonnegative
             double cbeta=djj-jj;
             double alpha=1-calpha;
@@ -2161,11 +2155,11 @@ void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *cou
         for(int j=0;j<ncols;++j, f+=2){
             double di=i+f[0];
             double dj=j+f[1];
-            if(di<0 || dj<0 || di>nrows-1 || dj>ncols-1){
-                continue;
-            }
             int ii=floor(i+f[0]);
             int jj=floor(j+f[1]);
+            if((ii<0) || (jj<0) || (ii>=nrows) || (jj>=ncols)){
+                continue;
+            }
             counts[ii*ncols+jj]++;
             ++jj;
             if(jj<ncols){
