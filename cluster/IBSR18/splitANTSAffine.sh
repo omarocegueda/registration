@@ -90,7 +90,7 @@ if [ "$1" == "o" ]; then
         cp $dir/*.gz results
         cp $dir/*.txt results
     done
-    
+    exit 0    
 fi
 ############################Unknown##################################
 echo Unknown option \'$1\'. The available options are "(c)"lean, "(s)"plit, s"(u)"bmit, c"(o)"llect.

@@ -2,14 +2,13 @@
 ####################################################
 # Author: Omar Ocegueda (omar@cimat.mx)
 #PBS -l nodes=1:ppn=1
-#PBS -l walltime=00:01:00
+#PBS -l walltime=00:00:30
 #PBS -N Diffeomorphic
-export DATA_DIR=/home/omar/code/registration/IBSR_nifti_stripped
-export CODE_DIR=/home/omar/code/registration
-export WORK_DIR=/home/omar/experiments/registration
-mkdir -p $WORK_DIR
+export PYTHONPATH=/opt/python/anaconda/lib/python2.7/site-packages:/home/omar/code/registration
 ###################################
 date
-ls -l *.gz
+reference=$(ls reference)
+target=$(ls target)
+python registrationDiffeomorphic.py target/$target reference/$reference 10.0
 date
 exit 0
