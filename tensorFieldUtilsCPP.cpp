@@ -828,15 +828,13 @@ int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam,
                 double dii=i+f[0];
                 double djj=j+f[1];
                 //find the top left index and the interpolation coefficients
-                int ii=floor(f[0]);
-                int jj=floor(f[1]);
+                int ii=floor(dii);
+                int jj=floor(djj);
                 if((ii<0) || (jj<0) || (ii>=nrows)||(jj>=ncols)){//no one is affected
                     continue;
                 }
-                double calpha=f[0]-ii;
-                double cbeta=f[1]-jj;
-                ii+=i;
-                jj+=j;
+                double calpha=dii-ii;
+                double cbeta=djj-jj;
                 double alpha=1-calpha;
                 double beta=1-cbeta;
                 //---finally accumulate the affected terms---
@@ -937,18 +935,15 @@ int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, doub
                     double dii=i+f[1];
                     double djj=j+f[2];
                     //find the top left index and the interpolation coefficients
-                    int kk=floor(f[0]);
-                    int ii=floor(f[1]);
-                    int jj=floor(f[2]);
+                    int kk=floor(dkk);
+                    int ii=floor(dii);
+                    int jj=floor(djj);
                     if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
                         continue;
                     }
-                    double cgamma=f[0]-kk;
-                    double calpha=f[1]-ii;
-                    double cbeta=f[2]-jj;
-                    ii+=i;
-                    jj+=j;
-                    kk+=k;
+                    double cgamma=dkk-kk;
+                    double calpha=dii-ii;
+                    double cbeta=djj-jj;
                     double alpha=1-calpha;
                     double beta=1-cbeta;
                     double gammaScalar=1-cgamma;
@@ -2155,8 +2150,8 @@ void countSupportingDataPerPixel(double *forward, int nrows, int ncols, int *cou
         for(int j=0;j<ncols;++j, f+=2){
             double di=i+f[0];
             double dj=j+f[1];
-            int ii=floor(i+f[0]);
-            int jj=floor(j+f[1]);
+            int ii=floor(di);
+            int jj=floor(dj);
             if((ii<0) || (jj<0) || (ii>=nrows) || (jj>=ncols)){
                 continue;
             }
