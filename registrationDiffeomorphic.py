@@ -7,6 +7,7 @@ from scipy import ndimage
 import registrationCommon as rcommon
 from registrationCommon import const_prefilter_map_coordinates
 import os
+import sys
 ###############################################################
 ####### Non-linear Monomodal registration - EM (2D)############
 ###############################################################
@@ -195,52 +196,64 @@ def testCircleToCMonomodalDiffeomorphic(lambdaParam):
 
 
 
-
+def displayRegistrationResultDiff():
+    fnameMoving='data/affineRegistered/templateT1ToIBSR01T1.nii.gz'
+    fnameFixed='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
+    nib_fixed = nib.load(fnameFixed)
+    fixed=nib_fixed.get_data().squeeze()
+    nib_moving = nib.load(fnameMoving)
+    moving=nib_moving.get_data().squeeze()
+    fnameDisplacement='displacement_templateT1ToIBSR01T1_diffMulti.npy'
+    fnameWarped='warped_templateT1ToIBSR01T1_diffMulti.npy'
+    displacement=np.load(fnameDisplacement)
+    warped=np.load(fnameWarped)
+    sh=moving.shape
+    shown=warped
+    f=rcommon.overlayImages(shown[:,sh[1]//4,:], fixed[:,sh[1]//4,:])
+    f=rcommon.overlayImages(shown[:,sh[1]//2,:], fixed[:,sh[1]//2,:])
+    f=rcommon.overlayImages(shown[:,3*sh[1]//4,:], fixed[:,3*sh[1]//4,:])
+    f=rcommon.overlayImages(shown[sh[0]//4,:,:], fixed[sh[0]//4,:,:])
+    f=rcommon.overlayImages(shown[sh[0]//2,:,:], fixed[sh[0]//2,:,:])
+    f=rcommon.overlayImages(shown[3*sh[0]//4,:,:], fixed[3*sh[0]//4,:,:])
+    f=rcommon.overlayImages(shown[:,:,sh[2]//4], fixed[:,:,sh[2]//4])
+    f=rcommon.overlayImages(shown[:,:,sh[2]//2], fixed[:,:,sh[2]//2])
+    f=rcommon.overlayImages(shown[:,:,3*sh[2]//4], fixed[:,:,3*sh[2]//4])
+    del f
+    del displacement
 
 ###############################################################
-####### Diffeomorphic Monomodal registration - EM (3D)############
+####### Diffeomorphic Monomodal registration - EM (3D)#########
 ###############################################################
-def estimateNewMonomodalDiffeomorphicField3D(moving, fixed, lambdaParam, maxOuterIter, previousDisplacement, previousDisplacementInverse):
+def estimateNewMonomodalDiffeomorphicField3D(moving, fixed, lambdaParam, maxOuterIter, previousDisplacement, reportProgress=False):
     '''
     Warning: in the monomodal case, the parameter lambda must be significantly lower than in the multimodal case. Try lambdaParam=1,
     as opposed as lambdaParam=150 used in the multimodal case
     '''
-    innerTolerance=1e-4
+    innerTolerance=1e-3
     outerTolerance=1e-3
-    sh=moving.shape
-    X0,X1,X2=np.mgrid[0:sh[0], 0:sh[1], 0:sh[2]]
     displacement     =np.zeros(shape=(moving.shape)+(3,), dtype=np.float64)
     residuals=np.zeros(shape=(moving.shape), dtype=np.float64)
     gradientField    =np.empty(shape=(moving.shape)+(3,), dtype=np.float64)
     totalDisplacement=np.zeros(shape=(moving.shape)+(3,), dtype=np.float64)
-    totalDisplacementInverse=np.zeros(shape=(moving.shape)+(3,), dtype=np.float64)
     if(previousDisplacement!=None):
         totalDisplacement[...]=previousDisplacement
-        totalDisplacementInverse[...]=previousDisplacementInverse
     outerIter=0
-    framesToCapture=5
-    maxOuterIter=framesToCapture*((maxOuterIter+framesToCapture-1)/framesToCapture)
-    itersPerCapture=maxOuterIter/framesToCapture
-    plt.figure()
     while(outerIter<maxOuterIter):
         outerIter+=1
-        print 'Outer iter:', outerIter
-        warped=ndimage.map_coordinates(moving, [X0+totalDisplacement[...,0], X1+totalDisplacement[...,1], X2+totalDisplacement[...,2]], prefilter=const_prefilter_map_coordinates)
-        if((outerIter==1) or (outerIter%itersPerCapture==0)):
-            plt.subplot(1,framesToCapture+1, 1+outerIter/itersPerCapture)
-            rcommon.overlayImages(warped[warped.shape[0]/2,...], fixed[fixed.shape[0]/2,...], False)
-            plt.title('Iter:'+str(outerIter-1))
+        if(reportProgress):
+            print 'Iter:',outerIter,'/',maxOuterIter
+        warped=np.array(tf.warp_volume(moving, totalDisplacement))
         sigmaField=np.ones_like(warped, dtype=np.float64)
         deltaField=fixed-warped
         g0, g1, g2=sp.gradient(warped)
-        gradientField[:,:,0]=g0
-        gradientField[:,:,1]=g1
-        gradientField[:,:,2]=g2
+        gradientField[:,:,:,0]=g0
+        gradientField[:,:,:,1]=g1
+        gradientField[:,:,:,2]=g2
         maxVariation=1+innerTolerance
         innerIter=0
         maxResidual=0
         displacement[...]=0
-        maxInnerIter=10
+        maxInnerIter=50
         while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
             maxVariation=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, totalDisplacement, displacement, residuals)
@@ -248,82 +261,171 @@ def estimateNewMonomodalDiffeomorphicField3D(moving, fixed, lambdaParam, maxOute
             if(maxResidual<opt):
                 maxResidual=opt
         maxDisplacement=np.max(np.abs(displacement))
-        expd, invexpd=tf.vector_field_exponential3D(displacement)
-        totalDisplacement=tf.compose_vector_fields3D(expd, totalDisplacement)
-        totalDisplacementInverse=tf.compose_vector_fields3D(totalDisplacementInverse, invexpd)
+        totalDisplacement=tf.compose_vector_fields3D(displacement, totalDisplacement)
         if(maxDisplacement<outerTolerance):
             break
-    print "Iter: ",innerIter, "Max lateral displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
+    print "Iter: ",outerIter, "Max lateral displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
     if(previousDisplacement!=None):
-        return totalDisplacement-previousDisplacement, totalDisplacementInverse
-    return totalDisplacement, totalDisplacementInverse
+        return totalDisplacement-previousDisplacement
+    return totalDisplacement
 
-def estimateMonomodalDiffeomorphicField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level, displacementList):
+def estimateMonomodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level, displacementList):
     n=len(movingPyramid)
     if(level==(n-1)):
-        #displacement=estimateNewMonomodalDeformationField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], None)
-        displacement, inverse=estimateNewMonomodalDiffeomorphicField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], None, None)
+        displacement=estimateNewMonomodalDiffeomorphicField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], None, level==0)
         if(displacementList!=None):
             displacementList.insert(0,displacement)
-        return displacement, inverse
-    subDisplacement, subDisplacementInverse=estimateMonomodalDiffeomorphicField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
-    sh=movingPyramid[level].shape
-    X0,X1=np.mgrid[0:sh[0], 0:sh[1]]*0.5
-    upsampled=np.empty(shape=(movingPyramid[level].shape)+(2,), dtype=np.float64)
-    upsampled[:,:,0]=ndimage.map_coordinates(subDisplacement[:,:,0], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
-    upsampled[:,:,1]=ndimage.map_coordinates(subDisplacement[:,:,1], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
-    upsampledInverse=np.empty(shape=(movingPyramid[level].shape)+(2,), dtype=np.float64)
-    upsampledInverse[:,:,0]=ndimage.map_coordinates(subDisplacementInverse[:,:,0], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
-    upsampledInverse[:,:,1]=ndimage.map_coordinates(subDisplacementInverse[:,:,1], [X0, X1], prefilter=const_prefilter_map_coordinates)*2
-    newDisplacement, newDisplacementInverse=estimateNewMonomodalDiffeomorphicField2D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], upsampled, upsampledInverse)
+        return displacement
+    subDisplacement=estimateMonomodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
+    sh=np.array(movingPyramid[level].shape)
+    upsampled=np.array(tf.upsample_displacement_field3D(subDisplacement, sh))*2
+    newDisplacement=estimateNewMonomodalDiffeomorphicField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, maxOuterIter[level], upsampled, level==0)
     newDisplacement+=upsampled
     if(displacementList!=None):
         displacementList.insert(0, newDisplacement)
-    return np.array(newDisplacement), np.array(newDisplacementInverse)
+    return np.array(newDisplacement)
 
-def testEstimateMonomodalDiffeomorphicField2DMultiScale(lambdaParam):
-    fname0='IBSR_01_to_02.nii.gz'
-    fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
-    nib_moving = nib.load(fname0)
-    nib_fixed= nib.load(fname1)
-    moving=nib_moving.get_data().squeeze()
-    fixed=nib_fixed.get_data().squeeze()
-    sl=moving.shape
-    sr=fixed.shape
-    level=5
-    #---sagital---
-    moving=moving[sl[0]//2,:,:].copy()
-    fixed=fixed[sr[0]//2,:,:].copy()
-    #---coronal---
-    #moving=moving[:,sl[1]//2,:].copy()
-    #fixed=fixed[:,sr[1]//2,:].copy()
-    #---axial---
-    #moving=moving[:,:,sl[2]//2].copy()
-    #fixed=fixed[:,:,sr[2]//2].copy()
+def testEstimateMonomodalDiffeomorphicField3DMultiScale(lambdaParam):
+    fnameMoving='data/affineRegistered/templateT1ToIBSR01T1.nii.gz'
+    fnameFixed='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
+    moving = nib.load(fnameMoving)
+    fixed= nib.load(fnameFixed)
+    moving=moving.get_data().squeeze().astype(np.float64)
+    fixed=fixed.get_data().squeeze().astype(np.float64)
+    moving=(moving-moving.min())/(moving.max()-moving.min())
+    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+    level=3
+    #maskMoving=np.ones_like(moving)
+    #maskFixed=np.ones_like(fixed)
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, np.ones_like(moving))]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, level, np.ones_like(fixed))]
+    rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
+    #maxOuterIter=[100,100,100,100,100,100,100,100,100]
+    maxOuterIter=[3,3,3,3,3,3,3,3,3]
+    #maxOuterIter=[10,20,50,100, 100, 100]
+    displacement=estimateMonomodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,None)
+    warped=tf.warp_volume(movingPyramid[0], displacement)
+    np.save('displacement_templateT1ToIBSR01T1_diff.npy', displacement)
+    np.save('warped_templateT1ToIBSR01T1_diff.npy', warped)
+
+
+
+
+
+
+
+
+
+
+
+###############################################################
+####### Diffeomorphic Multimodal registration - EM (3D)########
+###############################################################
+def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement, quantizationLevels, maxOuterIter, previousDisplacement, reportProgress=False):
+    innerTolerance=1e-3
+    outerTolerance=1e-3
+    displacement     =np.empty(shape=(moving.shape)+(3,), dtype=np.float64)
+    residuals=np.zeros(shape=(moving.shape), dtype=np.float64)
+    gradientField    =np.empty(shape=(moving.shape)+(3,), dtype=np.float64)
+    totalDisplacement=np.zeros(shape=(moving.shape)+(3,), dtype=np.float64)
+    if(previousDisplacement!=None):
+        totalDisplacement[...]=previousDisplacement
+    fixedQ=None
+    grayLevels=None
+    fixedQ, grayLevels, hist=tf.quantizePositiveVolumeCYTHON(fixed, quantizationLevels)
+    fixedQ=np.array(fixedQ, dtype=np.int32)
+    finished=False
+    outerIter=0
+    maxDisplacement=None
+    maxVariation=None
+    maxResidual=0
+    while((not finished) and (outerIter<maxOuterIter)):
+        outerIter+=1
+        if(reportProgress):
+            print 'Iter:',outerIter,'/',maxOuterIter
+        #---E step---
+        warped=np.array(tf.warp_volume(moving, totalDisplacement))
+        movingMask=((moving>0)*1.0)*((fixed>0)*1.0)
+        warpedMovingMask=np.array(tf.warp_volumeNN(movingMask, totalDisplacement)).astype(np.int32)
+        means, variances=tf.computeMaskedVolumeClassStatsCYTHON(warpedMovingMask, warped, quantizationLevels, fixedQ)
+        means[0]=0
+        means=np.array(means)
+        variances=np.array(variances)
+        sigmaField=variances[fixedQ]
+        deltaField=means[fixedQ]-warped#########Delta-field using Arce's rule
+        #--M step--
+        g0, g1, g2=sp.gradient(warped)
+        gradientField[:,:,:,0]=g0
+        gradientField[:,:,:,1]=g1
+        gradientField[:,:,:,2]=g2
+        maxVariation=1+innerTolerance
+        innerIter=0
+        maxInnerIter=100
+        displacement[...]=0
+        while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
+            innerIter+=1
+            maxVariation=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaDisplacement, totalDisplacement, displacement, residuals)
+            opt=np.max(residuals)
+            if(maxResidual<opt):
+                maxResidual=opt
+        #--accumulate displacement--
+        expd, inverseNone=tf.vector_field_exponential3D(displacement, False)
+        totalDisplacement=tf.compose_vector_fields3D(expd, totalDisplacement)
+        #--check stop condition--
+        nrm=np.sqrt(displacement[...,0]**2+displacement[...,1]**2+displacement[...,2]**2)
+        #maxDisplacement=np.max(nrm)
+        maxDisplacement=np.mean(nrm)
+        if((maxDisplacement<outerTolerance)or(outerIter>=maxOuterIter)):
+            finished=True
+    print "Iter: ",outerIter, "Mean displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
+    if(previousDisplacement!=None):
+        return totalDisplacement-previousDisplacement
+    return totalDisplacement
+
+def estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level=0, displacementList=None):
+    n=len(movingPyramid)
+    quantizationLevels=256
+    if(level==(n-1)):
+        displacement=estimateNewMultimodalDiffeomorphicField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], None, level==0)
+        if(displacementList!=None):
+            displacementList.insert(0, displacement)
+        return displacement
+    subDisplacement=estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
+    sh=np.array(movingPyramid[level].shape)
+    upsampled=np.array(tf.upsample_displacement_field3D(subDisplacement, sh))*2
+    newDisplacement=estimateNewMultimodalDiffeomorphicField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], upsampled, level==0)
+    newDisplacement+=upsampled
+    if(displacementList!=None):
+        displacementList.insert(0, newDisplacement)
+    return newDisplacement
+
+def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed, lambdaParam):
+    '''
+        python registrationDiffeomorphic.py 'data/affineRegistered/templateT1ToIBSR01T1.nii.gz' 'data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz' 10.0
+        testEstimateMultimodalDiffeomorphicField3DMultiScale('data/affineRegistered/templateT1ToIBSR01T1.nii.gz', 'data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
+    '''
+    print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
+    moving = nib.load(fnameMoving)
+    fixed= nib.load(fnameFixed)
+    moving=moving.get_data().squeeze().astype(np.float64)
+    fixed=fixed.get_data().squeeze().astype(np.float64)
+    moving=(moving-moving.min())/(moving.max()-moving.min())
+    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+    level=3
     maskMoving=moving>0
     maskFixed=fixed>0
-    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
-    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(fixed, level, maskFixed)]
-    rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
-    displacementList=[]
-    maxIter=200
-    displacement, inverse=estimateMonomodalDiffeomorphicField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxIter, 0,displacementList)
-    residual=tf.compose_vector_fields(displacement, inverse)
-    warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
-    rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
-    rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
-    rcommon.plotDiffeomorphism(displacement, inverse, residual)
-
-
-
-
-
-
-
-
-
-
-
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, level, maskFixed)]
+    rcommon.plotOverlaidPyramids3DCoronal(movingPyramid, fixedPyramid)
+    #maxOuterIter=[100,100,100,100,100,100,100,100,100]
+    #maxOuterIter=[3,3,3,3,3,3,3,3,3]
+    maxOuterIter=[10,20,50,100, 100, 100]
+    displacement=estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,None)
+    warped=tf.warp_volume(movingPyramid[0], displacement)
+    baseMoving=rcommon.getBaseFileName(fnameMoving)
+    baseFixed=rcommon.getBaseFileName(fnameFixed)
+    np.save('dispDiff_'+baseMoving+'_'+baseFixed+'.npy', displacement)
+    np.save('warpedDiff_'+baseMoving+'_'+baseFixed+'.npy', warped)
 
 
 
@@ -593,8 +695,13 @@ def testInversion_invertible():
     
 
 if __name__=='__main__':
+    moving=sys.argv[1]
+    fixed=sys.argv[2]
+    lambdaParam=np.float(sys.argv[3])
+    #testEstimateMonomodalDiffeomorphicField3DMultiScale(0.1)
+    testEstimateMultimodalDiffeomorphicField3DMultiScale(moving, fixed, lambdaParam)
     #testInversion(5)
-    testInversion_invertible()
+    #testInversion_invertible()
 #    testCircleToCMonomodalDiffeomorphic(5)
     #######################################
 #    maxOuterIter=[500,500,500,500,500,500]

@@ -9,10 +9,19 @@ import scipy as sp
 from scipy import ndimage
 import matplotlib.pyplot as plt
 import nibabel as nib
+import os
 ###############################################################
 ##########################  Common  ###########################
 ###############################################################
 const_prefilter_map_coordinates=False
+
+def getBaseFileName(fname):
+    base=os.path.basename(fname)
+    noExt=os.path.splitext(base)[0]
+    while(noExt!=base):
+        base=noExt
+        noExt=os.path.splitext(base)[0]
+    return noExt
 
 def getDistribution(img1, img2):
     sh=img1.shape
@@ -74,13 +83,15 @@ def createDeformationField2D_type3(nrows, ncols, maxDistp):
     return deff
 
 def drawLattice3D(dims, delta):
-    lattice=np.ndarray((1+(delta+1)*dims[0], 1+(delta+1)*dims[1], 1+(delta+1)*dims[2]), dtype=np.float64)
+    dims=np.array(dims)
+    nsquares=(dims-1)/(delta+1)
+    lattice=np.zeros(shape=dims, dtype=np.float64)
     lattice[...]=127
-    for i in range(dims[0]+1):
+    for i in range(nsquares[0]+1):
         lattice[i*(delta+1), :, :]=0
-    for j in range(dims[1]+1):
+    for j in range(nsquares[1]+1):
         lattice[:, j*(delta+1), :]=0
-    for k in range(dims[2]+1):
+    for k in range(nsquares[2]+1):
         lattice[:, :, k*(delta+1)]=0
     return lattice
 
@@ -348,3 +359,34 @@ def computeJacobianField(displacement):
     g00,g01=sp.gradient(displacement[...,0])
     g10,g11=sp.gradient(displacement[...,1])
     return (1+g00)*(1+g11)-g10*g01
+
+def saveDeformedLattice3D(dname):
+    '''
+        saveDeformedLattice3D('displacement_templateT1ToIBSR01T1_diff.npy')
+        saveDeformedLattice3D('displacement_templateT1ToIBSR01T1_diffMulti.npy')
+    '''
+    import nibabel as nib
+    import tensorFieldUtils as tf
+    print 'Loading displacement...'
+    displacement=np.load(dname)
+    L=drawLattice3D(displacement.shape[0:3], 10)
+    #print 'Computing inverse...'
+    #inverse=tf.invert_vector_field3D(displacement, 0.5, 100, 1e-4)
+    #print 'Computing residual...'
+    #residual=tf.compose_vector_fields3D(displacement, inverse)
+    #print 'Warping inverse lattice...'
+    #warped_res=np.array(tf.warp_volume(L, residual)).astype(np.int16)
+    #img_residual=nib.Nifti1Image(warped_res, np.eye(4))
+    #img_residual.to_filename('residual_lattice.nii.gz')
+    print 'Warping lattice...'
+    warped=np.array(tf.warp_volume(L, displacement)).astype(np.int16)
+    print 'Transforming to Nifti...'
+    img=nib.Nifti1Image(warped, np.eye(4))
+    print 'Saving warped lattice...'
+    img.to_filename('deformed_lattice.nii.gz')
+    print 'done.'
+    
+    
+    
+    
+    

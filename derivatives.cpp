@@ -1032,8 +1032,8 @@ int computeMultiDivergence(double *frr, double *fcc, double *frc, int *assignmen
 
 int computeMultiJacobian(double *fr, double *fc, int *assignmentV, int *assignmentH, int nrows, int ncols, int maxCompartments, double *dfdrr, double *dfdcc, double *dfdrc, EDerivativeType edt, EBoundaryCondition ebc){
 	double *tmp=new double[nrows*ncols*maxCompartments];
-	int retVal=computeMultiGradient(fr, assignmentV, assignmentH, nrows, ncols, maxCompartments, dfdrr, dfdrc, edt, ebc);
-	retVal=computeMultiGradient(fc, assignmentV, assignmentH, nrows, ncols, maxCompartments, tmp, dfdcc, edt, ebc);
+	computeMultiGradient(fr, assignmentV, assignmentH, nrows, ncols, maxCompartments, dfdrr, dfdrc, edt, ebc);
+	computeMultiGradient(fc, assignmentV, assignmentH, nrows, ncols, maxCompartments, tmp, dfdcc, edt, ebc);
 	int nsites=nrows*ncols*maxCompartments;
 	for(int i=0;i<nsites;++i){
 		dfdrc[i]=0.5*(dfdrc[i]+tmp[i]);
