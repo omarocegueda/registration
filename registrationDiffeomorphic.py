@@ -391,7 +391,7 @@ def estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid
             displacementList.insert(0, displacement)
         return displacement
     subDisplacement=estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
-    sh=np.array(movingPyramid[level].shape)
+    sh=np.array(movingPyramid[level].shape).astype(np.int32)
     upsampled=np.array(tf.upsample_displacement_field3D(subDisplacement, sh))*2
     newDisplacement=estimateNewMultimodalDiffeomorphicField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], upsampled, level==0)
     newDisplacement+=upsampled
