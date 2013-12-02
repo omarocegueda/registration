@@ -322,8 +322,6 @@ def testEstimateMonomodalDiffeomorphicField3DMultiScale(lambdaParam):
 ####### Diffeomorphic Multimodal registration - EM (3D)########
 ###############################################################
 def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement, quantizationLevels, maxOuterIter, previousDisplacement, reportProgress=False):
-    print 'Starting new level estimation...'
-    sys.stdout.flush()
     innerTolerance=1e-3
     outerTolerance=1e-3
     displacement     =np.empty(shape=(moving.shape)+(3,), dtype=np.float64)
@@ -345,17 +343,10 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         outerIter+=1
         if(reportProgress):
             print 'Iter:',outerIter,'/',maxOuterIter
-            sys.stdout.flush()
         #---E step---
-        print 'Warping volume...'
-        sys.stdout.flush()
         warped=np.array(tf.warp_volume(moving, totalDisplacement))
         movingMask=((moving>0)*1.0)*((fixed>0)*1.0)
-        print 'warping volume NN...'
-        sys.stdout.flush()
         warpedMovingMask=np.array(tf.warp_volumeNN(movingMask, totalDisplacement)).astype(np.int32)
-        print 'Computing class stats...'
-        sys.stdout.flush()
         means, variances=tf.computeMaskedVolumeClassStatsCYTHON(warpedMovingMask, warped, quantizationLevels, fixedQ)        
         means[0]=0
         means=np.array(means)
@@ -371,8 +362,6 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         innerIter=0
         maxInnerIter=100
         displacement[...]=0
-        print 'Iterating...'
-        sys.stdout.flush()
         while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
             maxVariation=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaDisplacement, totalDisplacement, displacement, residuals)
@@ -380,11 +369,7 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
             if(maxResidual<opt):
                 maxResidual=opt
         #--accumulate displacement--
-        print 'Exponentiating...'
-        sys.stdout.flush()
         expd, inverseNone=tf.vector_field_exponential3D(displacement, False)
-        print 'Composing vector fields...'
-        sys.stdout.flush()
         totalDisplacement=tf.compose_vector_fields3D(expd, totalDisplacement)
         #--check stop condition--
         nrm=np.sqrt(displacement[...,0]**2+displacement[...,1]**2+displacement[...,2]**2)
@@ -393,7 +378,6 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         if((maxDisplacement<outerTolerance)or(outerIter>=maxOuterIter)):
             finished=True
     print "Iter: ",outerIter, "Mean displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
-    sys.stdout.flush()
     if(previousDisplacement!=None):
         return totalDisplacement-previousDisplacement
     return totalDisplacement
@@ -408,8 +392,6 @@ def estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid
         return displacement
     subDisplacement=estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
     sh=np.array(movingPyramid[level].shape).astype(np.int32)
-    print 'Upsampling sub-displacement...'
-    sys.stdout.flush()
     upsampled=np.array(tf.upsample_displacement_field3D(subDisplacement, sh))*2
     newDisplacement=estimateNewMultimodalDiffeomorphicField3D(movingPyramid[level], fixedPyramid[level], lambdaParam, quantizationLevels, maxOuterIter[level], upsampled, level==0)
     newDisplacement+=upsampled
@@ -423,7 +405,6 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
         testEstimateMultimodalDiffeomorphicField3DMultiScale('data/affineRegistered/templateT1ToIBSR01T1.nii.gz', 'data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
     '''
     print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
-    sys.stdout.flush()
     moving = nib.load(fnameMoving)
     fixed= nib.load(fnameFixed)
     moving=moving.get_data().squeeze().astype(np.float64)

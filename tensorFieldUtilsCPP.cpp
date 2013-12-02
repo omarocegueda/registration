@@ -2006,7 +2006,7 @@ int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, do
 }
 
 int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv){
-    double EXP_EPSILON=0.01;//such that the vector field exponential is approx the identity
+    double EXP_EPSILON=0.1;//such that the vector field exponential is approx the identity
     //---compute the maximum norm---
     double stats[3];
     int nsites=nrows*ncols;
