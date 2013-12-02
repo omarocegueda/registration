@@ -1,6 +1,7 @@
 #!/bin/bash
 ####################################################
 # Author: Omar Ocegueda (omar@cimat.mx)
+#PBS -l pmem=4gb
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=04:00:00
 #PBS -N Diffeomorphic
