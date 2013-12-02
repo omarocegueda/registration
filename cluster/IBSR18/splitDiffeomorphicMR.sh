@@ -85,7 +85,7 @@ fi
 if [ "$1" == "o" ]; then
     mkdir -p results
     for dir in $(ls -d [0-9]*/); do
-        cp $dir/*.npy results
+        mv $dir/*.npy results
     done
     exit 0    
 fi

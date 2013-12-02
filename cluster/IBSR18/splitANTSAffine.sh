@@ -87,8 +87,8 @@ fi
 if [ "$1" == "o" ]; then
     mkdir -p results
     for dir in $(ls -d [0-9]*/); do
-        cp $dir/*.gz results
-        cp $dir/*.txt results
+        mv $dir/*.gz results
+        mv $dir/*.txt results
     done
     exit 0    
 fi
