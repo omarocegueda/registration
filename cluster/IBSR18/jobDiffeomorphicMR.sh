@@ -2,8 +2,10 @@
 ####################################################
 # Author: Omar Ocegueda (omar@cimat.mx)
 #PBS -l nodes=1:ppn=1
-#PBS -l walltime=00:00:30
+#PBS -l walltime=04:00:00
 #PBS -N Diffeomorphic
+#PBS -M jomaroceguedag@gmail.com
+export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH=/opt/python/anaconda/lib/python2.7/site-packages:/home/omar/code/registration
 ###################################
 date

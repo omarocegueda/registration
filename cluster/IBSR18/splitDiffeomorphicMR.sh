@@ -21,6 +21,8 @@
 # Example (submit): ./splitDiffeomorphicMR.sh u
 # Example (collect):./splitDiffeomorphicMR.sh o
 #
+#######################################################################
+pythonScriptName="/home/omar/code/registration/registrationDiffeomorphic.py"
 #############################No parameters#############################
 if [ -z "$1" ]; then
     echo Please specify an action: c "(clean)", s "(split)", u "(submit)", o "(collect)"
@@ -65,6 +67,7 @@ if [ "$1" == "s" ]; then
         ln "${movingNames[$index]}" $stri/target
         ln "${fixedNames[$index]}" $stri/reference
         cp jobDiffeomorphicMR.sh $stri
+        cp $pythonScriptName $stri
     done
     exit 0
 fi
