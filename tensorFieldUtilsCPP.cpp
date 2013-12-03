@@ -1629,7 +1629,12 @@ int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, 
                 if(beta<cbeta){
                     ++jj;
                 }
-                (*res)=volume[kk*sliceSize + ii*ncols + jj];
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                    (*res)=0;
+                }else{
+                    (*res)=volume[kk*sliceSize + ii*ncols + jj];
+                }
+                
             }
         }
     }
