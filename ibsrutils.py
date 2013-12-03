@@ -1,3 +1,4 @@
+#!/opt/python/anaconda/bin/python
 import matplotlib.pyplot as plt
 import numpy as np
 import nibabel as nib
@@ -105,7 +106,8 @@ def showRegistrationResultMidSlices(fnameWarped, fnameFixed):
 if __name__=="__main__":
     argc=len(sys.argv)
     if argc<2:
-        print 'Process task name expected.'
+        print 'Task name expected:\n','segatlas\n','invert\n','npy2nifti\n','lattice\n'
+        
         sys.exit(0)
     if(sys.argv[1]=='segatlas'):
         if argc<4:
@@ -170,7 +172,7 @@ if __name__=="__main__":
             print 'File name expected.'
             sys.exit(0)
         dname=sys.argv[2]
-        oname='lattice_'+dname
+        oname='lattice_'+changeExtension(dname, '.nii.gz')
         rcommon.saveDeformedLattice3D(dname, oname)
         sys.exit(0)
     print 'Unknown argument:',sys.argv[1]
