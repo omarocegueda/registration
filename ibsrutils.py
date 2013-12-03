@@ -152,6 +152,9 @@ if __name__=="__main__":
         np.save(invName, inverse)
         print 'Computing inversion error...'
         residual=np.array(tf.compose_vector_fields3D(displacement, inverse))
+        residualName="res"+dispName
+        print 'Saving residual as:', residualName
+        np.save(residualName, residual)
         residual=np.sqrt(np.sum(residual**2,3))
         print "Mean residual norm:", residual.mean()," (",residual.std(), "). Max residual norm:", residual.max()
         sys.exit(0)
