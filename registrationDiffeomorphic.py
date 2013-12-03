@@ -343,17 +343,17 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         outerIter+=1
         if(reportProgress):
             print 'Iter:',outerIter,'/',maxOuterIter
-            sys.stdout.flush()
+            #sys.stdout.flush()
         #---E step---
-        print "Warping..."
-        sys.stdout.flush()
+        #print "Warping..."
+        #sys.stdout.flush()
         warped=np.array(tf.warp_volume(moving, totalDisplacement))
         movingMask=((moving>0)*1.0)*((fixed>0)*1.0)
-        print "Warping NN..."
-        sys.stdout.flush()
+        #print "Warping NN..."
+        #sys.stdout.flush()
         warpedMovingMask=np.array(tf.warp_volumeNN(movingMask, totalDisplacement)).astype(np.int32)
-        print "Class stats..."
-        sys.stdout.flush()
+        #print "Class stats..."
+        #sys.stdout.flush()
         means, variances=tf.computeMaskedVolumeClassStatsCYTHON(warpedMovingMask, warped, quantizationLevels, fixedQ)        
         means[0]=0
         means=np.array(means)
@@ -369,8 +369,8 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         innerIter=0
         maxInnerIter=100
         displacement[...]=0
-        print "Iterating..."
-        sys.stdout.flush()
+        #print "Iterating..."
+        #sys.stdout.flush()
         while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
             maxVariation=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaDisplacement, totalDisplacement, displacement, residuals)
@@ -378,16 +378,16 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
             if(maxResidual<opt):
                 maxResidual=opt
         #--accumulate displacement--
-        print "Exponential3D. Range D:", displacement.min(), displacement.max()
-        sys.stdout.flush()
+        #print "Exponential3D. Range D:", displacement.min(), displacement.max()
+        #sys.stdout.flush()
         expd, inverseNone=tf.vector_field_exponential3D(displacement, False)
         expd=np.array(expd)
-        print "Range expd:", expd.min(), expd.max(), "Range TD:", totalDisplacement.min(), totalDisplacement.max()
-        print "Compose vector fields..."
-        sys.stdout.flush()
+        #print "Range expd:", expd.min(), expd.max(), "Range TD:", totalDisplacement.min(), totalDisplacement.max()
+        #print "Compose vector fields..."
+        #sys.stdout.flush()
         totalDisplacement=np.array(tf.compose_vector_fields3D(expd, totalDisplacement))
-        print "Composed rage:", totalDisplacement.min(), totalDisplacement.max()
-        sys.stdout.flush()
+        #print "Composed rage:", totalDisplacement.min(), totalDisplacement.max()
+        #sys.stdout.flush()
         #--check stop condition--
         nrm=np.sqrt(displacement[...,0]**2+displacement[...,1]**2+displacement[...,2]**2)
         #maxDisplacement=np.max(nrm)
@@ -395,10 +395,10 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         if((maxDisplacement<outerTolerance)or(outerIter>=maxOuterIter)):
             finished=True
     print "Iter: ",outerIter, "Mean displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
-    sys.stdout.flush()
+    #sys.stdout.flush()
     if(previousDisplacement!=None):
-        print 'Range TD:', totalDisplacement.min(), totalDisplacement.max(),'. Range PD:', previousDisplacement.min(), previousDisplacement.max()
-        sys.stdout.flush()
+        #print 'Range TD:', totalDisplacement.min(), totalDisplacement.max(),'. Range PD:', previousDisplacement.min(), previousDisplacement.max()
+        #sys.stdout.flush()
         return totalDisplacement-previousDisplacement
     return totalDisplacement
 
@@ -447,6 +447,17 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     baseFixed=rcommon.getBaseFileName(fnameFixed)
     np.save('dispDiff_'+baseMoving+'_'+baseFixed+'.npy', displacement)
     np.save('warpedDiff_'+baseMoving+'_'+baseFixed+'.npy', warped)
+    print 'Computing inverse...'
+    lambdaParam=0.9
+    maxIter=100
+    tolerance=1e-4
+    inverse=np.array(tf.invert_vector_field3D(displacement, lambdaParam, maxIter, tolerance))
+    np.save('invdispDiff_'+baseMoving+'_'+baseFixed+'.npy', inverse)
+    print 'Computing inversion error...'
+    residual=np.array(tf.compose_vector_fields3D(displacement, inverse))
+    np.save('resdispDiff_'+baseMoving+'_'+baseFixed+'.npy', residual)
+    residual=np.sqrt(np.sum(residual**2,3))
+    print "Mean residual norm:", residual.mean()," (",residual.std(), "). Max residual norm:", residual.max()
 
 
 

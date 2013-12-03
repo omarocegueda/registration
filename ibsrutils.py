@@ -136,7 +136,7 @@ if __name__=="__main__":
             sys.exit(0)
         dispName=sys.argv[2]
         displacement=np.load(dispName)
-        lambdaParam=0.5
+        lambdaParam=0.9
         maxIter=100
         tolerance=1e-4
         if argc>3:
