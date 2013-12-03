@@ -2,9 +2,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import nibabel as nib
 import itertools
-import tensorfieldUtils as tf
+import tensorFieldUtils as tf
 import sys
+import os
 import registrationCommon as rcommon
+
+def changeExtension(fname, newExt):
+    '''
+    changeExtension('/opt/registration/data/myfile.nii.gz', '.ext')
+    changeExtension('/opt/registration/data/myfile.nii.gz', '_suffix.ext')
+    '''
+    directory=os.path.dirname(fname)
+    basename=rcommon.getBaseFileName(fname)
+    return directory+'/'+basename+newExt
+
 def getSegmentationStats(namesFile):
     '''
     cnt, sizes, common=getSegmentationStats('/opt/registration/experiments/segNames.txt')
@@ -139,5 +150,27 @@ if __name__=="__main__":
         residual=np.array(tf.compose_vector_fields3D(displacement, inverse))
         residual=np.sqrt(np.sum(residual**2,3))
         print "Mean residual norm:", residual.mean()," (",residual.std(), "). Max residual norm:", residual.max()
-        
+        sys.exit(0)
+    elif(sys.argv[1]=='npy2nifti'):
+        if argc<3:
+            print 'File name expected.'
+            sys.exit(0)
+        fname=sys.argv[2]
+        try:
+            inputData=np.load(fname)
+        except IOError:
+            print 'Cannot open file:',fname
+            sys.exit(0)
+        outputData=nib.Nifti1Image(inputData, np.eye(4))
+        outputName=changeExtension(fname, '.nii.gz')
+        outputData.to_filename(outputName)
+        sys.exit(0)
+    elif(sys.argv[1]=='lattice'):
+        if argc<3:
+            print 'File name expected.'
+            sys.exit(0)
+        dname=sys.argv[2]
+        oname='lattice_'+dname
+        rcommon.saveDeformedLattice3D(dname, oname)
+        sys.exit(0)
     print 'Unknown argument:',sys.argv[1]
