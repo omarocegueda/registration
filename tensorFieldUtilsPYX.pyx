@@ -46,7 +46,9 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
     int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped)
     int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped)
+    int warpDiscreteVolumeNN(int *volume, double *d1, int nslices, int nrows, int ncols, int *warped)
     int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats)
+    void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg)
 
 def consecutive_label_map(int[:,:,:] v):
     cdef int n=v.shape[0]*v.shape[1]*v.shape[2]
@@ -383,6 +385,24 @@ def warp_volumeNN(double[:,:,:] volume, double[:,:,:,:] displacement):
     cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
     warpVolumeNN(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
     return warped
+
+def warp_discrete_volumeNN(int[:,:,:] volume, double[:,:,:,:] displacement):
+    cdef int nslices=volume.shape[0]
+    cdef int nrows=volume.shape[1]
+    cdef int ncols=volume.shape[2]
+    cdef int[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.int32)
+    warpVolumeNN(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
+    return warped
+
+def get_voting_segmentation(int[:,:,:,:] votes):
+    cdef int nslices=votes.shape[0]
+    cdef int nrows=votes.shape[1]
+    cdef int ncols=votes.shape[2]
+    cdef int nvotes=votes.shape[3]
+    cdef int[:,:,:] seg = np.ndarray((nslices, nrows, ncols), dtype=np.int32)
+    getVotingSegmentation(&votes[0,0,0,0], nslices, nrows, ncols, nvotes, &seg[0,0,0])
+    return seg
+
 
 def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, double tolerance):
     cdef int retVal

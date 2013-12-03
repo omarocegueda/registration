@@ -385,8 +385,4 @@ def saveDeformedLattice3D(dname):
     print 'Saving warped lattice...'
     img.to_filename('deformed_lattice.nii.gz')
     print 'done.'
-    
-    
-    
-    
-    
+

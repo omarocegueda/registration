@@ -1656,6 +1656,57 @@ int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, 
     return 0;
 }
 
+
+/*
+    Warp volume using Nearest Neighbor interpolation
+*/
+int warpDiscreteVolumeNN(int *volume, double *d1, int nslices, int nrows, int ncols, int *warped){
+    int sliceSize=nrows*ncols;
+    double *dx=d1;
+    int *res=warped;
+    memset(warped, 0, sizeof(int)*nslices*sliceSize); 
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=3, ++res){
+                double dkk=k+dx[0];
+                double dii=i+dx[1];
+                double djj=j+dx[2];
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int kk=floor(dkk);
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                    continue;
+                }
+                double cgamma=dkk-kk;
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                if(gamma<cgamma){
+                    ++kk;
+                }
+                if(alpha<calpha){
+                    ++ii;
+                }
+                if(beta<cbeta){
+                    ++jj;
+                }
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                    continue;
+                }else{
+                    (*res)=volume[kk*sliceSize + ii*ncols + jj];
+                }
+                
+            }
+        }
+    }
+    return 0;
+}
 /*
     Interpolates the vector field d2 at d1: d2(d1(x)) (i.e. applies first d1, then d2 to the result)
     Seen as a linear operator, it is defined by d1 and the input vector is d2
@@ -2210,3 +2261,22 @@ void consecutiveLabelMap(int *v, int n, int *out){
     }
 }
 
+void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg){
+    int nsites=nslices*nrows*ncols;
+    int *v=votes;
+    for(int i=0;i<nsites;++i, v+=nvotes){
+        map<int, int> cnt;
+        for(int j=0;j<nvotes;++j){
+           cnt[v[j]]++;
+        }
+        int best=-1;
+        int bestCount=-1;
+        for(map<int, int>::iterator it=cnt.begin(); it!=cnt.end();++it){
+            if((best<0) || (it->second>bestCount)){
+                best=it->first;
+                bestCount=it->second;
+            }
+        }
+        seg[i]=best;
+    }
+}
