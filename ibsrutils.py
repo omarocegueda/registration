@@ -14,8 +14,10 @@ def changeExtension(fname, newExt):
     changeExtension('/opt/registration/data/myfile.nii.gz', '_suffix.ext')
     '''
     directory=os.path.dirname(fname)
+    if directory:
+        directory+='/'
     basename=rcommon.getBaseFileName(fname)
-    return directory+'/'+basename+newExt
+    return directory+basename+newExt
 
 def getSegmentationStats(namesFile):
     '''
