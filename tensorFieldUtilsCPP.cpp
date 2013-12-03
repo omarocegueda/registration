@@ -934,6 +934,9 @@ int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, doub
                     double dkk=k+f[0];
                     double dii=i+f[1];
                     double djj=j+f[2];
+                    if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                        continue;
+                    }
                     //find the top left index and the interpolation coefficients
                     int kk=floor(dkk);
                     int ii=floor(dii);
@@ -1340,22 +1343,25 @@ int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int nc
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=3, res+=3){
-                int kk=floor(dx[0]);
-                int ii=floor(dx[1]);
-                int jj=floor(dx[2]);
-                double cgamma=dx[0]-kk;
-                double calpha=dx[1]-ii;//by definition these factors are nonnegative
-                double cbeta=dx[2]-jj;
-                double alpha=1-calpha;
-                double beta=1-cbeta;
-                double gamma=1-cgamma;
+                double dkk=k+dx[0];
+                double dii=i+dx[1];
+                double djj=j+dx[2];
+                if((dii<0)||(djj<0)||(dkk<0)||(dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){
+                    continue;
+                }
                 //---top-left
-                ii+=i;
-                jj+=j;
-                kk+=k;
+                int kk=floor(dkk);
+                int ii=floor(dii);
+                int jj=floor(djj);
                 if((ii<0)||(jj<0)||(kk<0)||(ii>=nrows)||(jj>=ncols)||(kk>=nslices)){
                     continue;
                 }
+                double cgamma=dkk-kk;
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
                 res[0]=dx[0];
                 res[1]=dx[1];
                 res[2]=dx[2];
@@ -1432,13 +1438,16 @@ int upsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, d
     int sliceSize=nrows*ncols;
     double dx[3];
     double *res=up;
-    memset(up, 0, sizeof(double)*ns*nr*nc);
+    memset(up, 0, sizeof(double)*ns*nr*nc*3);
     for(int k=0;k<ns;++k){
         for(int i=0;i<nr;++i){
             for(int j=0;j<nc;++j, res+=3){
                 dx[0]=(k&1)?0.5*k:k/2;
                 dx[1]=(i&1)?0.5*i:i/2;
                 dx[2]=(j&1)?0.5*j:j/2;
+                if((dx[0]<0) || (dx[1]<0) || (dx[2]<0) || (dx[1]>nrows-1)||(dx[2]>ncols-1)||(dx[0]>nslices-1)){//no one is affected
+                    continue;
+                }
                 int kk=floor(dx[0]);
                 int ii=floor(dx[1]);
                 int jj=floor(dx[2]);
@@ -1529,6 +1538,9 @@ int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, do
                 double dkk=k+dx[0];
                 double dii=i+dx[1];
                 double djj=j+dx[2];
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                    continue;
+                }
                 //find the top left index and the interpolation coefficients
                 int kk=floor(dkk);
                 int ii=floor(dii);
@@ -1607,6 +1619,9 @@ int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, 
                 double dkk=k+dx[0];
                 double dii=i+dx[1];
                 double djj=j+dx[2];
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                    continue;
+                }
                 //find the top left index and the interpolation coefficients
                 int kk=floor(dkk);
                 int ii=floor(dii);
@@ -1630,7 +1645,7 @@ int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, 
                     ++jj;
                 }
                 if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
-                    (*res)=0;
+                    continue;
                 }else{
                     (*res)=volume[kk*sliceSize + ii*ncols + jj];
                 }
