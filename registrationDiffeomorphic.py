@@ -381,9 +381,13 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, lambdaDisplacement,
         print "Exponential3D. Range D:", displacement.min(), displacement.max()
         sys.stdout.flush()
         expd, inverseNone=tf.vector_field_exponential3D(displacement, False)
+        expd=np.array(expd)
+        print "Range expd:", expd.min(), expd.max()
         print "Compose vector fields..."
         sys.stdout.flush()
-        totalDisplacement=tf.compose_vector_fields3D(expd, totalDisplacement)
+        totalDisplacement=np.array(tf.compose_vector_fields3D(expd, totalDisplacement))
+        print "Composed rage:", totalDisplacement.min(), totalDisplacement.max()
+        sys.stdout.flush()
         #--check stop condition--
         nrm=np.sqrt(displacement[...,0]**2+displacement[...,1]**2+displacement[...,2]**2)
         #maxDisplacement=np.max(nrm)
