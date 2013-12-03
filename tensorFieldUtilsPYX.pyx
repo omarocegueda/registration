@@ -391,7 +391,7 @@ def warp_discrete_volumeNN(int[:,:,:] volume, double[:,:,:,:] displacement):
     cdef int nrows=volume.shape[1]
     cdef int ncols=volume.shape[2]
     cdef int[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.int32)
-    warpVolumeNN(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
+    warpDiscreteVolumeNN(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
     return warped
 
 def get_voting_segmentation(int[:,:,:,:] votes):
