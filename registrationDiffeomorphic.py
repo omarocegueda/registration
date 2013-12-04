@@ -446,7 +446,8 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)
     np.save('dispDiff_'+baseMoving+'_'+baseFixed+'.npy', displacement)
-    np.save('warpedDiff_'+baseMoving+'_'+baseFixed+'.npy', warped)
+    imgWarped=nib.Nifti1Image(warped, np.eye(4))
+    imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     print 'Computing inverse...'
     lambdaParam=0.9
     maxIter=100

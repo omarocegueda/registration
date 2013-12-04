@@ -96,7 +96,9 @@ def segmentBrainwebAtlas(segNames, displacementFnames):
 
 def showRegistrationResultMidSlices(fnameWarped, fnameFixed):
     '''
-    saveRegistrationResultMidSlices('data/affineRegistered/templateT1ToIBSR01T1.nii.gz', 'data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz', 'displacement_templateT1ToIBSR01T1_diffMulti.npy')
+    showRegistrationResultMidSlices('IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
+    showRegistrationResultMidSlices('warpedDiff_IBSR_07_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
+    
     '''
     fixed=nib.load(fnameFixed).get_data().squeeze().astype(np.float64)
     warped=nib.load(fnameWarped).get_data().squeeze().astype(np.float64)

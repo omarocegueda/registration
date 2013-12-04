@@ -86,6 +86,7 @@ if [ "$1" == "o" ]; then
     mkdir -p results
     for dir in $(ls -d [0-9]*/); do
         mv $dir/*.npy results
+        mv $dir/*.nii.gz results
     done
     exit 0    
 fi
