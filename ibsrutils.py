@@ -32,7 +32,7 @@ def getSegmentationStats(namesFile):
     for name in names:
         name=name.strip()
         nib_vol = nib.load(name)
-        vol=nib_vol.get_data().astype(np.int32).reshape(-1)
+        vol=nib_vol.get_data().squeeze().astype(np.int32).reshape(-1)
         vol.sort()
         values = list(set(vol))
         groups={g[0]:len(list(g[1])) for g in itertools.groupby(vol)}
@@ -83,15 +83,23 @@ def segmentBrainwebAtlas(segNames, displacementFnames):
     nvol=len(segNames)
     votes=None
     for i in range(nvol):
+        segNames[i]=segNames[i].strip()
+        displacementFnames[i]=displacementFnames[i].strip()
         nib_vol = nib.load(segNames[i])
-        vol=nib_vol.get_data().astype(np.int32)
+        vol=nib_vol.get_data().squeeze().astype(np.int32)
         displacement=np.load(displacementFnames[i])
+        print 'Warping segmentation', i+1, '/',nvol, '. Vol shape:', vol.shape, 'Disp. shape:', displacement.shape
         warped=np.array(tf.warp_discrete_volumeNN(vol, displacement))
+        del vol
+        del displacement
         if votes==None:
             votes=np.ndarray(shape=(warped.shape+(nvol,)), dtype=np.int32)
         votes[...,i]=warped
+        del warped
+    print 'Computing voting segmentation...'
     seg=np.array(tf.get_voting_segmentation(votes)).astype(np.int16)
     img=nib.Nifti1Image(seg, np.eye(4))
+    print 'Saving segmentation...'
     img.to_filename('votingSegmentation.nii.gz')
 
 def showRegistrationResultMidSlices(fnameWarped, fnameFixed):
