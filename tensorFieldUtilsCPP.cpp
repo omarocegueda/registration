@@ -2487,4 +2487,5 @@ int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *a
             }
         }
     }
+    return 0;
 }
