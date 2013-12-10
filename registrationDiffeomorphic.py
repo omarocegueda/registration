@@ -347,7 +347,7 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, initAffine, lambdaD
     maxResidual=0
     fixedMask=(fixed>0).astype(np.int32)
     movingMask=(moving>0).astype(np.int32)
-    trustRegion=fixedMask*np.array(tf.warp_discrete_volumeNNAffine(movingMask, np.array(fixedMask.shape), initAffine))#consider only the overlap after affine registration
+    trustRegion=fixedMask*np.array(tf.warp_discrete_volumeNNAffine(movingMask, np.array(fixedMask.shape, dtype=np.int32), initAffine))#consider only the overlap after affine registration
     while((not finished) and (outerIter<maxOuterIter)):
         outerIter+=1
         if(reportProgress):
