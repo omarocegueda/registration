@@ -42,9 +42,13 @@ int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int nc
 int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv);
 
 int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols);
-int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped);
-int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped);
-int warpDiscreteVolumeNN(int *volume, double *d1, int nslices, int nrows, int ncols, int *warped);
+int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *affine, double *warped, int nsRef, int nrRef, int ncRef);
+int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped);
+int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped);
+int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, double *affine, int *warped, int nsRef, int nrRef, int ncRef);
+int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, int *warped);
 int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats);
+int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine);
 
 void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg);
+int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal);

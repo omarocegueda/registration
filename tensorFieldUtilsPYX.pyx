@@ -44,12 +44,19 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp)
     int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv)
     int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
-    int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped)
-    int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped)
-    int warpDiscreteVolumeNN(int *volume, double *d1, int nslices, int nrows, int ncols, int *warped)
+    int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *affine, double *warped, int nsRef, int nrRef, int ncRef)
+    int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped)
+    int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped)
+    int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, double *affine, int *warped, int nsRef, int nrRef, int ncRef)
+    int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, int *warped)
     int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats)
+    int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
     void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg)
+    int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal)
 
+cdef checkFortran(a):
+    if np.isfortran(np.array(a)):
+        print 'Warning: passing fortran array to C++ routine. C-order is internally assummed when processing multi-dimensional arrays in C++.'
 def consecutive_label_map(int[:,:,:] v):
     cdef int n=v.shape[0]*v.shape[1]*v.shape[2]
     cdef int[:,:,:] out=cvarray(shape=(v.shape[0], v.shape[1], v.shape[2]), itemsize=sizeof(int), format="i")
@@ -68,6 +75,8 @@ cpdef integrateTensorFieldProductsCYTHON(double[:, :, :, :] q, double[:, :, :] d
     cdef int k=dims[3]    
     cdef double[:,:] A=np.zeros(shape=(k, k), dtype=np.double)
     cdef double[:] b=np.zeros(shape=(k,), dtype=np.double)
+    checkFortran(q)
+    checkFortran(diff)
     integrateTensorFieldProductsCPP(&q[0,0,0,0], &dims[0], &diff[0,0,0], &A[0,0], &b[0])
     return A,b
 
@@ -81,6 +90,7 @@ cpdef quantizeImageCYTHON(double[:,:]v, int numLevels):
     cdef int[:,:] out=np.zeros(shape=(dims[0], dims[1],), dtype=np.int32)
     cdef double[:] levels=np.zeros(shape=(numLevels,), dtype=np.double)
     cdef int[:] hist=np.zeros(shape=(numLevels,), dtype=np.int32)
+    checkFortran(v)
     quantizeImageCPP(&v[0,0], &dims[0], numLevels, &out[0,0], &levels[0], &hist[0])
     return out, levels, hist
 
@@ -94,6 +104,7 @@ cpdef quantizePositiveImageCYTHON(double[:,:]v, int numLevels):
     cdef int[:,:] out=np.zeros(shape=(dims[0], dims[1],), dtype=np.int32)
     cdef double[:] levels=np.zeros(shape=(numLevels,), dtype=np.double)
     cdef int[:] hist=np.zeros(shape=(numLevels,), dtype=np.int32)
+    checkFortran(v)
     quantizePositiveImageCPP(&v[0,0], &dims[0], numLevels, &out[0,0], &levels[0], &hist[0])
     return out, levels, hist
 
@@ -108,6 +119,7 @@ cpdef quantizePositiveVolumeCYTHON(double[:,:,:]v, int numLevels):
     cdef int[:,:,:] out=np.zeros(shape=(dims[0], dims[1], dims[2]), dtype=np.int32)
     cdef double[:] levels=np.zeros(shape=(numLevels,), dtype=np.double)
     cdef int[:] hist=np.zeros(shape=(numLevels,), dtype=np.int32)
+    checkFortran(v)
     quantizePositiveVolumeCPP(&v[0,0,0], &dims[0], numLevels, &out[0,0,0], &levels[0], &hist[0])
     return out, levels, hist
 
@@ -122,6 +134,7 @@ cpdef quantizeVolumeCYTHON(double[:,:,:]v, int numLevels):
     cdef int[:,:,:] out=np.zeros(shape=(dims[0], dims[1], dims[2],), dtype=np.int32)
     cdef double[:] levels=np.zeros(shape=(numLevels,), dtype=np.double)
     cdef int[:] hist=np.zeros(shape=(numLevels,), dtype=np.int32)
+    checkFortran(v)
     quantizeVolumeCPP(&v[0,0,0], &dims[0], numLevels, &out[0,0,0], &levels[0], &hist[0])
     return out, levels, hist
 
@@ -131,6 +144,8 @@ cpdef computeImageClassStatsCYTHON(double[:,:] v, int numLabels, int[:,:] labels
     dims[1]=v.shape[1]
     cdef double[:] means=np.zeros(shape=(numLabels,), dtype=np.double)
     cdef double[:] variances=np.zeros(shape=(numLabels, ), dtype=np.double)
+    checkFortran(v)
+    checkFortran(labels)
     computeImageClassStatsCPP(&v[0,0], &dims[0], numLabels, &labels[0,0], &means[0], &variances[0])
     return means, variances
 
@@ -140,6 +155,9 @@ cpdef computeMaskedImageClassStatsCYTHON(int[:,:] mask, double[:,:] v, int numLa
     dims[1]=v.shape[1]
     cdef double[:] means=np.zeros(shape=(numLabels,), dtype=np.double)
     cdef double[:] variances=np.zeros(shape=(numLabels, ), dtype=np.double)
+    checkFortran(mask)
+    checkFortran(v)
+    checkFortran(labels)
     computeMaskedImageClassStatsCPP(&mask[0,0], &v[0,0], &dims[0], numLabels, &labels[0,0], &means[0], &variances[0])
     return means, variances
 
@@ -150,6 +168,8 @@ cpdef computeVolumeClassStatsCYTHON(double[:,:,:] v, int numLabels, int[:,:,:] l
     dims[2]=v.shape[2]
     cdef double[:] means=np.zeros(shape=(numLabels,), dtype=np.double)
     cdef double[:] variances=np.zeros(shape=(numLabels, ), dtype=np.double)
+    checkFortran(v)
+    checkFortran(labels)
     computeVolumeClassStatsCPP(&v[0,0,0], &dims[0], numLabels, &labels[0,0,0], &means[0], &variances[0])
     return means, variances
 
@@ -160,6 +180,9 @@ cpdef computeMaskedVolumeClassStatsCYTHON(int[:,:,:] mask, double[:,:,:] v, int 
     dims[2]=v.shape[2]
     cdef double[:] means=np.zeros(shape=(numLabels,), dtype=np.double)
     cdef double[:] variances=np.zeros(shape=(numLabels, ), dtype=np.double)
+    checkFortran(mask)
+    checkFortran(v)
+    checkFortran(labels)
     computeMaskedVolumeClassStatsCPP(&mask[0,0,0], &v[0,0,0], &dims[0], numLabels, &labels[0,0,0], &means[0], &variances[0])
     return means, variances
 
@@ -172,6 +195,9 @@ cpdef integrateWeightedTensorFieldProductsCYTHON(double[:,:,:,:] q, double[:,:,:
     cdef int k=dims[3]
     cdef double[:,:] Aw=np.zeros(shape=(k, k), dtype=np.double)
     cdef double[:] bw=np.zeros(shape=(k,), dtype=np.double)
+    checkFortran(q)
+    checkFortran(diff)
+    checkFortran(labels)
     integrateWeightedTensorFieldProductsCPP(&q[0,0,0,0], &dims[0], &diff[0,0,0], numLabels, &labels[0,0,0], &weights[0], &Aw[0,0], &bw[0])
     return Aw,bw
 
@@ -184,6 +210,10 @@ cpdef integrateMaskedWeightedTensorFieldProductsCYTHON(int[:,:,:] mask, double[:
     cdef int k=dims[3]
     cdef double[:,:] Aw=np.zeros(shape=(k, k), dtype=np.double)
     cdef double[:] bw=np.zeros(shape=(k,), dtype=np.double)
+    checkFortran(mask)
+    checkFortran(q)
+    checkFortran(diff)
+    checkFortran(labels)
     integrateMaskedWeightedTensorFieldProductsCPP(&mask[0,0,0], &q[0,0,0,0], &dims[0], &diff[0,0,0], numLabels, &labels[0,0,0], &weights[0], &Aw[0,0], &bw[0])
     return Aw,bw
 
@@ -191,6 +221,12 @@ cpdef iterateDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigma
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
     dims[0]=deltaField.shape[0]
     dims[1]=deltaField.shape[1]
+    checkFortran(deltaField)
+    checkFortran(sigmaField)
+    checkFortran(gradientField)
+    checkFortran(previousDisplacement)
+    checkFortran(displacementField)
+    checkFortran(residuals)
     maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], &residuals[0,0])
     return maxDisplacement
 
@@ -198,6 +234,13 @@ cpdef iterateMaskedDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:]
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
     dims[0]=deltaField.shape[0]
     dims[1]=deltaField.shape[1]
+    checkFortran(deltaField)
+    checkFortran(sigmaField)
+    checkFortran(gradientField)
+    checkFortran(mask)
+    checkFortran(previousDisplacement)
+    checkFortran(displacementField)
+    checkFortran(residuals)
     maxDisplacement=iterateMaskedDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &mask[0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], &residuals[0,0])
     return maxDisplacement
 
@@ -206,6 +249,12 @@ cpdef iterateDisplacementField3DCYTHON(double[:,:,:] deltaField, double[:,:,:] s
     dims[0]=deltaField.shape[0]
     dims[1]=deltaField.shape[1]
     dims[2]=deltaField.shape[2]
+    checkFortran(deltaField)
+    checkFortran(sigmaField)
+    checkFortran(gradientField)
+    checkFortran(previousDisplacement)
+    checkFortran(displacementField)
+    checkFortran(residuals)
     maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0,0], &displacementField[0,0,0,0], &residuals[0,0,0])
     return maxDisplacement
 
@@ -216,6 +265,9 @@ cpdef computeMaskedVolumeClassStatsProbsCYTHON(int[:,:] mask, double[:,:] img, d
     nclasses=probs.shape[2]
     cdef double[:] means=np.zeros(shape=(nclasses,), dtype=np.double)
     cdef double[:] variances=np.zeros(shape=(nclasses, ), dtype=np.double)
+    checkFortran(mask)
+    checkFortran(img)
+    checkFortran(probs)
     computeMaskedVolumeClassStatsProbsCPP(&mask[0,0], &img[0,0], &dims[0], nclasses, &probs[0,0,0], &means[0], &variances[0])
     return means, variances
 
@@ -227,6 +279,10 @@ cpdef integrateMaskedWeightedTensorFieldProductsProbsCYTHON(int[:,:] mask, doubl
     cdef int k=dims[2]
     cdef double[:,:] Aw=np.zeros(shape=(k, k), dtype=np.double)
     cdef double[:] bw=np.zeros(shape=(k,), dtype=np.double)
+    checkFortran(mask)
+    checkFortran(q)
+    checkFortran(diff)
+    checkFortran(probs)
     integrateMaskedWeightedTensorFieldProductsProbsCPP(&mask[0,0], &q[0,0,0], &dims[0], &diff[0,0], nclasses, &probs[0,0,0], &weights[0], &Aw[0,0], &bw[0])
     return Aw,bw
 
@@ -236,6 +292,7 @@ cpdef invert_vector_field(double[:,:,:] d, double lambdaParam, int maxIter, doub
     cdef int ncols=d.shape[1]
     cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
     cdef double[:,:,:] invd=np.zeros_like(d)
+    checkFortran(d)
     retVal=invertVectorField(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0], &stats[0])
     print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
     return invd
@@ -245,6 +302,7 @@ cpdef invert_vector_field_tv_l2(double[:,:,:] d, double lambdaParam, int maxIter
     cdef int nrows=d.shape[0]
     cdef int ncols=d.shape[1]
     cdef double[:,:,:] invd=np.zeros_like(d)
+    checkFortran(d)
     retVal=invertVectorField_TV_L2(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0]);
     return invd
 
@@ -254,6 +312,7 @@ cpdef invert_vector_field_Yan(double[:,:,:] d, int maxIter, double tolerance):
     cdef int nrows=d.shape[0]
     cdef int ncols=d.shape[1]
     cdef double[:,:,:] invd=np.zeros_like(d)
+    checkFortran(d)
     retVal=invertVectorFieldYan(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0])
     return invd
 
@@ -280,6 +339,8 @@ cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     cdef double[:,:,:] comp=np.zeros_like(d1)
     cdef int retVal
     cdef double[:] stats=cvarray(shape=(3,), itemsize=sizeof(double), format='d')
+    checkFortran(d1)
+    checkFortran(d2)
     retVal=composeVectorFields(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &comp[0,0,0], &stats[0])
     #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
     return comp, stats
@@ -290,6 +351,8 @@ cpdef compose_vector_fields3D(double[:,:,:,:] d1, double[:,:,:,:] d2):
     cdef int ncols=d1.shape[2]
     cdef double[:,:,:,:] comp=np.zeros_like(d1)
     cdef int retVal
+    checkFortran(d1)
+    checkFortran(d2)
     retVal=composeVectorFields3D(&d1[0,0,0,0], &d2[0,0,0,0], nslices, nrows, ncols, &comp[0,0,0,0])
     #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
     return comp
@@ -299,6 +362,8 @@ cpdef vector_field_interpolation(double[:,:,:] d1, double[:,:,:] d2):
     cdef int ncols=d1.shape[1]
     cdef double[:,:,:] sol=np.zeros_like(d1)
     cdef int retVal
+    checkFortran(d1)
+    checkFortran(d2)
     retVal=vectorFieldInterpolation(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &sol[0,0,0])
     return sol
 
@@ -307,6 +372,8 @@ cpdef vector_field_adjoint_interpolation(double[:,:,:] d1, double[:,:,:] d2):
     cdef int ncols=d1.shape[1]
     cdef double[:,:,:] sol=np.zeros_like(d1)
     cdef int retVal
+    checkFortran(d1)
+    checkFortran(d2)
     retVal=vectorFieldAdjointInterpolation(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &sol[0,0,0])
     return sol
 
@@ -316,6 +383,7 @@ cpdef vector_field_exponential(double[:,:,:] v):
     cdef int retVal
     cdef int nrows=v.shape[0]
     cdef int ncols=v.shape[1]
+    checkFortran(v)
     retVal=vectorFieldExponential(&v[0,0,0], nrows, ncols, &expv[0,0,0], &invexpv[0,0,0])
     return expv, invexpv
 
@@ -328,6 +396,7 @@ cpdef vector_field_exponential3D(double[:,:,:,:] v, bool computeInverse):
     cdef int nslices=v.shape[0]
     cdef int nrows=v.shape[1]
     cdef int ncols=v.shape[2]
+    checkFortran(v)
     if(computeInverse):
         retVal=vectorFieldExponential3D(&v[0,0,0,0], nslices, nrows, ncols, &expv[0,0,0,0], &invexpv[0,0,0,0])
     else:
@@ -356,6 +425,7 @@ cpdef count_supporting_data_per_pixel(double[:,:,:] forward):
     cdef int nrows=forward.shape[0]
     cdef int ncols=forward.shape[1]
     cdef int[:,:] counts=np.zeros(shape=(nrows, ncols), dtype=np.int32)
+    checkFortran(forward)
     countSupportingDataPerPixel(&forward[0,0,0], nrows, ncols, &counts[0,0])
     return counts
 
@@ -366,32 +436,86 @@ def upsample_displacement_field3D(double[:,:,:,:] field, int[:] targetShape):
     cdef int nslices=targetShape[0]
     cdef int nrows=targetShape[1]
     cdef int ncols=targetShape[2]
+    checkFortran(field)
     cdef double[:,:,:,:] up = np.ndarray((nslices, nrows, ncols,3), dtype=np.float64)
     upsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &up[0,0,0,0],nslices, nrows, ncols);
     return up
 
-def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement):
-    cdef int nslices=volume.shape[0]
-    cdef int nrows=volume.shape[1]
-    cdef int ncols=volume.shape[2]
-    cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
-    warpVolume(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
+def warp_volume_affine(double[:,:,:] volume, int[:]refShape, double[:,:] affine=None):
+    cdef int nsVol=volume.shape[0]
+    cdef int nrVol=volume.shape[1]
+    cdef int ncVol=volume.shape[2]
+    cdef double[:,:,:] warped = np.ndarray((refShape[0], refShape[1], refShape[2]), dtype=np.float64)
+    checkFortran(volume)
+    checkFortran(affine)
+    if affine==None:
+        warpVolumeAffine(&volume[0,0,0], nsVol, nrVol, ncVol, NULL, &warped[0,0,0], refShape[0], refShape[1], refShape[2])
+    else:
+        warpVolumeAffine(&volume[0,0,0], nsVol, nrVol, ncVol, &affine[0,0], &warped[0,0,0], refShape[0], refShape[1], refShape[2])
     return warped
 
-def warp_volumeNN(double[:,:,:] volume, double[:,:,:,:] displacement):
-    cdef int nslices=volume.shape[0]
-    cdef int nrows=volume.shape[1]
-    cdef int ncols=volume.shape[2]
+def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affine=None):
+    cdef int nslices=displacement.shape[0]
+    cdef int nrows=displacement.shape[1]
+    cdef int ncols=displacement.shape[2]
+    cdef int nsVol=volume.shape[0]
+    cdef int nrVol=volume.shape[1]
+    cdef int ncVol=volume.shape[2]
     cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
-    warpVolumeNN(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
+    checkFortran(volume)
+    checkFortran(displacement)
+    checkFortran(affine)
+    if affine==None:
+        warpVolume(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, NULL, &warped[0,0,0]);
+    else:
+        warpVolume(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, &affine[0,0], &warped[0,0,0])
     return warped
 
-def warp_discrete_volumeNN(int[:,:,:] volume, double[:,:,:,:] displacement):
-    cdef int nslices=volume.shape[0]
-    cdef int nrows=volume.shape[1]
-    cdef int ncols=volume.shape[2]
+def warp_volumeNN(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affine=None):
+    cdef int nslices=displacement.shape[0]
+    cdef int nrows=displacement.shape[1]
+    cdef int ncols=displacement.shape[2]
+    cdef int nsVol=volume.shape[0]
+    cdef int nrVol=volume.shape[1]
+    cdef int ncVol=volume.shape[2]
+    cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
+    checkFortran(volume)
+    checkFortran(displacement)
+    checkFortran(affine)
+    if affine==None:
+        warpVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, NULL, &warped[0,0,0]);
+    else:
+        warpVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, &affine[0,0], &warped[0,0,0])
+    return warped
+
+def warp_discrete_volumeNNAffine(int[:,:,:] volume, int[:] refShape, double[:,:] affine=None):
+    cdef int nsVol=volume.shape[0]
+    cdef int nrVol=volume.shape[1]
+    cdef int ncVol=volume.shape[2]
+    cdef int[:,:,:] warped = np.ndarray((refShape[0], refShape[1], refShape[2]), dtype=np.int32)
+    checkFortran(volume)
+    checkFortran(affine)
+    if affine==None:
+        warpDiscreteVolumeNNAffine(&volume[0,0,0], nsVol, nrVol, ncVol, NULL, &warped[0,0,0], refShape[0], refShape[1], refShape[2])
+    else:
+        warpDiscreteVolumeNNAffine(&volume[0,0,0], nsVol, nrVol, ncVol, &affine[0,0], &warped[0,0,0], refShape[0], refShape[1], refShape[2])
+    return warped
+
+def warp_discrete_volumeNN(int[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affine=None):
+    cdef int nslices=displacement.shape[0]
+    cdef int nrows=displacement.shape[1]
+    cdef int ncols=displacement.shape[2]
+    cdef int nsVol=volume.shape[0]
+    cdef int nrVol=volume.shape[1]
+    cdef int ncVol=volume.shape[2]
     cdef int[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.int32)
-    warpDiscreteVolumeNN(&volume[0,0,0], &displacement[0,0,0,0], nslices, nrows, ncols, &warped[0,0,0]);
+    checkFortran(volume)
+    checkFortran(displacement)
+    checkFortran(affine)
+    if affine==None:
+        warpDiscreteVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, NULL, &warped[0,0,0])
+    else:
+        warpDiscreteVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, &affine[0,0], &warped[0,0,0])
     return warped
 
 def get_voting_segmentation(int[:,:,:,:] votes):
@@ -400,9 +524,9 @@ def get_voting_segmentation(int[:,:,:,:] votes):
     cdef int ncols=votes.shape[2]
     cdef int nvotes=votes.shape[3]
     cdef int[:,:,:] seg = np.ndarray((nslices, nrows, ncols), dtype=np.int32)
+    checkFortran(votes)
     getVotingSegmentation(&votes[0,0,0,0], nslices, nrows, ncols, nvotes, &seg[0,0,0])
     return seg
-
 
 def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, double tolerance):
     cdef int retVal
@@ -411,6 +535,27 @@ def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, do
     cdef int ncols=d.shape[2]
     cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
     cdef double[:,:,:,:] invd=np.zeros_like(d)
+    checkFortran(d)
     retVal=invertVectorField3D(&d[0,0,0,0], nslices, nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0,0], &stats[0])
     print 'Max step:', stats[0], 'Last iteration:', int(stats[1])
     return invd
+
+def prepend_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
+    cdef int retVal
+    cdef int nslices=d.shape[0]
+    cdef int nrows=d.shape[1]
+    cdef int ncols=d.shape[2]
+    retVal=prependAffineToDisplacementField(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
+
+def get_displacement_range(double[:,:,:,:] d, double[:,:] affine):
+    cdef int retVal
+    cdef int nslices=d.shape[0]
+    cdef int nrows=d.shape[1]
+    cdef int ncols=d.shape[2]
+    cdef double[:] minVal = np.ndarray((3,), dtype=np.float64)
+    cdef double[:] maxVal = np.ndarray((3,), dtype=np.float64)
+    if affine==None:
+        retVal=getDisplacementRange(&d[0,0,0,0], nslices, nrows, ncols, NULL, &minVal[0], &maxVal[0])
+    else:
+        retVal=getDisplacementRange(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0], &minVal[0], &maxVal[0])
+    return minVal, maxVal

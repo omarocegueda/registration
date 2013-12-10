@@ -87,6 +87,7 @@ def segmentBrainwebAtlas(segNames, displacementFnames):
         displacementFnames[i]=displacementFnames[i].strip()
         nib_vol = nib.load(segNames[i])
         vol=nib_vol.get_data().squeeze().astype(np.int32)
+        vol=np.copy(vol, order='C')
         displacement=np.load(displacementFnames[i])
         print 'Warping segmentation', i+1, '/',nvol, '. Vol shape:', vol.shape, 'Disp. shape:', displacement.shape
         warped=np.array(tf.warp_discrete_volumeNN(vol, displacement))
@@ -102,14 +103,39 @@ def segmentBrainwebAtlas(segNames, displacementFnames):
     print 'Saving segmentation...'
     img.to_filename('votingSegmentation.nii.gz')
 
-def showRegistrationResultMidSlices(fnameWarped, fnameFixed):
+def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     '''
     showRegistrationResultMidSlices('IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-    showRegistrationResultMidSlices('warpedDiff_IBSR_07_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
+    showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
+    showRegistrationResultMidSlices('IBSR_04_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
+    showRegistrationResultMidSlices('warpedDiff_IBSR_04_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
     
+    
+    showRegistrationResultMidSlices('IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
+    showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
+    
+    showRegistrationResultMidSlices('t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')        
+    showRegistrationResultMidSlices('warpedDiff_t2_icbm_normal_1mm_pn0_rf0_peeled_IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')    
+    
+    showRegistrationResultMidSlices('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt')
+    showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+
     '''
-    fixed=nib.load(fnameFixed).get_data().squeeze().astype(np.float64)
-    warped=nib.load(fnameWarped).get_data().squeeze().astype(np.float64)
+    if(fnameAffine==None):
+        T=np.eye(4)
+    else:
+        T=rcommon.readAntsAffine(fnameAffine)
+    fixed=nib.load(fnameFixed)
+    F=fixed.get_affine()
+    fixed=fixed.get_data().squeeze().astype(np.float64)
+    moving=nib.load(fnameMoving)
+    M=moving.get_affine()
+    moving=moving.get_data().squeeze().astype(np.float64)
+    initAffine=np.linalg.inv(M).dot(T.dot(F))
+    
+    fixed=np.copy(fixed, order='C')
+    moving=np.copy(moving, order='C')
+    warped=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape), initAffine))
     sh=warped.shape
     rcommon.overlayImages(warped[:,sh[1]//2,:], fixed[:,sh[1]//2,:])
     rcommon.overlayImages(warped[sh[0]//2,:,:], fixed[sh[0]//2,:,:])

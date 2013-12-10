@@ -127,6 +127,8 @@ def testEstimateMonomodalDeformationField2DMultiScale(lambdaParam):
     nib_fixed= nib.load(fname1)
     moving=nib_moving.get_data().squeeze()
     fixed=nib_fixed.get_data().squeeze()
+    moving=np.copy(moving, order='C')
+    fixed=np.copy(fixed, order='C')
     sl=moving.shape
     sr=fixed.shape
     level=5
@@ -257,8 +259,10 @@ def displayRegistrationResult():
     fnameFixed='data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz'
     nib_fixed = nib.load(fnameFixed)
     fixed=nib_fixed.get_data().squeeze()
+    fixed=np.copy(fixed, order='C')
     nib_moving = nib.load(fnameMoving)
     moving=nib_moving.get_data().squeeze()
+    moving=np.copy(moving, order='C')
     fnameDisplacement='displacement_templateT1ToIBSR01T1.npy'
     fnameWarped='warped_templateT1ToIBSR01T1.npy'
     displacement=np.load(fnameDisplacement)
@@ -284,8 +288,10 @@ def testEstimateMonomodalDeformationField3DMultiScale(lambdaParam):
     nib_fixed = nib.load(fnameFixed)
     moving=nib_moving.get_data().squeeze().astype(np.float64)
     fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    moving=np.copy(moving, order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+    fixed=np.copy(fixed, order='C')
     level=3
     maskMoving=moving>0
     maskFixed=fixed>0
@@ -437,6 +443,8 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic):
     nib_fixed = nib.load(fnameFixed)
     moving=nib_moving.get_data().squeeze().astype(np.float64)
     fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    moving=np.copy(moving, order='C')
+    fixed=np.copy(fixed, order='C')
     sl=moving.shape
     sr=fixed.shape    
     moving=moving[:,sl[1]//2,:].copy()
@@ -452,6 +460,7 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic):
     else:
         templateT1=nib.load('data/t1/IBSR_template_to_01.nii.gz')
         templateT1=templateT1.get_data().squeeze().astype(np.float64)
+        templateT1=np.copy(templateT1, order='C')
         sh=templateT1.shape
         templateT1=templateT1[:,sh[1]//2,:]
         templateT1=(templateT1-templateT1.min())/(templateT1.max()-templateT1.min())
@@ -463,6 +472,7 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic):
             #load two T1 images: the template and an IBSR sample
             ibsrT1=nib.load('data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
             ibsrT1=ibsrT1.get_data().squeeze().astype(np.float64)
+            ibsrT1=np.copy(ibsrT1, order='C')
             ibsrT1=ibsrT1[:,sh[1]//2,:]
             ibsrT1=(ibsrT1-ibsrT1.min())/(ibsrT1.max()-ibsrT1.min())
             #register the template(moving) to the ibsr sample(fixed)
@@ -638,6 +648,8 @@ def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam=250, syntheti
     nib_fixed = nib.load(fnameFixed)
     moving=nib_moving.get_data().squeeze().astype(np.float64)
     fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    moving=np.copy(moving, order='C')
+    fixed=np.copy(fixed, order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
     maxOuterIter=[10,50,100,100,100,100]
@@ -649,6 +661,7 @@ def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam=250, syntheti
     else:
         templateT1=nib.load(fnameFixed)
         templateT1=templateT1.get_data().squeeze().astype(np.float64)
+        templateT1=np.copy(templateT1, order='C')
         templateT1=(templateT1-templateT1.min())/(templateT1.max()-templateT1.min())
         if(os.path.exists(displacementGTName)):
             print 'Loading precomputed realistic field...'
@@ -658,6 +671,7 @@ def testEstimateMultimodalDeformationField3DMultiScale(lambdaParam=250, syntheti
             #load two T1 images: the template and an IBSR sample
             ibsrT1=nib.load('data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
             ibsrT1=ibsrT1.get_data().squeeze().astype(np.float64)
+            ibsrT1=np.copy(ibsrT1, order='C')
             ibsrT1=(ibsrT1-ibsrT1.min())/(ibsrT1.max()-ibsrT1.min())
             #register the template(moving) to the ibsr sample(fixed)
             maskMoving=templateT1>0
@@ -974,6 +988,9 @@ def reviewRegistrationResults():
     fixed=nib_fixed.get_data().squeeze().astype(np.float64)
     moving=nib_moving.get_data().squeeze().astype(np.float64)
     warped=nib_warped.get_data().squeeze().astype(np.float64)
+    fixed=np.copy(fixed, order='C')
+    moving=np.copy(moving, order='C')
+    warped=np.copy(warped, order='C')
     #generate and show pyramids
     pyramidMaxLevel=3
     maskMoving=np.ones_like(moving)
@@ -990,6 +1007,7 @@ def reviewRegistrationResults():
     nib_displacement = nib.load(displacementFName)
     #nib_displacementInverse = nib.load(displacementInverseFName)
     displacement=nib_displacement.get_data().squeeze().astype(np.float64)
+    displacement=np.copy(displacement, order='C')
     #displacementInverse=nib_displacementInverse.get_data().squeeze().astype(np.float64)
     #apply displacement and show overlaid volumes
     warped=rcommon.warpVolume(moving, displacement, nib_moving.get_affine(), nib_displacement.get_affine())
@@ -1011,6 +1029,8 @@ def showOverlaidVolumes(fixedFName, movingFName):
     nib_moving=nib.load(movingFName)
     fixed=nib_fixed.get_data().squeeze().astype(np.float64)
     moving=nib_moving.get_data().squeeze().astype(np.float64)
+    fixed=np.copy(fixed, order='C')
+    moving=np.copy(moving, order='C')
     sf=np.array(fixed.shape)//2
     sm=np.array(moving.shape)//2
     rcommon.overlayImages(fixed[sf[0],:,:], moving[sm[0],:,:])
@@ -1081,6 +1101,7 @@ def testBrainwebSegmentation():
     discreteName='data/t1/IBSR18/IBSR_01/IBSR_01_seg_ana.nii.gz'
     nib_discrete=nib.load(discreteName)
     discrete=nib_discrete.get_data().squeeze().astype(np.int32)
+    discrete=np.copy(discrete, order='C')
     discrete=np.array(tf.consecutive_label_map(discrete))
     ns, nr, nc=discrete.shape
     colorImage=np.zeros(shape=discrete.shape+(3,), dtype=np.int8)

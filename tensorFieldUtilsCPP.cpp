@@ -1526,26 +1526,27 @@ int upsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, d
     return 0;
 }
 
-
-int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped){
-    int sliceSize=nrows*ncols;
-    double *dx=d1;
+#define APPLY_AFFINE_X0(x0,x1,x2,affine) (affine[0]*(x0) + affine[1]*(x1) + affine[2]*(x2) + affine[3])
+#define APPLY_AFFINE_X1(x0,x1,x2,affine) (affine[4]*(x0) + affine[5]*(x1) + affine[6]*(x2) + affine[7])
+#define APPLY_AFFINE_X2(x0,x1,x2,affine) (affine[8]*(x0) + affine[9]*(x1) + affine[10]*(x2) + affine[11])
+int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *affine, double *warped, int nsRef, int nrRef, int ncRef){
+    int sliceSizeVol=nrVol*ncVol;
     double *res=warped;
-    memset(warped, 0, sizeof(double)*nslices*sliceSize); 
-    for(int k=0;k<nslices;++k){
-        for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=3, ++res){
-                double dkk=k+dx[0];
-                double dii=i+dx[1];
-                double djj=j+dx[2];
-                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+    memset(warped, 0, sizeof(double)*nsRef*nrRef*ncRef);
+    for(int k=0;k<nsRef;++k){
+        for(int i=0;i<nrRef;++i){
+            for(int j=0;j<ncRef;++j, ++res){
+                double dkk=APPLY_AFFINE_X0(k,i,j,affine);
+                double dii=APPLY_AFFINE_X1(k,i,j,affine);
+                double djj=APPLY_AFFINE_X2(k,i,j,affine);
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrVol-1)||(djj>ncVol-1)||(dkk>nsVol-1)){//no one is affected
                     continue;
                 }
                 //find the top left index and the interpolation coefficients
                 int kk=floor(dkk);
                 int ii=floor(dii);
                 int jj=floor(djj);
-                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrVol)||(jj>=ncVol)||(kk>=nsVol)){//no one is affected
                     continue;
                 }
                 double cgamma=dkk-kk;
@@ -1556,46 +1557,131 @@ int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, do
                 double gamma=1-cgamma;
                 //---top-left
                 (*res)=0;
-                double *z=&volume[kk*sliceSize+ii*ncols+jj];
+                double *z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
                 (*res)+=alpha*beta*gamma*(*z);
                 //---top-right
                 ++jj;
-                if(jj<ncols){
-                    z=&volume[kk*sliceSize+ii*ncols+jj];
+                if(jj<ncVol){
+                    z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
                     (*res)+=alpha*cbeta*gamma*(*z);
                 }
                 //---bottom-right
                 ++ii;
-                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                    z=&volume[kk*sliceSize+ii*ncols+jj];
+                if((ii>=0)&&(jj>=0)&&(ii<nrVol)&&(jj<ncVol)){
+                    z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
                     (*res)+=calpha*cbeta*gamma*(*z);
                 }
                 //---bottom-left
                 --jj;
-                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                    z=&volume[kk*sliceSize+ii*ncols+jj];
+                if((ii>=0)&&(jj>=0)&&(ii<nrVol)&&(jj<ncVol)){
+                    z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
                     (*res)+=calpha*beta*gamma*(*z);
                 }
                 ++kk;
-                if(kk<nslices){
+                if(kk<nsVol){
                     --ii;
-                    z=&volume[kk*sliceSize+ii*ncols+jj];
+                    z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
                     (*res)+=alpha*beta*cgamma*(*z);
                     ++jj;
-                    if(jj<ncols){
-                        z=&volume[kk*sliceSize+ii*ncols+jj];
+                    if(jj<ncVol){
+                        z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
                         (*res)+=alpha*cbeta*cgamma*(*z);
                     }
                     //---bottom-right
                     ++ii;
-                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                        z=&volume[kk*sliceSize+ii*ncols+jj];
+                    if((ii>=0)&&(jj>=0)&&(ii<nrVol)&&(jj<ncVol)){
+                        z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
                         (*res)+=calpha*cbeta*cgamma*(*z);
                     }
                     //---bottom-left
                     --jj;
-                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
-                        z=&volume[kk*sliceSize+ii*ncols+jj];
+                    if((ii>=0)&&(jj>=0)&&(ii<nrVol)&&(jj<ncVol)){
+                        z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
+                        (*res)+=calpha*beta*cgamma*(*z);
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped){
+    int sliceSizeVol=nrVol*ncVol;
+    double *dx=d1;
+    double *res=warped;
+    memset(warped, 0, sizeof(double)*nslices*nrows*ncols); 
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=3, ++res){
+                double dkk,dii,djj;
+                if(affine!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
+                    dii=APPLY_AFFINE_X1(k,i,j,affine)+dx[1];
+                    djj=APPLY_AFFINE_X2(k,i,j,affine)+dx[2];
+                }else{
+                    dkk=k+dx[0];
+                    dii=i+dx[1];
+                    djj=j+dx[2];
+                }
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrVol-1)||(djj>ncVol-1)||(dkk>nsVol-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int kk=floor(dkk);
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrVol)||(jj>=ncVol)||(kk>=nsVol)){//no one is affected
+                    continue;
+                }
+                double cgamma=dkk-kk;
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                //---top-left
+                (*res)=0;
+                double *z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
+                (*res)+=alpha*beta*gamma*(*z);
+                //---top-right
+                ++jj;
+                if(jj<ncVol){
+                    z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
+                    (*res)+=alpha*cbeta*gamma*(*z);
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nrVol)&&(jj<ncVol)){
+                    z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
+                    (*res)+=calpha*cbeta*gamma*(*z);
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nrVol)&&(jj<ncVol)){
+                    z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
+                    (*res)+=calpha*beta*gamma*(*z);
+                }
+                ++kk;
+                if(kk<nsVol){
+                    --ii;
+                    z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
+                    (*res)+=alpha*beta*cgamma*(*z);
+                    ++jj;
+                    if(jj<ncVol){
+                        z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
+                        (*res)+=alpha*cbeta*cgamma*(*z);
+                    }
+                    //---bottom-right
+                    ++ii;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrVol)&&(jj<ncVol)){
+                        z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
+                        (*res)+=calpha*cbeta*cgamma*(*z);
+                    }
+                    //---bottom-left
+                    --jj;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrVol)&&(jj<ncVol)){
+                        z=&volume[kk*sliceSizeVol+ii*ncVol+jj];
                         (*res)+=calpha*beta*cgamma*(*z);
                     }
                 }
@@ -1608,25 +1694,32 @@ int warpVolume(double *volume, double *d1, int nslices, int nrows, int ncols, do
 /*
     Warp volume using Nearest Neighbor interpolation
 */
-int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, double *warped){
-    int sliceSize=nrows*ncols;
+int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped){
+    int sliceSizeVol=nrVol*ncVol;
     double *dx=d1;
     double *res=warped;
-    memset(warped, 0, sizeof(double)*nslices*sliceSize); 
+    memset(warped, 0, sizeof(double)*nslices*nrows*ncols); 
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=3, ++res){
-                double dkk=k+dx[0];
-                double dii=i+dx[1];
-                double djj=j+dx[2];
-                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                double dkk,dii,djj;
+                if(affine!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
+                    dii=APPLY_AFFINE_X1(k,i,j,affine)+dx[1];
+                    djj=APPLY_AFFINE_X2(k,i,j,affine)+dx[2];
+                }else{
+                    dkk=k+dx[0];
+                    dii=i+dx[1];
+                    djj=j+dx[2];
+                }
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrVol-1)||(djj>ncVol-1)||(dkk>nsVol-1)){//no one is affected
                     continue;
                 }
                 //find the top left index and the interpolation coefficients
                 int kk=floor(dkk);
                 int ii=floor(dii);
                 int jj=floor(djj);
-                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrVol)||(jj>=ncVol)||(kk>=nsVol)){//no one is affected
                     continue;
                 }
                 double cgamma=dkk-kk;
@@ -1644,12 +1737,64 @@ int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, 
                 if(beta<cbeta){
                     ++jj;
                 }
-                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrVol)||(jj>=ncVol)||(kk>=nsVol)){//no one is affected
                     continue;
                 }else{
-                    (*res)=volume[kk*sliceSize + ii*ncols + jj];
+                    (*res)=volume[kk*sliceSizeVol + ii*ncVol + jj];
                 }
-                
+            }
+        }
+    }
+    return 0;
+}
+
+int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, double *affine, int *warped, int nsRef, int nrRef, int ncRef){
+    int sliceSizeVol=nrVol*ncVol;
+    int *res=warped;
+    memset(warped, 0, sizeof(int)*nsRef*nrRef*ncRef);
+    for(int k=0;k<nsRef;++k){
+        for(int i=0;i<nrRef;++i){
+            for(int j=0;j<ncRef;++j, ++res){
+                double dkk,dii,djj;
+                if(affine!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affine);
+                    dii=APPLY_AFFINE_X1(k,i,j,affine);
+                    djj=APPLY_AFFINE_X2(k,i,j,affine);
+                }else{
+                    dkk=k;
+                    dii=i;
+                    djj=j;
+                }
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrVol-1)||(djj>ncVol-1)||(dkk>nsVol-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int kk=floor(dkk);
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrVol)||(jj>=ncVol)||(kk>=nsVol)){//no one is affected
+                    continue;
+                }
+                double cgamma=dkk-kk;
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                if(gamma<cgamma){
+                    ++kk;
+                }
+                if(alpha<calpha){
+                    ++ii;
+                }
+                if(beta<cbeta){
+                    ++jj;
+                }
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrVol)||(jj>=ncVol)||(kk>=nsVol)){//no one is affected
+                    continue;
+                }else{
+                    (*res)=volume[kk*sliceSizeVol + ii*ncVol + jj];
+                }
             }
         }
     }
@@ -1660,25 +1805,32 @@ int warpVolumeNN(double *volume, double *d1, int nslices, int nrows, int ncols, 
 /*
     Warp volume using Nearest Neighbor interpolation
 */
-int warpDiscreteVolumeNN(int *volume, double *d1, int nslices, int nrows, int ncols, int *warped){
-    int sliceSize=nrows*ncols;
+int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, int *warped){
+    int sliceSizeVol=nrVol*ncVol;
     double *dx=d1;
     int *res=warped;
-    memset(warped, 0, sizeof(int)*nslices*sliceSize); 
+    memset(warped, 0, sizeof(int)*nslices*nrows*ncols); 
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=3, ++res){
-                double dkk=k+dx[0];
-                double dii=i+dx[1];
-                double djj=j+dx[2];
-                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrows-1)||(djj>ncols-1)||(dkk>nslices-1)){//no one is affected
+                double dkk,dii,djj;
+                if(affine!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
+                    dii=APPLY_AFFINE_X1(k,i,j,affine)+dx[1];
+                    djj=APPLY_AFFINE_X2(k,i,j,affine)+dx[2];
+                }else{
+                    dkk=k+dx[0];
+                    dii=i+dx[1];
+                    djj=j+dx[2];
+                }
+                if((dii<0) || (djj<0) || (dkk<0) || (dii>nrVol-1)||(djj>ncVol-1)||(dkk>nsVol-1)){//no one is affected
                     continue;
                 }
                 //find the top left index and the interpolation coefficients
                 int kk=floor(dkk);
                 int ii=floor(dii);
                 int jj=floor(djj);
-                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrVol)||(jj>=ncVol)||(kk>=nsVol)){//no one is affected
                     continue;
                 }
                 double cgamma=dkk-kk;
@@ -1696,17 +1848,41 @@ int warpDiscreteVolumeNN(int *volume, double *d1, int nslices, int nrows, int nc
                 if(beta<cbeta){
                     ++jj;
                 }
-                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                if((ii<0) || (jj<0) || (kk<0) || (ii>=nrVol)||(jj>=ncVol)||(kk>=nsVol)){//no one is affected
                     continue;
                 }else{
-                    (*res)=volume[kk*sliceSize + ii*ncols + jj];
+                    (*res)=volume[kk*sliceSizeVol + ii*ncVol + jj];
                 }
-                
             }
         }
     }
     return 0;
 }
+
+int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine){
+    double *dx=d1;
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=3){
+                double dkk,dii,djj;
+                if(affine!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affine);
+                    dii=APPLY_AFFINE_X1(k,i,j,affine);
+                    djj=APPLY_AFFINE_X2(k,i,j,affine);
+                }else{
+                    dkk=k;
+                    dii=i;
+                    djj=j;
+                }
+                dx[0]+=dkk-k;
+                dx[1]+=dii-i;
+                dx[2]+=djj-j;
+            }
+        }
+    }
+    return 0;
+}
+
 /*
     Interpolates the vector field d2 at d1: d2(d1(x)) (i.e. applies first d1, then d2 to the result)
     Seen as a linear operator, it is defined by d1 and the input vector is d2
@@ -2192,9 +2368,9 @@ int writeDoubleBuffer(double *buffer, int nDoubles, char *fname){
 
 int readDoubleBuffer(char *fname, int nDoubles, double *buffer){
     FILE *F=fopen(fname, "rb");
-    fread(buffer, sizeof(double), nDoubles, F);
+    size_t retVal=fread((void*)buffer, sizeof(double), nDoubles, F);
     fclose(F);
-    return 0;
+    return retVal!=size_t(nDoubles);
 }
 
 
@@ -2278,5 +2454,37 @@ void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nv
             }
         }
         seg[i]=best;
+    }
+}
+
+int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal){
+    double *dx=d;
+    minVal[0]=maxVal[0]=d[0];
+    minVal[1]=maxVal[1]=d[1];
+    minVal[2]=maxVal[2]=d[2];
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=3){
+                double dkk,dii,djj;
+                if(affine!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
+                    dii=APPLY_AFFINE_X1(k,i,j,affine)+dx[1];
+                    djj=APPLY_AFFINE_X2(k,i,j,affine)+dx[2];
+                }else{
+                    dkk=k+dx[0];
+                    dii=i+dx[1];
+                    djj=j+dx[2];
+                }
+                if(dkk>maxVal[0]){
+                    maxVal[0]=dkk;
+                }
+                if(dii>maxVal[1]){
+                    maxVal[1]=dii;
+                }
+                if(djj>maxVal[2]){
+                    maxVal[2]=djj;
+                }
+            }
+        }
     }
 }
