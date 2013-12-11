@@ -434,7 +434,16 @@ def estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid
         displacementList.insert(0, newDisplacement)
     return newDisplacement
 
-def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed, fnameAffine, lambdaParam):
+def saveDeformedLattice3D(displacement, oname):
+    minVal, maxVal=tf.get_displacement_range(displacement, None)
+    sh=np.array([np.ceil(maxVal[0]),np.ceil(maxVal[1]),np.ceil(maxVal[2])], dtype=np.int32)
+    L=np.array(rcommon.drawLattice3D(sh, 10))
+    warped=np.array(tf.warp_volume(L, displacement, np.eye(4))).astype(np.int16)
+    img=nib.Nifti1Image(warped, np.eye(4))
+    img.to_filename(oname)
+
+
+def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed, fnameAffine, warpDir, lambdaParam):
     '''
         testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt', 100)
     '''
@@ -466,35 +475,32 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     maxOuterIter=[10,20,50,100, 100, 100]
     displacement=estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, initAffine, lambdaParam, maxOuterIter, 0,None)
     tf.prepend_affine_to_displacement_field(displacement, initAffine)
-    warped=np.array(tf.warp_volume(movingPyramid[0], displacement, np.eye(4)))
+    #####Warp all requested volumes
+    #---first the target using tri-linear interpolation---
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)
-    np.save('dispDiff_'+baseMoving+'_'+baseFixed+'.npy', displacement)
+    warped=np.array(tf.warp_volume(movingPyramid[0], displacement, np.eye(4))).astype(np.int16)
     imgWarped=nib.Nifti1Image(warped, np.eye(4))
     imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
-    print 'Computing inverse...'
+    #---now the rest of the targets using nearest neighbor
+    names=[os.path.join(warpDir,name) for name in os.listdir(warpDir)]
+    for name in names:
+        toWarp=nib.load(name).get_data().squeeze().astype(np.int32)
+        warped=np.array(tf.warp_discrete_volumeNN(toWarp, displacement, np.eye(4))).astype(np.int16)
+        imgWarped=nib.Nifti1Image(warped, np.eye(4))
+        imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
+    #---finally, the deformed lattices (forward, inverse and resdidual)---    
     lambdaParam=0.9
     maxIter=100
     tolerance=1e-4
+    print 'Computing inverse...'
     inverse=np.array(tf.invert_vector_field3D(displacement, lambdaParam, maxIter, tolerance))
-    np.save('invdispDiff_'+baseMoving+'_'+baseFixed+'.npy', inverse)
-    print 'Computing inversion error...'
     residual=np.array(tf.compose_vector_fields3D(displacement, inverse))
-    np.save('resdispDiff_'+baseMoving+'_'+baseFixed+'.npy', residual)
+    saveDeformedLattice3D(displacement, 'latticeDispDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
+    saveDeformedLattice3D(inverse, 'latticeInvDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
+    saveDeformedLattice3D(residual, 'latticeResdiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     residual=np.sqrt(np.sum(residual**2,3))
     print "Mean residual norm:", residual.mean()," (",residual.std(), "). Max residual norm:", residual.max()
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
