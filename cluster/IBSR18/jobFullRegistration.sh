@@ -25,5 +25,5 @@ else
     echo "Affine mapping found ($affine). Skipping affine registration."
 fi
 #Diffeomorphic registration
-python registrationDiffeomorphic.py target/$target reference/$reference $affine 100.0
+python registrationDiffeomorphic.py target/$target reference/$reference $affine warp 100.0
 date

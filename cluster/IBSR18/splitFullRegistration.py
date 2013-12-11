@@ -7,6 +7,7 @@ import fnmatch
 import shutil
 import subprocess
 import errno
+registrationScriptName='/home/omar/code/registration/registrationDiffeomorphic.py'
 def query_yes_no(question, default="yes"):
     """Ask a yes/no question via raw_input() and return their answer.
 
@@ -78,6 +79,7 @@ if __name__=='__main__':
         for i in range(nlines):
             if not names[i]:
                 continue
+            print 'Splitting reference:',names[i][0]
             reference=names[i]
             stri='0'+str(i+1) if i+1<10 else str(i+1)
             for j in range(nlines):
@@ -94,16 +96,17 @@ if __name__=='__main__':
                 subprocess.call('ln '+target[0]+' '+dirName+'/target', shell=True)
                 subprocess.call('ln '+reference[0]+' '+dirName+'/reference', shell=True)
                 subprocess.call('ln jobFullRegistration.sh '+dirName, shell=True)
-                for w in target:
+                subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
+                for w in target[1:]:
                     subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
         sys.exit(0)
     ############################Submit###################################
     if sys.argv[1]=='u':
         dirNames=[name for name in os.listdir(".") if os.path.isdir(name) and fnmatch.fnmatch(name, '[0-9]*')]
         for name in dirNames:
-            os.chdir(name)
-            subprocess.call('qsub jobFullRegistration.sh -d .')
-            os.chdir('..')
+            os.chdir('./'+name)
+            subprocess.call('qsub jobFullRegistration.sh -d .', shell=True)
+            os.chdir('./..')
         sys.exit(0)
     ############################Collect##################################
     if sys.argv[1]=='o':
@@ -111,9 +114,11 @@ if __name__=='__main__':
         dirNames=[name for name in os.listdir(".") if os.path.isdir(name) and fnmatch.fnmatch(name, '[0-9]*')]
         for name in dirNames:
             os.chdir(name)
-            subprocess.call('mv '+os.path.join(name,'*.npy')+' results')
-            subprocess.call('mv '+os.path.join(name,'*.nii.gz')+' results')
-            subprocess.call('mv '+os.path.join(name,'*.txt')+' results')
+            subprocess.call('mv '+os.path.join(name,'*.npy')+' results', shell=True)
+            subprocess.call('mv '+os.path.join(name,'*.nii.gz')+' results', shell=True)
+            subprocess.call('mv '+os.path.join(name,'*.txt')+' results', shell=True)
+            subprocess.call('mv '+os.path.join(name,'*.e*')+' results', shell=True)
+            subprocess.call('mv '+os.path.join(name,'*.o*')+' results', shell=True)
             os.chdir('..')
         sys.exit(0)
     ############################Unknown##################################
