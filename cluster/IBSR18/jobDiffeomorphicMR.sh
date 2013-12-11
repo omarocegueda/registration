@@ -12,6 +12,7 @@ export PYTHONPATH=/opt/python/anaconda/lib/python2.7/site-packages:/home/omar/co
 date
 reference=$(ls reference)
 target=$(ls target)
-python registrationDiffeomorphic.py target/$target reference/$reference 10.0
+affine=$(ls affine)
+python registrationDiffeomorphic.py target/$target reference/$reference affine/$affine 100.0
 date
 exit 0

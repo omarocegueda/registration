@@ -22,7 +22,6 @@
 # Example (collect):./splitDiffeomorphicMR.sh o
 #
 #######################################################################
-pythonScriptName="/home/omar/code/registration/registrationDiffeomorphic.py"
 #############################No parameters#############################
 if [ -z "$1" ]; then
     echo Please specify an action: c "(clean)", s "(split)", u "(submit)", o "(collect)"
@@ -44,38 +43,34 @@ if [ "$1" == "c" ]; then
 fi
 #############################Split####################################
 if [ "$1" == "s" ]; then
-    if [[ -z "$2" || -z "$3" || -z "$4" ]]; then
-        echo Please specify three text file names: moving names, fixed names and affine names \(they must have the same number of lines\)
+    if [[ -z "$2" ]]; then
+        echo Please specify a text file containing the names of the files to register
         exit 0
     fi
-    movingNames=(`cat "$2"`)
-    lenMoving=${#movingNames[@]}
-    fixedNames=(`cat "$3"`)
-    lenFixed=${#fixedNames[@]}
-    affineNames=(`cat "$4"`)
-    lenAffine=${#affineNames[@]}
-    if [ $lenMoving -ne $lenFixed ]; then
-        echo Moving names and Fixed names must have the same number of file names. Moving has $lenMoving, fixed has $lenFixed
-        exit 0
-    fi
-    if [ $lenMoving -ne $lenAffine ]; then
-        echo Moving, fixed and affine names must have the same number of elements. Moving and fixed have $lenMoving, affine has $lenAffine
-        exit 0
-    fi
-    for index in ${!movingNames[*]}; do
-        folderIndex=$[$index +1 ]
-        stri="$folderIndex"
-        if [[ $folderIndex -lt 10 ]]; then
-            stri="0$folderIndex"
+    allNames=(`cat "$2"`)
+    lenAllNames=${#allNames[@]}
+    for reference in ${!allNames[*]}; do
+        referenceIndex=$[$reference +1 ]
+        strReference="$referenceIndex"
+        if [[ $referenceIndex -lt 10 ]]; then
+            strReference="0$strReference"
         fi
-        mkdir -p "$stri"/target
-        mkdir -p "$stri"/reference
-        mkdir -p "$stri"/affine
-        ln "${movingNames[$index]}" $stri/target
-        ln "${fixedNames[$index]}" $stri/reference
-        ln "${affineNames[$index]}" $stri/affine
-        cp jobDiffeomorphicMR.sh $stri
-        cp $pythonScriptName $stri
+        for target in ${!allNames[*]}; do
+            if [[ $reference -eq $target ]]; then
+                continue
+            fi
+            targetIndex=$[$target+1 ]
+            strTarget="$targetIndex"
+            if [[ $targetIndex -lt 10 ]]; then
+                strTarget="0$strTarget"
+            fi
+            stri="${strTarget}_${strReference}"
+            mkdir -p "$stri"/target
+            mkdir -p "$stri"/reference
+            ln "${allNames[$target]}" $stri/target
+            ln "${allNames[$reference]}" $stri/reference
+            ln jobFullRegistration.sh $stri
+        done
     done
     exit 0
 fi
@@ -84,7 +79,7 @@ if [ "$1" == "u" ]; then
     for name in $(ls -d */); do
         echo Submitting: \'$name\'
         cd $name
-        qsub jobDiffeomorphicMR.sh -d .
+        qsub jobFullRegistration.sh -d .
         cd ..
     done
     exit 0
@@ -95,6 +90,7 @@ if [ "$1" == "o" ]; then
     for dir in $(ls -d [0-9]*/); do
         mv $dir/*.npy results
         mv $dir/*.nii.gz results
+        mv $dir/*.txt results
     done
     exit 0    
 fi
