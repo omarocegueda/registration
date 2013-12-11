@@ -6,6 +6,7 @@ import os
 import fnmatch
 import shutil
 import subprocess
+import errno
 def query_yes_no(question, default="yes"):
     """Ask a yes/no question via raw_input() and return their answer.
 
@@ -60,14 +61,12 @@ if __name__=='__main__':
         dirNames=[name for name in os.listdir(".") if os.path.isdir(name) and fnmatch.fnmatch(name, '[0-9]*')]
         for name in dirNames:
             shutil.rmtree(name)
-    sys.exit(0)
+        sys.exit(0)
     #############################Split####################################
     if sys.argv[1]=='s':
         if argc<3:
             print 'Please specify a text file containing the names of the files to register'
             sys.exit(0)
-        
-        sys.exit(0)
         try:
             with open(sys.argv[2]) as f:
                 lines=f.readlines()
@@ -75,21 +74,28 @@ if __name__=='__main__':
             print 'Could not open file:', sys.argv[2]
             sys.exit(0)
         names=[line.strip().split() for line in lines]
-        i=0
-        for reference in names:
+        nlines=len(names)
+        for i in range(nlines):
+            if not names[i]:
+                continue
+            reference=names[i]
             stri='0'+str(i+1) if i+1<10 else str(i+1)
-            j=0
-            for target in names:
-                j+=1
+            for j in range(nlines):
                 if i==j:
                     continue
+                if not names[j]:
+                    continue
+                target=names[j]
                 strj='0'+str(j+1) if j+1<10 else str(j+1)
                 dirName=strj+'_'+stri
                 mkdir_p(os.path.join(dirName,'target'))
                 mkdir_p(os.path.join(dirName,'reference'))
-                os.symlink(target, os.path.join(dirName,'target'))
-                os.symlink(reference, os.path.join(dirName,'reference'))
-                os.symlink('jobFullRegistration.sh', dirName)
+                mkdir_p(os.path.join(dirName,'warp'))
+                subprocess.call('ln '+target[0]+' '+dirName+'/target', shell=True)
+                subprocess.call('ln '+reference[0]+' '+dirName+'/reference', shell=True)
+                subprocess.call('ln jobFullRegistration.sh '+dirName, shell=True)
+                for w in target:
+                    subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
         sys.exit(0)
     ############################Submit###################################
     if sys.argv[1]=='u':
