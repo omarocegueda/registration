@@ -53,6 +53,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
     void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg)
     int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal)
+    int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jacard, int nlabels)
 
 cdef checkFortran(a):
     if np.isfortran(np.array(a)):
@@ -559,3 +560,12 @@ def get_displacement_range(double[:,:,:,:] d, double[:,:] affine):
     else:
         retVal=getDisplacementRange(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0], &minVal[0], &maxVal[0])
     return minVal, maxVal
+
+def compute_jacard(int[:,:,:] A, int[:,:,:] B, int nlabels):
+    cdef int retVal
+    cdef int nslices=A.shape[0]
+    cdef int nrows=A.shape[1]
+    cdef int ncols=A.shape[2]
+    cdef double[:,:] jacard = np.ndarray((nlabels, nlabels), dtype=np.float64)
+    retVal=computeJacard(&A[0,0,0], &B[0,0,0], nslices, nrows, ncols, &jacard[0,0], nlabels)
+    return jacard

@@ -103,6 +103,16 @@ def segmentBrainwebAtlas(segNames, displacementFnames):
     print 'Saving segmentation...'
     img.to_filename('votingSegmentation.nii.gz')
 
+def warpSegmentation(segName, dispName):
+    nib_vol = nib.load(segName)
+    vol=nib_vol.get_data().squeeze().astype(np.int32)
+    vol=np.copy(vol, order='C')
+    displacement=np.load(dispName)
+    baseName=rcommon.getBaseFileName(segName)
+    warped=np.array(tf.warp_discrete_volumeNN(vol, displacement))
+    warped=nib.Nifti1Image(warped, np.eye(4))
+    warped.to_filename("warped"+baseName+"nii.gz")
+
 def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     '''
     showRegistrationResultMidSlices('IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
@@ -141,15 +151,30 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     rcommon.overlayImages(warped[sh[0]//2,:,:], fixed[sh[0]//2,:,:])
     rcommon.overlayImages(warped[:,:,sh[2]//2], fixed[:,:,sh[2]//2])    
 
+def computeJacard(aname, bname, nlabels):
+    nib_A=nib.load(aname)
+    A=nib_A.get_data().squeeze().astype(np.int32)
+    A=np.copy(A, order='C')
+    print "A range:",A.min(), A.max()
+    nib_B=nib.load(bname)
+    B=nib_B.get_data().squeeze().astype(np.int32)
+    B=np.copy(B, order='C')
+    print "B range:",B.min(), B.max()
+    jacard=np.array(tf.compute_jacard(A,B, nlabels))
+    print "Jacard range:",jacard.min(), jacard.max()
+    baseA=rcommon.getBaseFileName(aname)
+    baseB=rcommon.getBaseFileName(bname)
+    np.savetxt("jacard_"+baseA+"_"+baseB+".txt",jacard)
+
 if __name__=="__main__":
     argc=len(sys.argv)
     if argc<2:
         print 'Task name expected:\n','segatlas\n','invert\n','npy2nifti\n','lattice\n'
-        
         sys.exit(0)
     if(sys.argv[1]=='segatlas'):
         if argc<4:
-            print "Two file names expected as arguments"
+            print "Two file names expected as arguments: segmentation files and displacement files"
+            sys.exit(0)
         segNamesFile=sys.argv[2]
         dispNamesFile=sys.argv[3]
         try:
@@ -215,5 +240,21 @@ if __name__=="__main__":
         dname=sys.argv[2]
         oname='lattice_'+changeExtension(dname, '.nii.gz')
         rcommon.saveDeformedLattice3D(dname, oname)
+        sys.exit(0)
+    elif(sys.argv[1]=='warpseg'):
+        if argc<4:
+            print "Two file names expected as arguments"
+            sys.exit(0)
+        segName=sys.argv[2]
+        dispName=sys.argv[3]
+        print "Warping:", segName
+        warpSegmentation(segName, dispName)
+    elif(sys.argv[1]=='jacard'):
+        if argc<5:
+            print "Two file names and a numerical parameter (num labels) expected as arguments"
+        aname=sys.argv[2]
+        bname=sys.argv[3]
+        nlabels=int(sys.argv[4])
+        computeJacard(aname, bname, nlabels)
         sys.exit(0)
     print 'Unknown argument:',sys.argv[1]

@@ -52,3 +52,4 @@ int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int nco
 
 void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg);
 int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal);
+int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jacard, int nlabels);
