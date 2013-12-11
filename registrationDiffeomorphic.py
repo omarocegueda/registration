@@ -767,9 +767,10 @@ if __name__=='__main__':
     moving=sys.argv[1]
     fixed=sys.argv[2]
     affine=sys.argv[3]
+    warpDir=sys.argv[4]
     lambdaParam=np.float(sys.argv[4])
     #testEstimateMonomodalDiffeomorphicField3DMultiScale(0.1)
-    testEstimateMultimodalDiffeomorphicField3DMultiScale(moving, fixed, affine, lambdaParam)
+    testEstimateMultimodalDiffeomorphicField3DMultiScale(moving, fixed, affine, warpDir, lambdaParam)
     #testInversion(5)
     #testInversion_invertible()
 #    testCircleToCMonomodalDiffeomorphic(5)
