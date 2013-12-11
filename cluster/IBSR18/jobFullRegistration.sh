@@ -18,8 +18,12 @@ targetbase="${targetbase%.*}"
 referencebase="${reference%.*}"
 referencebase="${referencebase%.*}"
 #Affine registration using Mutual information with ANTS
-ANTS 3 -m MI[reference/$reference, target/$target, 1, 32] -i 0 -o ${targetbase}_${referencebase}
-#Diffeomorphic registration
 affine="${targetbase}_${referencebase}Affine.txt"
+if ! [ -r $affine ]; then
+    ANTS 3 -m MI[reference/$reference, target/$target, 1, 32] -i 0 -o ${targetbase}_${referencebase}
+else
+    echo "Affine mapping found ($affine). Skipping affine registration."
+fi
+#Diffeomorphic registration
 python registrationDiffeomorphic.py target/$target reference/$reference $affine 100.0
 date
