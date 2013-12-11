@@ -486,9 +486,10 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     names=[os.path.join(warpDir,name) for name in os.listdir(warpDir)]
     for name in names:
         toWarp=nib.load(name).get_data().squeeze().astype(np.int32)
+        baseWarp=rcommon.getBaseFileName(name)
         warped=np.array(tf.warp_discrete_volumeNN(toWarp, displacement, np.eye(4))).astype(np.int16)
         imgWarped=nib.Nifti1Image(warped, np.eye(4))
-        imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
+        imgWarped.to_filename('warpedDiff_'+baseWarp+'_'+baseFixed+'.nii.gz')
     #---finally, the deformed lattices (forward, inverse and resdidual)---    
     lambdaParam=0.9
     maxIter=100
