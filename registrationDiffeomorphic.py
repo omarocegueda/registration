@@ -471,24 +471,31 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, maskMoving)]
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, level, maskFixed)]
     #maxOuterIter=[100,100,100,100,100,100,100,100,100]
-    #maxOuterIter=[3,3,3,3,3,3,3,3,3]
+    #maxOuterIter=[1,1,1,1,1,1,1,1,1]
     maxOuterIter=[10,20,50,100, 100, 100]
+    baseMoving=rcommon.getBaseFileName(fnameMoving)
+    baseFixed=rcommon.getBaseFileName(fnameFixed)    
+#    if(os.path.exists('disp_'+baseMoving+'_'+baseFixed+'.npy')):
+#        displacement=np.load('disp_'+baseMoving+'_'+baseFixed+'.npy')
+#    else:
     displacement=estimateMultimodalDiffeomorphicField3DMultiScale(movingPyramid, fixedPyramid, initAffine, lambdaParam, maxOuterIter, 0,None)
     tf.prepend_affine_to_displacement_field(displacement, initAffine)
+#    np.save('disp_'+baseMoving+'_'+baseFixed+'.npy', displacement)
     #####Warp all requested volumes
     #---first the target using tri-linear interpolation---
-    baseMoving=rcommon.getBaseFileName(fnameMoving)
-    baseFixed=rcommon.getBaseFileName(fnameFixed)
-    warped=np.array(tf.warp_volume(movingPyramid[0], displacement, np.eye(4))).astype(np.int16)
-    imgWarped=nib.Nifti1Image(warped, np.eye(4))
+    moving=nib.load(fnameMoving).get_data().squeeze().astype(np.float64)
+    moving=np.copy(moving, order='C')
+    warped=np.array(tf.warp_volume(moving, displacement)).astype(np.int16)
+    imgWarped=nib.Nifti1Image(warped, F)
     imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     #---now the rest of the targets using nearest neighbor
     names=[os.path.join(warpDir,name) for name in os.listdir(warpDir)]
     for name in names:
         toWarp=nib.load(name).get_data().squeeze().astype(np.int32)
+        toWarp=np.copy(toWarp, order='C')
         baseWarp=rcommon.getBaseFileName(name)
-        warped=np.array(tf.warp_discrete_volumeNN(toWarp, displacement, np.eye(4))).astype(np.int16)
-        imgWarped=nib.Nifti1Image(warped, np.eye(4))
+        warped=np.array(tf.warp_discrete_volumeNN(toWarp, displacement)).astype(np.int16)
+        imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
         imgWarped.to_filename('warpedDiff_'+baseWarp+'_'+baseFixed+'.nii.gz')
     #---finally, the deformed lattices (forward, inverse and resdidual)---    
     lambdaParam=0.9
@@ -764,6 +771,7 @@ def testInversion_invertible():
 #testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None, 100)
 
 #python registrationDiffeomorphic.py IBSR_01_ana_strip.nii.gz t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt 100
+#python registrationDiffeomorphic.py "/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz" "/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz" "IBSR_01_ana_strip_IBSR_02_ana_stripAffine.txt" "warp" 100.0
 if __name__=='__main__':
     moving=sys.argv[1]
     fixed=sys.argv[2]

@@ -129,6 +129,9 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     
     showRegistrationResultMidSlices('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt')
     showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+    
+    
+    showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_IBSR_02_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz', None)
 
     '''
     if(fnameAffine==None):
@@ -151,15 +154,19 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     rcommon.overlayImages(warped[sh[0]//2,:,:], fixed[sh[0]//2,:,:])
     rcommon.overlayImages(warped[:,:,sh[2]//2], fixed[:,:,sh[2]//2])    
 
-def computeJacard(aname, bname, nlabels):
+def computeJacard(aname, bname):
     nib_A=nib.load(aname)
+    affineA=nib_A.get_affine()
     A=nib_A.get_data().squeeze().astype(np.int32)
     A=np.copy(A, order='C')
     print "A range:",A.min(), A.max()
     nib_B=nib.load(bname)
+    newB=nib.Nifti1Image(nib_B.get_data(),affineA)
+    newB.to_filename(bname)
     B=nib_B.get_data().squeeze().astype(np.int32)
     B=np.copy(B, order='C')
     print "B range:",B.min(), B.max()
+    nlabels=1+np.max([A.max(), B.max()])
     jacard=np.array(tf.compute_jacard(A,B, nlabels))
     print "Jacard range:",jacard.min(), jacard.max()
     baseA=rcommon.getBaseFileName(aname)
@@ -252,9 +259,36 @@ if __name__=="__main__":
     elif(sys.argv[1]=='jacard'):
         if argc<5:
             print "Two file names and a numerical parameter (num labels) expected as arguments"
+            sys.exit(0)
         aname=sys.argv[2]
         bname=sys.argv[3]
-        nlabels=int(sys.argv[4])
-        computeJacard(aname, bname, nlabels)
+        computeJacard(aname, bname)
+        sys.exit(0)
+    elif(sys.argv[1]=='fulljacard'):#compute the mean and std dev of jacard index among all pairs of the given volumes
+        if argc<3:
+            print "A text file containing the segmentation names must be provided."
+        try:
+            with open(sys.argv[2]) as f:
+                names=[line.strip().split() for line in f.readlines()]
+        except IOError:
+            print 'Cannot open file:',sys.argv[2]
+            sys.exit(0)
+        nlines=len(names)
+        for i in range(nlines):
+            if not names[i]:
+                continue
+            registrationReference=names[i][0]
+            reference=names[i][1]
+            for j in range(nlines):
+                if i==j:
+                    continue
+                if not names[j]:
+                    continue
+                target=names[j][1]
+                ###############
+                baseReference=rcommon.getBaseFileName(registrationReference)
+                baseTarget=rcommon.getBaseFileName(target)
+                warpedName='warpedDiff_'+baseTarget+'_'+baseReference+'.nii.gz'
+                computeJacard(reference, warpedName)
         sys.exit(0)
     print 'Unknown argument:',sys.argv[1]
