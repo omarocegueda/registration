@@ -55,7 +55,7 @@ if __name__=='__main__':
         sys.exit(0)
     #############################Clean#####################################
     if sys.argv[1]=='c':
-        if os.path.isdir('results'):
+        if not os.path.isdir('results'):
             cleanAnyway=query_yes_no("It seems like you have not collected the results yet. Clean anyway? (y/n)")
             if not cleanAnyway:
                 sys.exit(0)
@@ -113,13 +113,10 @@ if __name__=='__main__':
         mkdir_p('results')
         dirNames=[name for name in os.listdir(".") if os.path.isdir(name) and fnmatch.fnmatch(name, '[0-9]*')]
         for name in dirNames:
-            os.chdir(name)
-            subprocess.call('mv '+os.path.join(name,'*.npy')+' results', shell=True)
             subprocess.call('mv '+os.path.join(name,'*.nii.gz')+' results', shell=True)
             subprocess.call('mv '+os.path.join(name,'*.txt')+' results', shell=True)
             subprocess.call('mv '+os.path.join(name,'*.e*')+' results', shell=True)
             subprocess.call('mv '+os.path.join(name,'*.o*')+' results', shell=True)
-            os.chdir('..')
         sys.exit(0)
     ############################Unknown##################################
     print 'Unknown option "'+sys.argv[1]+'". The available options are "(c)"lean, "(s)"plit, s"(u)"bmit, c"(o)"llect.'
