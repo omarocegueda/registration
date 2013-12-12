@@ -155,6 +155,13 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     rcommon.overlayImages(warped[:,:,sh[2]//2], fixed[:,:,sh[2]//2])    
 
 def computeJacard(aname, bname):
+    baseA=rcommon.getBaseFileName(aname)
+    baseB=rcommon.getBaseFileName(bname)
+    oname="jacard_"+baseA+"_"+baseB+".txt"
+    if(os.path.exists(oname)):
+        print 'Jacard matrix found. Skipped computation.'
+        jacard=np.loadtxt(oname)
+        return jacard
     nib_A=nib.load(aname)
     affineA=nib_A.get_affine()
     A=nib_A.get_data().squeeze().astype(np.int32)
@@ -169,9 +176,7 @@ def computeJacard(aname, bname):
     nlabels=1+np.max([A.max(), B.max()])
     jacard=np.array(tf.compute_jacard(A,B, nlabels))
     print "Jacard range:",jacard.min(), jacard.max()
-    baseA=rcommon.getBaseFileName(aname)
-    baseB=rcommon.getBaseFileName(bname)
-    np.savetxt("jacard_"+baseA+"_"+baseB+".txt",jacard)
+    np.savetxt(oname,jacard)
     return jacard
 
 if __name__=="__main__":
@@ -277,6 +282,8 @@ if __name__=="__main__":
         nlines=len(names)
         sumJacard=None
         sumJacard2=None
+        minScore=None
+        worstPair=None
         nsamples=0.0
         for i in range(nlines):
             if not names[i]:
@@ -298,6 +305,8 @@ if __name__=="__main__":
                 if sumJacard==None:
                     sumJacard=jacard
                     sumJacard2=jacard**2
+                    worstPair=(i,j)
+                    minScore=np.trace(jacard)
                 else:
                     shOld=sumJacard.shape
                     shNew=jacard.shape
@@ -310,6 +319,11 @@ if __name__=="__main__":
                     newSum2[:shNew[0], :shNew[1]]+=jacard[...]**2
                     sumJacard=newSum
                     sumJacard2=newSum2
+                    optTrace=np.trace(jacard)
+                    if optTrace<minScore:
+                        minScore=optTrace
+                        worstPair=(i,j)
+        print 'Min trace:',minScore,'. Worst pair:',worstPair
         meanJacard=sumJacard/nsamples
         variance=sumJacard2/nsamples-meanJacard**2#E[X^2] - E[X]^2
         std=np.sqrt(variance)
