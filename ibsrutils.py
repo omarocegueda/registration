@@ -132,7 +132,7 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     
     
     showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_IBSR_02_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz', None)
-
+    showRegistrationResultMidSlices('warpedDiff_IBSR_01_segTRI_ana_IBSR_02_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_segTRI_ana.nii.gz', None)
     '''
     if(fnameAffine==None):
         T=np.eye(4)
@@ -172,6 +172,7 @@ def computeJacard(aname, bname):
     baseA=rcommon.getBaseFileName(aname)
     baseB=rcommon.getBaseFileName(bname)
     np.savetxt("jacard_"+baseA+"_"+baseB+".txt",jacard)
+    return jacard
 
 if __name__=="__main__":
     argc=len(sys.argv)
@@ -274,6 +275,9 @@ if __name__=="__main__":
             print 'Cannot open file:',sys.argv[2]
             sys.exit(0)
         nlines=len(names)
+        sumJacard=None
+        sumJacard2=None
+        nsamples=0.0
         for i in range(nlines):
             if not names[i]:
                 continue
@@ -289,6 +293,27 @@ if __name__=="__main__":
                 baseReference=rcommon.getBaseFileName(registrationReference)
                 baseTarget=rcommon.getBaseFileName(target)
                 warpedName='warpedDiff_'+baseTarget+'_'+baseReference+'.nii.gz'
-                computeJacard(reference, warpedName)
+                jacard=computeJacard(reference, warpedName)
+                nsamples+=1
+                if sumJacard==None:
+                    sumJacard=jacard
+                    sumJacard2=jacard**2
+                else:
+                    shOld=sumJacard.shape
+                    shNew=jacard.shape
+                    extendedShape=(np.max([shOld[0], shNew[0]]), np.max([shOld[1], shNew[1]]))
+                    newSum=np.zeros(shape=extendedShape, dtype=np.float64)
+                    newSum2=np.zeros(shape=extendedShape, dtype=np.float64)
+                    newSum[:shOld[0], :shOld[1]]=sumJacard[...]
+                    newSum[:shNew[0], :shNew[1]]+=jacard[...]
+                    newSum2[:shOld[0], :shOld[1]]=sumJacard2[...]
+                    newSum2[:shNew[0], :shNew[1]]+=jacard[...]**2
+                    sumJacard=newSum
+                    sumJacard2=newSum2
+        meanJacard=sumJacard/nsamples
+        variance=sumJacard2/nsamples-meanJacard**2#E[X^2] - E[X]^2
+        std=np.sqrt(variance)
+        np.savetxt("jacard_mean.txt",meanJacard)
+        np.savetxt("jacard_std.txt",std)
         sys.exit(0)
     print 'Unknown argument:',sys.argv[1]
