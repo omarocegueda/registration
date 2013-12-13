@@ -7,7 +7,7 @@
 #PBS -N FullRegistration
 #PBS -M jomaroceguedag@gmail.com
 export PATH="/opt/python/anaconda/bin:$PATH"
-export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:$HOME/local/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
+export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
 ###################################
 date
 reference=$(ls reference)
