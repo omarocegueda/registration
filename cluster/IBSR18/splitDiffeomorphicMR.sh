@@ -71,11 +71,11 @@ if [ "$1" == "s" ]; then
         mkdir -p "$stri"/target
         mkdir -p "$stri"/reference
         mkdir -p "$stri"/affine
-        ln "${movingNames[$index]}" $stri/target
-        ln "${fixedNames[$index]}" $stri/reference
-        ln "${affineNames[$index]}" $stri/affine
-        cp jobDiffeomorphicMR.sh $stri
-        cp $pythonScriptName $stri
+        ln -s "${movingNames[$index]}" $stri/target
+        ln -s "${fixedNames[$index]}" $stri/reference
+        ln -s "${affineNames[$index]}" $stri/affine
+        ln -s jobDiffeomorphicMR.sh $stri
+        ln -s $pythonScriptName $stri
     done
     exit 0
 fi
