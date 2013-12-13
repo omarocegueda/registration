@@ -490,6 +490,8 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     imgWarped=nib.Nifti1Image(warped, F)
     imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     #---warp using affine only
+    moving=nib.load(fnameMoving).get_data().squeeze().astype(np.int32)
+    moving=np.copy(moving, order='C')
     warped=np.array(tf.warp_discrete_volumeNNAffine(moving, referenceShape, initAffine)).astype(np.int16)
     imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
     imgWarped.to_filename('warpedAffine_'+baseMoving+'_'+baseFixed+'.nii.gz')
