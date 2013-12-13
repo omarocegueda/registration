@@ -451,6 +451,7 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     sys.stdout.flush()
     moving = nib.load(fnameMoving)
     fixed= nib.load(fnameFixed)
+    referenceShape=np.array(fixed.shape, dtype=np.int32)
     M=moving.get_affine()
     F=fixed.get_affine()
     if not fnameAffine:
@@ -465,7 +466,7 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     fixed=np.copy(fixed, order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    level=3
+    level=2
     maskMoving=moving>0
     maskFixed=fixed>0
     movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, maskMoving)]
@@ -488,15 +489,24 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     warped=np.array(tf.warp_volume(moving, displacement)).astype(np.int16)
     imgWarped=nib.Nifti1Image(warped, F)
     imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
+    #---warp using affine only
+    warped=np.array(tf.warp_discrete_volumeNNAffine(moving, referenceShape, initAffine)).astype(np.int16)
+    imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
+    imgWarped.to_filename('warpedAffine_'+baseMoving+'_'+baseFixed+'.nii.gz')
     #---now the rest of the targets using nearest neighbor
     names=[os.path.join(warpDir,name) for name in os.listdir(warpDir)]
     for name in names:
+        #---warp using the non-linear deformation
         toWarp=nib.load(name).get_data().squeeze().astype(np.int32)
         toWarp=np.copy(toWarp, order='C')
         baseWarp=rcommon.getBaseFileName(name)
         warped=np.array(tf.warp_discrete_volumeNN(toWarp, displacement)).astype(np.int16)
         imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
         imgWarped.to_filename('warpedDiff_'+baseWarp+'_'+baseFixed+'.nii.gz')
+        #---warp using affine inly
+        warped=np.array(tf.warp_discrete_volumeNNAffine(toWarp, referenceShape, initAffine)).astype(np.int16)
+        imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
+        imgWarped.to_filename('warpedAffine_'+baseWarp+'_'+baseFixed+'.nii.gz')
     #---finally, the deformed lattices (forward, inverse and resdidual)---    
     lambdaParam=0.9
     maxIter=100

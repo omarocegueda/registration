@@ -103,37 +103,68 @@ def segmentBrainwebAtlas(segNames, displacementFnames):
     print 'Saving segmentation...'
     img.to_filename('votingSegmentation.nii.gz')
 
-def warpSegmentation(segName, dispName):
-    nib_vol = nib.load(segName)
-    vol=nib_vol.get_data().squeeze().astype(np.int32)
-    vol=np.copy(vol, order='C')
+def warpNonlinear(targetName, referenceName, dispName, oname, interpolationType='trilinear'):
+    baseName=rcommon.getBaseFileName(targetName)
     displacement=np.load(dispName)
-    baseName=rcommon.getBaseFileName(segName)
-    warped=np.array(tf.warp_discrete_volumeNN(vol, displacement))
-    warped=nib.Nifti1Image(warped, np.eye(4))
-    warped.to_filename("warped"+baseName+"nii.gz")
+    nib_target = nib.load(targetName)
+    if interpolationType=='NN':
+        target=nib_target.get_data().squeeze().astype(np.int32)
+        target=np.copy(target, order='C')
+        warped=np.array(tf.warp_discrete_volumeNN(target, displacement))
+    else:
+        target=nib_target.get_data().squeeze().astype(np.float64)
+        target=np.copy(target, order='C')
+        warped=np.array(tf.warp_volume(target, displacement))        
+    referenceAffine=nib.load(referenceName).get_affine()
+    warped=nib.Nifti1Image(warped, referenceAffine)
+    if not oname:
+        oname="warped"+baseName+"nii.gz"
+    warped.to_filename(oname)
+
+def warpANTSAffine(targetName, referenceName, affineName, oname, interpolationType='trilinear'):
+    baseName=rcommon.getBaseFileName(targetName)
+    nib_target=nib.load(targetName)
+    nib_reference=nib.load(referenceName)
+    M=nib_target.get_affine()
+    F=nib_reference.get_affine()
+    referenceShape=np.array(nib_reference.shape, dtype=np.int32)
+    ######Load and compose affine#####
+    if not affineName:
+        T=np.eye(4)
+    else:
+        T=rcommon.readAntsAffine(affineName)
+    affineComposition=np.linalg.inv(M).dot(T.dot(F))
+    ######################
+    if interpolationType=='NN':
+        target=nib_target.get_data().squeeze().astype(np.int32)
+        target=np.copy(target, order='C')
+        warped=np.array(tf.warp_discrete_volumeNNAffine(target, referenceShape, affineComposition)).astype(np.int16)
+    else:
+        target=nib_target.get_data().squeeze().astype(np.float64)
+        target=np.copy(target, order='C')
+        warped=np.array(tf.warp_volume_affine(target, referenceShape, affineComposition)).astype(np.int16)
+    warped=nib.Nifti1Image(warped, F)
+    if not oname:
+        oname="warped"+baseName+"nii.gz"
+    warped.to_filename(oname)
 
 def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
-    '''
-    showRegistrationResultMidSlices('IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-    showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-    showRegistrationResultMidSlices('IBSR_04_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-    showRegistrationResultMidSlices('warpedDiff_IBSR_04_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-    
-    
-    showRegistrationResultMidSlices('IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-    showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')
-    
-    showRegistrationResultMidSlices('t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')        
-    showRegistrationResultMidSlices('warpedDiff_t2_icbm_normal_1mm_pn0_rf0_peeled_IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz')    
-    
+    '''    
     showRegistrationResultMidSlices('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt')
     showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
     
     
     showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_IBSR_02_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz', None)
     showRegistrationResultMidSlices('warpedDiff_IBSR_01_segTRI_ana_IBSR_02_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_segTRI_ana.nii.gz', None)
+    ##Worst pair:
+        showRegistrationResultMidSlices('warpedDiff_IBSR_16_segTRI_ana_IBSR_12_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_segTRI_ana.nii.gz', None)
+        
+        showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_16/IBSR_16_segTRI_ana.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_segTRI_ana.nii.gz', None)
+        showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_16/IBSR_16_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('warpedAffine_IBSR_16_segTRI_ana_IBSR_12_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_segTRI_ana.nii.gz', None)
+        
     '''
+    
     if(fnameAffine==None):
         T=np.eye(4)
     else:
@@ -254,14 +285,39 @@ if __name__=="__main__":
         oname='lattice_'+changeExtension(dname, '.nii.gz')
         rcommon.saveDeformedLattice3D(dname, oname)
         sys.exit(0)
-    elif(sys.argv[1]=='warpseg'):
-        if argc<4:
-            print "Two file names expected as arguments"
+    elif(sys.argv[1]=='warp' or sys.argv[1]=='warpNN'):
+        if argc<5:
+            print "Expected arguments: target reference dispName [oname]"
             sys.exit(0)
-        segName=sys.argv[2]
-        dispName=sys.argv[3]
-        print "Warping:", segName
-        warpSegmentation(segName, dispName)
+        targetName=sys.argv[2]
+        referenceName=sys.argv[3]
+        dispName=sys.argv[4]
+        oname=None
+        if argc>5:
+            oname=sys.argv[5]
+        if(sys.argv[1]=='warp'):
+            warpNonlinear(targetName, referenceName, dispName, oname, 'trilinear')
+        else:
+            warpNonlinear(targetName, referenceName, dispName, oname, 'NN')
+        sys.exit(0)
+    elif(sys.argv[1]=='warpAffine' or sys.argv[1]=='warpAffineNN'):
+        '''
+        python ibsrutils.py warpAffineNN /opt/registration/data/t1/IBSR18/IBSR_16/IBSR_16_segTRI_ana.nii.gz /opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_ana_strip.nii.gz IBSR_16_ana_strip_IBSR_12_ana_stripAffine.txt warpedAffine_IBSR_16_segTRI_ana_IBSR_12_ana_strip.nii.gz
+        '''
+        if argc<5:
+            print "Expected arguments: target reference affineName [oname]"
+            sys.exit(0)
+        targetName=sys.argv[2]
+        referenceName=sys.argv[3]
+        affineName=sys.argv[4]
+        oname=None
+        if argc>5:
+            oname=sys.argv[5]
+        if sys.argv[1]=='warpAffine':
+            warpANTSAffine(targetName, referenceName, affineName, oname, interpolationType='trilinear')
+        else:
+            warpANTSAffine(targetName, referenceName, affineName, oname, interpolationType='NN')
+        sys.exit(0)
     elif(sys.argv[1]=='jacard'):
         if argc<5:
             print "Two file names and a numerical parameter (num labels) expected as arguments"
@@ -323,7 +379,7 @@ if __name__=="__main__":
                     if optTrace<minScore:
                         minScore=optTrace
                         worstPair=(i,j)
-        print 'Min trace:',minScore,'. Worst pair:',worstPair
+        print 'Min trace:',minScore,'. Worst pair:[',reference,', ',warpedName,']'
         meanJacard=sumJacard/nsamples
         variance=sumJacard2/nsamples-meanJacard**2#E[X^2] - E[X]^2
         std=np.sqrt(variance)
