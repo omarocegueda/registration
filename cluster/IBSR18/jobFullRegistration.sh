@@ -19,6 +19,10 @@ referencebase="${reference%.*}"
 referencebase="${referencebase%.*}"
 #Affine registration using Mutual information with ANTS
 affine="${targetbase}_${referencebase}Affine.txt"
+affinePrecomputed="../affine/${affine}"
+if [ -r $affinePrecomputed]; then
+    cp $affinePrecomputed .
+fi
 if ! [ -r $affine ]; then
     ANTS 3 -m MI[reference/$reference, target/$target, 1, 32] -i 0 -o ${targetbase}_${referencebase}
 else
