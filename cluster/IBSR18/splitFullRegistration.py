@@ -93,12 +93,12 @@ if __name__=='__main__':
                 mkdir_p(os.path.join(dirName,'target'))
                 mkdir_p(os.path.join(dirName,'reference'))
                 mkdir_p(os.path.join(dirName,'warp'))
-                subprocess.call('ln -s '+target[0]+' '+dirName+'/target', shell=True)
-                subprocess.call('ln -s '+reference[0]+' '+dirName+'/reference', shell=True)
-                subprocess.call('ln -s jobFullRegistration.sh '+dirName, shell=True)
-                subprocess.call('ln -s '+registrationScriptName+' '+dirName, shell=True)
+                subprocess.call('ln '+target[0]+' '+dirName+'/target', shell=True)
+                subprocess.call('ln '+reference[0]+' '+dirName+'/reference', shell=True)
+                subprocess.call('ln jobFullRegistration.sh '+dirName, shell=True)
+                subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
                 for w in target[1:]:
-                    subprocess.call('ln -s '+w+' '+dirName+'/warp', shell=True)
+                    subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
         sys.exit(0)
     ############################Submit###################################
     if sys.argv[1]=='u':

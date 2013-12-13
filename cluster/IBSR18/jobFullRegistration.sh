@@ -7,7 +7,7 @@
 #PBS -N FullRegistration
 #PBS -M jomaroceguedag@gmail.com
 export PATH="/opt/python/anaconda/bin:$PATH"
-export PYTHONPATH=/opt/python/anaconda/lib/python2.7/site-packages:/home/omar/local/lib/python2.7/site-packages:/home/omar/code/registration
+export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:$HOME/local/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
 ###################################
 date
 reference=$(ls reference)
@@ -20,7 +20,7 @@ referencebase="${referencebase%.*}"
 #Affine registration using Mutual information with ANTS
 affine="${targetbase}_${referencebase}Affine.txt"
 affinePrecomputed="../affine/${affine}"
-if [ -r $affinePrecomputed]; then
+if [ -r $affinePrecomputed ]; then
     cp $affinePrecomputed .
 fi
 if ! [ -r $affine ]; then
