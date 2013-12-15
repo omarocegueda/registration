@@ -162,6 +162,8 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
         showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_16/IBSR_16_segTRI_ana.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_segTRI_ana.nii.gz', None)
         showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_16/IBSR_16_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_ana_strip.nii.gz', None)
         showRegistrationResultMidSlices('warpedAffine_IBSR_16_segTRI_ana_IBSR_12_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_segTRI_ana.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_16_ana_strip_IBSR_12_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('warpedAffine_IBSR_16_ana_strip_IBSR_12_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_ana_strip.nii.gz', None)
         
     '''
     
@@ -209,6 +211,57 @@ def computeJacard(aname, bname):
     print "Jacard range:",jacard.min(), jacard.max()
     np.savetxt(oname,jacard)
     return jacard
+
+def fullJacard(names, segIndex):
+    nlines=len(names)
+    sumJacard=None
+    sumJacard2=None
+    minScore=None
+    worstPair=None
+    nsamples=0.0
+    for i in range(nlines):
+        if not names[i]:
+            continue
+        registrationReference=names[i][0]
+        reference=names[i][segIndex]
+        for j in range(nlines):
+            if i==j:
+                continue
+            if not names[j]:
+                continue
+            target=names[j][segIndex]
+            ###############
+            baseReference=rcommon.getBaseFileName(registrationReference)
+            baseTarget=rcommon.getBaseFileName(target)
+            warpedName='warpedDiff_'+baseTarget+'_'+baseReference+'.nii.gz'
+            jacard=computeJacard(reference, warpedName)
+            nsamples+=1
+            if sumJacard==None:
+                sumJacard=jacard
+                sumJacard2=jacard**2
+                worstPair=(i,j)
+                minScore=np.trace(jacard)
+            else:
+                shOld=sumJacard.shape
+                shNew=jacard.shape
+                extendedShape=(np.max([shOld[0], shNew[0]]), np.max([shOld[1], shNew[1]]))
+                newSum=np.zeros(shape=extendedShape, dtype=np.float64)
+                newSum2=np.zeros(shape=extendedShape, dtype=np.float64)
+                newSum[:shOld[0], :shOld[1]]=sumJacard[...]
+                newSum[:shNew[0], :shNew[1]]+=jacard[...]
+                newSum2[:shOld[0], :shOld[1]]=sumJacard2[...]
+                newSum2[:shNew[0], :shNew[1]]+=jacard[...]**2
+                sumJacard=newSum
+                sumJacard2=newSum2
+                optTrace=np.trace(jacard)
+                if optTrace<minScore:
+                    minScore=optTrace
+                    worstPair=(i,j)
+    meanJacard=sumJacard/nsamples
+    variance=sumJacard2/nsamples-meanJacard**2#E[X^2] - E[X]^2
+    std=np.sqrt(variance)
+    return meanJacard, std, worstPair, minScore
+
 
 if __name__=="__main__":
     argc=len(sys.argv)
@@ -335,55 +388,11 @@ if __name__=="__main__":
         except IOError:
             print 'Cannot open file:',sys.argv[2]
             sys.exit(0)
-        nlines=len(names)
-        sumJacard=None
-        sumJacard2=None
-        minScore=None
-        worstPair=None
-        nsamples=0.0
-        for i in range(nlines):
-            if not names[i]:
-                continue
-            registrationReference=names[i][0]
-            reference=names[i][1]
-            for j in range(nlines):
-                if i==j:
-                    continue
-                if not names[j]:
-                    continue
-                target=names[j][1]
-                ###############
-                baseReference=rcommon.getBaseFileName(registrationReference)
-                baseTarget=rcommon.getBaseFileName(target)
-                warpedName='warpedDiff_'+baseTarget+'_'+baseReference+'.nii.gz'
-                jacard=computeJacard(reference, warpedName)
-                nsamples+=1
-                if sumJacard==None:
-                    sumJacard=jacard
-                    sumJacard2=jacard**2
-                    worstPair=(i,j)
-                    minScore=np.trace(jacard)
-                else:
-                    shOld=sumJacard.shape
-                    shNew=jacard.shape
-                    extendedShape=(np.max([shOld[0], shNew[0]]), np.max([shOld[1], shNew[1]]))
-                    newSum=np.zeros(shape=extendedShape, dtype=np.float64)
-                    newSum2=np.zeros(shape=extendedShape, dtype=np.float64)
-                    newSum[:shOld[0], :shOld[1]]=sumJacard[...]
-                    newSum[:shNew[0], :shNew[1]]+=jacard[...]
-                    newSum2[:shOld[0], :shOld[1]]=sumJacard2[...]
-                    newSum2[:shNew[0], :shNew[1]]+=jacard[...]**2
-                    sumJacard=newSum
-                    sumJacard2=newSum2
-                    optTrace=np.trace(jacard)
-                    if optTrace<minScore:
-                        minScore=optTrace
-                        worstPair=(i,j)
-        print 'Min trace:',minScore,'. Worst pair:[',reference,', ',warpedName,']'
-        meanJacard=sumJacard/nsamples
-        variance=sumJacard2/nsamples-meanJacard**2#E[X^2] - E[X]^2
-        std=np.sqrt(variance)
-        np.savetxt("jacard_mean.txt",meanJacard)
-        np.savetxt("jacard_std.txt",std)
+        filesPerSample=len(names[0])
+        for segIndex in range(1,filesPerSample):
+            meanJacard, stdJacard, worstPair, minScore=fullJacard(names, segIndex)
+            print '[', segIndex,'] Min trace:',minScore,'. Worst pair:',worstPair,'[',names[worstPair[0]][segIndex],', ',names[worstPair[1]][segIndex],']'
+            np.savetxt("jacard_mean_"+str(segIndex)+'.txt',meanJacard)
+            np.savetxt("jacard_std_"+str(segIndex)+'.txt',stdJacard)
         sys.exit(0)
     print 'Unknown argument:',sys.argv[1]
