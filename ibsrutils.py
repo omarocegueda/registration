@@ -395,7 +395,7 @@ if __name__=="__main__":
         for segIndex in range(1,filesPerSample):
             meanJacard, stdJacard, worstPair, minScore=fullJacard(names, segIndex, warpedPreffix)
             print '[', segIndex,'] Min trace:',minScore,'. Worst pair:',worstPair,'[',names[worstPair[0]][segIndex],', ',names[worstPair[1]][segIndex],']'
-            np.savetxt("jacard_mean_"+str(segIndex)+'.txt',meanJacard)
-            np.savetxt("jacard_std_"+str(segIndex)+'.txt',stdJacard)
+            np.savetxt("jacard_mean_"+warpedPreffix+str(segIndex)+'.txt',meanJacard)
+            np.savetxt("jacard_std_"+warpedPreffix+str(segIndex)+'.txt',stdJacard)
         sys.exit(0)
     print 'Unknown argument:',sys.argv[1]
