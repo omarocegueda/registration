@@ -212,7 +212,7 @@ def computeJacard(aname, bname):
     np.savetxt(oname,jacard)
     return jacard
 
-def fullJacard(names, segIndex):
+def fullJacard(names, segIndex, warpedPreffix):
     nlines=len(names)
     sumJacard=None
     sumJacard2=None
@@ -233,7 +233,7 @@ def fullJacard(names, segIndex):
             ###############
             baseReference=rcommon.getBaseFileName(registrationReference)
             baseTarget=rcommon.getBaseFileName(target)
-            warpedName='warpedDiff_'+baseTarget+'_'+baseReference+'.nii.gz'
+            warpedName=warpedPreffix+baseTarget+'_'+baseReference+'.nii.gz'
             jacard=computeJacard(reference, warpedName)
             nsamples+=1
             if sumJacard==None:
@@ -388,9 +388,12 @@ if __name__=="__main__":
         except IOError:
             print 'Cannot open file:',sys.argv[2]
             sys.exit(0)
+        warpedPreffix="warpedDiff_"
+        if(argc>3):
+            warpedPreffix=sys.argv[3]#e.g.: 'warpedAffine_'
         filesPerSample=len(names[0])
         for segIndex in range(1,filesPerSample):
-            meanJacard, stdJacard, worstPair, minScore=fullJacard(names, segIndex)
+            meanJacard, stdJacard, worstPair, minScore=fullJacard(names, segIndex, warpedPreffix)
             print '[', segIndex,'] Min trace:',minScore,'. Worst pair:',worstPair,'[',names[worstPair[0]][segIndex],', ',names[worstPair[1]][segIndex],']'
             np.savetxt("jacard_mean_"+str(segIndex)+'.txt',meanJacard)
             np.savetxt("jacard_std_"+str(segIndex)+'.txt',stdJacard)
