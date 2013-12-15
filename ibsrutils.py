@@ -165,6 +165,14 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
         showRegistrationResultMidSlices('warpedDiff_IBSR_16_ana_strip_IBSR_12_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_ana_strip.nii.gz', None)
         showRegistrationResultMidSlices('warpedAffine_IBSR_16_ana_strip_IBSR_12_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_ana_strip.nii.gz', None)
         
+        showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_16/IBSR_16_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('warpedAffine_IBSR_10_ana_strip_IBSR_16_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_16/IBSR_16_ana_strip.nii.gz', None)
+        
+        showRegistrationResultMidSlices('warpedAffine_IBSR_16_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_16_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
+        
+        
+        
     '''
     
     if(fnameAffine==None):
@@ -192,7 +200,7 @@ def computeJacard(aname, bname):
     baseB=rcommon.getBaseFileName(bname)
     oname="jacard_"+baseA+"_"+baseB+".txt"
     if(os.path.exists(oname)):
-        print 'Jacard matrix found. Skipped computation.'
+        print 'Jacard overlap found. Skipped computation.'
         jacard=np.loadtxt(oname)
         return jacard
     nib_A=nib.load(aname)
@@ -240,22 +248,22 @@ def fullJacard(names, segIndex, warpedPreffix):
                 sumJacard=jacard
                 sumJacard2=jacard**2
                 worstPair=(i,j)
-                minScore=np.trace(jacard)
+                minScore=np.sum(jacard)
             else:
-                shOld=sumJacard.shape
-                shNew=jacard.shape
-                extendedShape=(np.max([shOld[0], shNew[0]]), np.max([shOld[1], shNew[1]]))
+                lenOld=len(sumJacard)
+                lenNew=len(jacard)
+                extendedShape=(np.max([lenOld, lenNew]),)
                 newSum=np.zeros(shape=extendedShape, dtype=np.float64)
                 newSum2=np.zeros(shape=extendedShape, dtype=np.float64)
-                newSum[:shOld[0], :shOld[1]]=sumJacard[...]
-                newSum[:shNew[0], :shNew[1]]+=jacard[...]
-                newSum2[:shOld[0], :shOld[1]]=sumJacard2[...]
-                newSum2[:shNew[0], :shNew[1]]+=jacard[...]**2
+                newSum[:lenOld]=sumJacard[...]
+                newSum[:lenNew]+=jacard[...]
+                newSum2[:lenOld]=sumJacard2[...]
+                newSum2[:lenNew]+=jacard[...]**2
                 sumJacard=newSum
                 sumJacard2=newSum2
-                optTrace=np.trace(jacard)
-                if optTrace<minScore:
-                    minScore=optTrace
+                optSum=np.sum(jacard)
+                if optSum<minScore:
+                    minScore=optSum
                     worstPair=(i,j)
     meanJacard=sumJacard/nsamples
     variance=sumJacard2/nsamples-meanJacard**2#E[X^2] - E[X]^2
@@ -372,8 +380,8 @@ if __name__=="__main__":
             warpANTSAffine(targetName, referenceName, affineName, oname, interpolationType='NN')
         sys.exit(0)
     elif(sys.argv[1]=='jacard'):
-        if argc<5:
-            print "Two file names and a numerical parameter (num labels) expected as arguments"
+        if argc<4:
+            print "Two file names expected as arguments"
             sys.exit(0)
         aname=sys.argv[2]
         bname=sys.argv[3]

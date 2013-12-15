@@ -566,6 +566,6 @@ def compute_jacard(int[:,:,:] A, int[:,:,:] B, int nlabels):
     cdef int nslices=A.shape[0]
     cdef int nrows=A.shape[1]
     cdef int ncols=A.shape[2]
-    cdef double[:,:] jacard = np.ndarray((nlabels, nlabels), dtype=np.float64)
-    retVal=computeJacard(&A[0,0,0], &B[0,0,0], nslices, nrows, ncols, &jacard[0,0], nlabels)
+    cdef double[:] jacard = np.ndarray((nlabels, ), dtype=np.float64)
+    retVal=computeJacard(&A[0,0,0], &B[0,0,0], nslices, nrows, ncols, &jacard[0], nlabels)
     return jacard

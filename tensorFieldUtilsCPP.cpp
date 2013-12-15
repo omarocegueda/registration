@@ -2496,9 +2496,9 @@ int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jac
     int *b=B;
     int *cnt=new int[nlabels*nlabels];
     int *sz=new int[nlabels];
-    memset(cnt, 0, sizeof(int)*nlabels*nlabels);
+    memset(cnt, 0, sizeof(int)*nlabels);
     memset(sz, 0, sizeof(int)*nlabels);
-    memset(jacard, 0, sizeof(double)*nlabels*nlabels);
+    memset(jacard, 0, sizeof(double)*nlabels);
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j,++a, ++b){
@@ -2510,22 +2510,20 @@ int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jac
                     ii=*b;
                     jj=*a;
                 }
-                cnt[ii*nlabels + jj]++;
                 sz[ii]++;
-                if(ii!=jj){
+                if(ii==jj){
+                    cnt[ii]++;
+                }else{
                     sz[jj]++;
                 }
             }
         }
     }
     for(int i=0;i<nlabels;++i){
-        for(int j=i;j<nlabels;++j){
-            int u=sz[i]+sz[j]-cnt[i*nlabels+j];
-            if(u==0){
-                continue;
-            }
-            jacard[i*nlabels+j]=jacard[j*nlabels+i]=double(cnt[i*nlabels+j])/double(u);
+        if(sz[i]==0){
+            continue;
         }
+        jacard[i]=double(cnt[i])/double(sz[i]);
     }
     delete[] cnt;
     delete[] sz;
