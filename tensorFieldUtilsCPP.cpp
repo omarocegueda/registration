@@ -639,6 +639,15 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
                         maxDisplacement=opt;
                     }
                     residual[pos]=0;
+                }else if (sigma<1e-9){
+                    double nrm2=g[0]*g[0]+g[1]*g[1]+g[2]*g[2];
+                    if(nrm2<1e-9){
+                        d[0]=d[1]=d[2]=0;
+                    }else{
+                        d[0]=(g[0]*delta)/nrm2;
+                        d[1]=(g[1]*delta)/nrm2;
+                        d[2]=(g[2]*delta)/nrm2;
+                    }
                 }else{
 #ifdef GLOBAL_FIELD_CORRECTION
                     y[0]=(delta*g[0]) + sigma*lambdaParam*(y[0]-nn*prevd[0]);
