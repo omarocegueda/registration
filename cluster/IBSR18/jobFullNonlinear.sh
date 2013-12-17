@@ -4,7 +4,7 @@
 #PBS -l pmem=4gb
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=01:45:00
-#PBS -N FullRegistration
+#PBS -N FullNonlinear
 #PBS -M jomaroceguedag@gmail.com
 export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
@@ -29,5 +29,5 @@ else
     echo "Affine mapping found ($affine). Skipping affine registration."
 fi
 #Diffeomorphic registration
-python registrationDiffeomorphic.py target/$target reference/$reference $affine warp 100.0
+python registrationNonlinear.py target/$target reference/$reference $affine warp 100.0
 date

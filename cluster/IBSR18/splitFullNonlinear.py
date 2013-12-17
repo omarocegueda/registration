@@ -105,7 +105,7 @@ if __name__=='__main__':
         dirNames=[name for name in os.listdir(".") if os.path.isdir(name) and fnmatch.fnmatch(name, '[0-9]*')]
         for name in dirNames:
             os.chdir('./'+name)
-            subprocess.call('qsub jobFullRegistration.sh -d .', shell=True)
+            subprocess.call('qsub jobFullNonlinear.sh -d .', shell=True)
             os.chdir('./..')
         sys.exit(0)
     ############################Collect##################################

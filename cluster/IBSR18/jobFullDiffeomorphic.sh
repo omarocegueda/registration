@@ -4,7 +4,7 @@
 #PBS -l pmem=4gb
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=01:45:00
-#PBS -N FullRegistration
+#PBS -N FullDiffeomorphic
 #PBS -M jomaroceguedag@gmail.com
 export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
