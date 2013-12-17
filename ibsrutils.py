@@ -48,6 +48,7 @@ def getSegmentationStats(namesFile):
 def getLabelingInfo(fname):
     '''
     labels, colors=getLabelingInfo('/opt/registration/data/IBSR_labels.txt')
+    labels, colors=getLabelingInfo('/opt/registration/data/IBSR_common_labels.txt')
     '''
     with open(fname) as f:
         lines=f.readlines()
