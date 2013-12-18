@@ -95,7 +95,7 @@ if __name__=='__main__':
                 mkdir_p(os.path.join(dirName,'warp'))
                 subprocess.call('ln '+target[0]+' '+dirName+'/target', shell=True)
                 subprocess.call('ln '+reference[0]+' '+dirName+'/reference', shell=True)
-                subprocess.call('ln jobFullRegistration.sh '+dirName, shell=True)
+                subprocess.call('ln jobFullDiffeomorphic.sh '+dirName, shell=True)
                 subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
                 for w in target[1:]:
                     subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
@@ -105,7 +105,7 @@ if __name__=='__main__':
         dirNames=[name for name in os.listdir(".") if os.path.isdir(name) and fnmatch.fnmatch(name, '[0-9]*')]
         for name in dirNames:
             os.chdir('./'+name)
-            subprocess.call('qsub jobFullRegistration.sh -d .', shell=True)
+            subprocess.call('qsub jobFullDiffeomorphic.sh -d .', shell=True)
             os.chdir('./..')
         sys.exit(0)
     ############################Collect##################################
