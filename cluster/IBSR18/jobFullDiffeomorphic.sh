@@ -3,7 +3,7 @@
 # Author: Omar Ocegueda (omar@cimat.mx)
 #PBS -l pmem=4gb
 #PBS -l nodes=1:ppn=1
-#PBS -l walltime=01:45:00
+#PBS -l walltime=03:00:00
 #PBS -N FullDiffeomorphic
 #PBS -M jomaroceguedag@gmail.com
 export PATH="/opt/python/anaconda/bin:$PATH"
@@ -31,5 +31,5 @@ else
     echo "Affine mapping found ($affine). Skipping affine registration."
 fi
 #Diffeomorphic registration
-python registrationDiffeomorphic.py target/$target reference/$reference $affine warp 50.0
+python registrationDiffeomorphic.py target/$target reference/$reference $affine warp 75.0
 date
