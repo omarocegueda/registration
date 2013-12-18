@@ -659,7 +659,7 @@ def testEstimateMultimodalNonlinearField3DMultiScale(fnameMoving, fnameFixed, fn
     maskFixed=fixed>0
     movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, maskMoving)]
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, level, maskFixed)]
-    maxOuterIter=[10,20,50,100, 100, 100]
+    maxOuterIter=[25,50,100,100, 100, 100]
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)    
     displacement=estimateMultimodalNonlinearField3DMultiScale(movingPyramid, fixedPyramid, initAffine, lambdaParam, maxOuterIter, 0,None)
