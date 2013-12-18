@@ -471,9 +471,7 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     maskFixed=fixed>0
     movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(moving, level, maskMoving)]
     fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(fixed, level, maskFixed)]
-    #maxOuterIter=[100,100,100,100,100,100,100,100,100]
-    #maxOuterIter=[1,1,1,1,1,1,1,1,1]
-    maxOuterIter=[10,20,50,100, 100, 100]
+    maxOuterIter=[25,50,100,100, 100, 100]
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)    
 #    if(os.path.exists('disp_'+baseMoving+'_'+baseFixed+'.npy')):
