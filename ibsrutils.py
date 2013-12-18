@@ -172,6 +172,9 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
         showRegistrationResultMidSlices('warpedAffine_IBSR_16_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
         showRegistrationResultMidSlices('warpedDiff_IBSR_16_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
         
+        showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_IBSR_02_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
+        
+        
         
         
     '''
@@ -271,6 +274,20 @@ def fullJacard(names, segIndex, warpedPreffix):
     std=np.sqrt(variance)
     return meanJacard, std, worstPair, minScore
 
+def getRohlfingResults(meanName, sdName):
+    '''
+    R=getRohlfingResults('jacard_mean_warpedDiff_3.txt', 'jacard_std_warpedDiff_3.txt')
+    '''
+    labels, colors=getLabelingInfo('/opt/registration/data/IBSR_common_labels.txt')
+    r=np.loadtxt('data/rohlfing_table.txt')    
+    means=np.loadtxt(meanName)
+    sd=np.loadtxt(sdName)
+    rohlfing={int(r[i,0]): np.append(r[i,1:], [[means[int(r[i,0])], sd[int(r[i,0])]]]) for i in range(r.shape[0])}
+    with open('results.txt','w') as f:
+        for k in rohlfing:
+            line=labels[k]+':\t'+str(rohlfing[k]).replace('\n','\t').replace('[','').replace(']','')
+            f.write(line+'\n')
+    return rohlfing
 
 if __name__=="__main__":
     argc=len(sys.argv)
