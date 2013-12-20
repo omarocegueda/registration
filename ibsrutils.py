@@ -7,7 +7,7 @@ import tensorFieldUtils as tf
 import sys
 import os
 import registrationCommon as rcommon
-
+import stats
 def changeExtension(fname, newExt):
     '''
     changeExtension('/opt/registration/data/myfile.nii.gz', '.ext')
@@ -289,6 +289,23 @@ def getRohlfingResults(meanName, sdName):
             f.write(line+'\n')
     return rohlfing
 
+def pairedTTests(fnames, dirA, dirB):
+    labels, colors=getLabelingInfo('/opt/registration/data/IBSR_common_labels.txt')
+    n=len(fnames)
+    m=len(labels)
+    baseline=np.ndarray(shape=(m,n), dtype=np.float64)
+    follow_up=np.ndarray(shape=(m,n), dtype=np.float64)
+    for i in range(n):
+        fa=np.loadtxt(dirA+'/'+fnames[i])
+        fb=np.loadtxt(dirB+'/'+fnames[i])
+        baseline[:,i]=fa[labels.keys()]
+        follow_up[:,i]=fb[labels.keys()]
+    pvalues=np.array(m, dtype=np.float64)
+    for i in range(m):
+        t,p=stats.ttest_rel(baseline[i,:], follow_up[i,:])
+        pvalues[i]=p
+    return pvalues
+
 if __name__=="__main__":
     argc=len(sys.argv)
     if argc<2:
@@ -424,4 +441,14 @@ if __name__=="__main__":
             np.savetxt("jacard_mean_"+warpedPreffix+str(segIndex)+'.txt',meanJacard)
             np.savetxt("jacard_std_"+warpedPreffix+str(segIndex)+'.txt',stdJacard)
         sys.exit(0)
+    elif(sys.argv[1]=='ptt'):
+        if argc<3:
+            print "Three arguments expected: names, dirA, dirB"
+        with open(sys.argv[2]) as f:
+            fnames=[line.strip().split() for line in f.readlines()]
+        dirA=sys.argv[3]
+        dirB=sys.argv[4]
+        pvalues=pairedTTests(fnames, dirA, dirB)
+        np.savetxt('pvalues.txt',pvalues)
+        
     print 'Unknown argument:',sys.argv[1]
