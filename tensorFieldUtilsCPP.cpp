@@ -638,7 +638,10 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
                     if(maxDisplacement<opt){
                         maxDisplacement=opt;
                     }
-                    residual[pos]=0;
+                    if(residual!=NULL){
+                        residual[pos]=0;
+                    }
+                    
                 }else if (sigma<1e-9){
                     double nrm2=g[0]*g[0]+g[1]*g[1]+g[2]*g[2];
                     if(nrm2<1e-9){
@@ -667,7 +670,11 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
                     double xx=d[0];
                     double yy=d[1];
                     double zz=d[2];
-                    solve3DSymmetricPositiveDefiniteSystem(A,y,d, &residual[pos]);
+                    if(residual!=NULL){
+                        solve3DSymmetricPositiveDefiniteSystem(A,y,d, &residual[pos]);
+                    }else{
+                        solve3DSymmetricPositiveDefiniteSystem(A,y,d, NULL);
+                    }
                     xx-=d[0];
                     yy-=d[1];
                     zz-=d[2];
@@ -882,10 +889,12 @@ int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam,
             }
         }
     }//for iter
+    //composeVectorFields(forward, inv, nrows, ncols, residual, substats);
     delete[] temp;
     delete[] denom;
     delete[] residual;
-    stats[0]=sqrt(maxChange);
+    //stats[0]=sqrt(maxChange);
+    stats[0]=substats[1];
     stats[1]=iter;
     return 0;
 }
@@ -1271,7 +1280,7 @@ int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, dou
 
 
 /*
-    Computes comp(x)=d2(d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
+    Computes comp(x)=d2(x+d1(x))+d1(x) (i.e. applies first d1, then add d2 to the result)
 */
 int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats){
     double *dx=d1;
@@ -1283,18 +1292,21 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
     memset(comp, 0, sizeof(double)*nrows*ncols*2); 
     for(int i=0;i<nrows;++i){
         for(int j=0;j<ncols;++j, dx+=2, res+=2){
-            int ii=floor(dx[0]);
-            int jj=floor(dx[1]);
-            double calpha=dx[0]-ii;//by definition these factors are nonnegative
-            double cbeta=dx[1]-jj;
+            double dii=i+dx[0];
+            double djj=j+dx[1];
+            if((dii<0)||(nrows-1<dii)||(djj<0)||(ncols-1<djj)){
+                continue;
+            }
+            int ii=floor(dii);
+            int jj=floor(djj);
+            if((ii<0) || (nrows<=ii)||(jj<0)||(ncols<=jj) ){
+                continue;
+            }
+            double calpha=dii-ii;//by definition these factors are nonnegative
+            double cbeta=djj-jj;
             double alpha=1-calpha;
             double beta=1-cbeta;
             //---top-left
-            ii+=i;
-            jj+=j;
-            if((ii<0)||(jj<0)||(ii>=nrows)||(jj>=ncols)){
-                continue;
-            }
             res[0]=dx[0];
             res[1]=dx[1];
             double *z=&d2[2*(ii*ncols+jj)];
@@ -1342,7 +1354,7 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
 
 
 /*
-    Computes comp(x)=d2(d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
+    Computes comp(x)=d2(x+d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
 */
 int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp){
     int sliceSize=nrows*ncols;
@@ -2239,27 +2251,80 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
 
 int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats){
     double error=1+tolerance;
-    double *temp[2];
+    double substats[3];
+    double *temp[3];
     temp[0]=new double[nrows*ncols*2];
     temp[1]=invd;
+    temp[2]=new double[nrows*ncols*2];
     memset(temp[0], 0, sizeof(double)*2*nrows*ncols);
     int nsites=2*nrows*ncols;
     int iter;
+    double epsilon=0.5;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
-        composeVectorFields(temp[iter&1], d, nrows, ncols, temp[1-(iter&1)], stats);
+        composeVectorFields(temp[iter&1], d, nrows, ncols, temp[1-(iter&1)], substats);
+        double difmag=0;
+        error=0;
         double *p=temp[1-(iter&1)];
-        for(int i=0;i<nsites;++i,++p){
-            *p*=-1;
+        for(int i=0;i<nsites;i+=2, p+=2){
+            double mag=sqrt(p[0]*p[0]+p[1]*p[1]);
+            error+=mag;
+            if(difmag<mag){
+                difmag=mag;
+            }
         }
-        composeVectorFields(d, temp[1-(iter&1)], nrows, ncols, temp[1-(iter&1)], stats);
-        error=stats[1];
+        error/=(nrows*ncols);
+        p=temp[1-(iter&1)];
+        double *q=temp[iter&1];
+        for(int i=0;i<nsites;i+=2,p+=2,q+=2){
+            p[0]=q[0]-epsilon*p[0];
+            p[1]=q[1]-epsilon*p[1];
+        }
     }
     if(iter&1){//then the last computation was stored at temp[0]
         memcpy(invd, temp[0], sizeof(double)*2*nrows*ncols);
     }
     delete[] temp[0];
+    delete[] temp[2];
+    stats[0]=substats[1];
+    stats[1]=iter;
     return 0;
 }
+
+
+int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats){
+    double error=1+tolerance;
+    double *temp[3];
+    temp[0]=new double[nslices*nrows*ncols*3];
+    temp[1]=invd;
+    int nsites=3*nslices*nrows*ncols;
+    memset(temp[0], 0, sizeof(double)*nsites);
+    int iter;
+    double epsilon=0.5;
+    for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
+        composeVectorFields3D(temp[iter&1], d, nslices, nrows, ncols, temp[1-(iter&1)]);
+        double *p=temp[1-(iter&1)];
+        double *q=temp[iter&1];
+        error=0;
+        for(int i=0;i<nsites;i+=3){
+            double mag=0;
+            for(int j=0;j<3;++j,++p,++q){
+                mag+=(*p)*(*p);
+                *p=(*q)-epsilon*(*p);//this relaxation was introduced in ANTS
+            }
+            mag=sqrt(mag);
+            error+=mag;
+        }
+        error/=(nslices*nrows*ncols);
+    }
+    if(iter&1){//then the last computation was stored at temp[0]
+        memcpy(invd, temp[0], sizeof(double)*nsites);
+    }
+    delete[] temp[0];
+    stats[0]=error;
+    stats[1]=iter;
+    return 0;
+}
+
 
 int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv){
     double EXP_EPSILON=0.1;//such that the vector field exponential is approx the identity

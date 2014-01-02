@@ -30,6 +30,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
     int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats)
     int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats)
+    int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats)
     int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats)
     int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv)
     int readDoubleBuffer(char *fname, int nDoubles, double *buffer)
@@ -56,8 +57,9 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jacard, int nlabels)
 
 cdef checkFortran(a):
-    if np.isfortran(np.array(a)):
-        print 'Warning: passing fortran array to C++ routine. C-order is internally assummed when processing multi-dimensional arrays in C++.'
+    pass
+#    if np.isfortran(np.array(a)):
+#        print 'Warning: passing fortran array to C++ routine. C-order is internally assummed when processing multi-dimensional arrays in C++.'
 def consecutive_label_map(int[:,:,:] v):
     cdef int n=v.shape[0]*v.shape[1]*v.shape[2]
     cdef int[:,:,:] out=cvarray(shape=(v.shape[0], v.shape[1], v.shape[2]), itemsize=sizeof(int), format="i")
@@ -256,7 +258,10 @@ cpdef iterateDisplacementField3DCYTHON(double[:,:,:] deltaField, double[:,:,:] s
     checkFortran(previousDisplacement)
     checkFortran(displacementField)
     checkFortran(residuals)
-    maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0,0], &displacementField[0,0,0,0], &residuals[0,0,0])
+    if residuals==None:
+        maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0,0], &displacementField[0,0,0,0], NULL)
+    else:
+        maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0,0], &displacementField[0,0,0,0], &residuals[0,0,0])
     return maxDisplacement
 
 cpdef computeMaskedVolumeClassStatsProbsCYTHON(int[:,:] mask, double[:,:] img, double[:,:,:] probs):
@@ -295,7 +300,7 @@ cpdef invert_vector_field(double[:,:,:] d, double lambdaParam, int maxIter, doub
     cdef double[:,:,:] invd=np.zeros_like(d)
     checkFortran(d)
     retVal=invertVectorField(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0], &stats[0])
-    print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
+    print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
 cpdef invert_vector_field_tv_l2(double[:,:,:] d, double lambdaParam, int maxIter, double tolerance):
@@ -317,22 +322,16 @@ cpdef invert_vector_field_Yan(double[:,:,:] d, int maxIter, double tolerance):
     retVal=invertVectorFieldYan(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0])
     return invd
 
-#cpdef invert_vector_field_fixed_point(double[:,:,:] d, int maxIter, double tolerance):
-#    cdef double[:,:,:] invd=np.zeros_like(d)
-#    sh=d.shape
-#    X0,X1=np.mgrid[0:sh[0], 0:sh[1]]
-#    for it in range(maxIter):
-#        invd[:,:,0], invd[:,:,1]=(-1*ndimage.map_coordinates(d[:,:,0], [X0+invd[...,0], X1+invd[...,1]], prefilter=const_prefilter_map_coordinates),
-#                                    -1*ndimage.map_coordinates(d[:,:,1], [X0+invd[...,0], X1+invd[...,1]], prefilter=const_prefilter_map_coordinates))
-#    return invd
-#    cdef int retVal
-#    cdef int nrows=d.shape[0]
-#    cdef int ncols=d.shape[1]
-#    cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
-#    cdef double[:,:,:] invd=np.zeros_like(d)
-#    retVal=invertVectorFieldFixedPoint(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0], &stats[0])
-#    print 'Max GS step:', stats[0], 'Last iteration:', int(stats[1])
-#    return invd
+cpdef invert_vector_field_fixed_point(double[:,:,:] d, int maxIter, double tolerance):
+    cdef int retVal
+    cdef int nrows=d.shape[0]
+    cdef int ncols=d.shape[1]
+    cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
+    cdef double[:,:,:] invd=np.zeros_like(d)
+    checkFortran(d)
+    retVal=invertVectorFieldFixedPoint(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0], &stats[0])
+    print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
+    return invd
 
 cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     cdef int nrows=d1.shape[0]
@@ -538,7 +537,19 @@ def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, do
     cdef double[:,:,:,:] invd=np.zeros_like(d)
     checkFortran(d)
     retVal=invertVectorField3D(&d[0,0,0,0], nslices, nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0,0], &stats[0])
-    print 'Max step:', stats[0], 'Last iteration:', int(stats[1])
+    print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
+    return invd
+
+def invert_vector_field_fixed_point3D(double[:,:,:,:] d, int maxIter, double tolerance):
+    cdef int retVal
+    cdef int nslices=d.shape[0]
+    cdef int nrows=d.shape[1]
+    cdef int ncols=d.shape[2]
+    cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
+    cdef double[:,:,:,:] invd=np.zeros_like(d)
+    checkFortran(d)
+    retVal=invertVectorFieldFixedPoint3D(&d[0,0,0,0], nslices, nrows, ncols, maxIter, tolerance, &invd[0,0,0,0], &stats[0])
+    print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
 def prepend_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):

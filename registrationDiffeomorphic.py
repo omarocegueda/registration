@@ -59,8 +59,10 @@ def estimateNewMonomodalDiffeomorphicField2D(moving, fixed, lambdaParam, maxOute
                 maxResidual=opt
         maxDisplacement=np.max(np.abs(displacement))
         expd, invexpd=tf.vector_field_exponential(displacement)
-        totalDisplacement=tf.compose_vector_fields(expd, totalDisplacement)
-        totalDisplacementInverse=tf.compose_vector_fields(totalDisplacementInverse, invexpd)
+        totalDisplacement, stats=tf.compose_vector_fields(expd, totalDisplacement)
+        #totalDisplacement=np.array(totalDisplacement)
+        totalDisplacementInverse, stats=tf.compose_vector_fields(totalDisplacementInverse, invexpd)
+        #totalDisplacementInverse=np.array(totalDisplacementInverse)
         if(maxDisplacement<outerTolerance):
             break
     print "Iter: ",innerIter, "Max lateral displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
@@ -165,7 +167,8 @@ def testCircleToCMonomodalDiffeomorphic(lambdaParam):
     plt.clabel(CS, inline=1, fontsize=10)
     plt.title('det(J(displacement))')
     print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
-    directInverse=tf.invert_vector_field(displacement, 0.5, 1000, 1e-7)
+    #directInverse=np.array(tf.invert_vector_field(displacement, 0.5, 1000, 1e-7))
+    directInverse=np.array(tf.invert_vector_field_fixed_point(displacement, 100, 1e-7))
     detJacobianInverse=rcommon.computeJacobianField(directInverse)
     plt.figure()
     plt.imshow(detJacobianInverse)
@@ -174,8 +177,10 @@ def testCircleToCMonomodalDiffeomorphic(lambdaParam):
     plt.title('det(J(displacement^-1))')
     print 'J^-1 range:', '[', detJacobianInverse.min(), detJacobianInverse.max(),']'
     #directInverse=rcommon.invert_vector_field_fixed_point(displacement, 1000, 1e-7)
-    residual=np.array(tf.compose_vector_fields(displacement, inverse))
-    directResidual=np.array(tf.compose_vector_fields(displacement, directInverse))
+    residual, stats=tf.compose_vector_fields(displacement, inverse)
+    residual=np.array(residual)
+    directResidual,stats=tf.compose_vector_fields(displacement, directInverse)
+    directResidual=np.array(directResidual)
 #    warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
 #    rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
 #    rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
@@ -758,7 +763,7 @@ def testInversion(lambdaParam):
     tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement_clean.bin')
 
 def testInversion_invertible():
-    displacement_clean=tf.create_invertible_displacement_field(256, 256, 0.5, 8)
+    displacement_clean=tf.create_invertible_displacement_field(256, 256, 0.05, 8)
     detJacobian=rcommon.computeJacobianField(displacement_clean)
     plt.figure()
     plt.imshow(detJacobian)
@@ -768,11 +773,13 @@ def testInversion_invertible():
     plt.clabel(CS, inline=1, fontsize=10)
     plt.title('det(J(displacement))')
     #displacement=displacement_clean+np.random.normal(0.0, 0.0, displacement_clean.shape)
-    displacement=displacement_clean
+    displacement=np.array(displacement_clean)
     #inverse=rcommon.invert_vector_field_fixed_point(displacement, 100, 1e-7)
-    inverse=tf.invert_vector_field(displacement, 0.1, 100, 1e-7)
-    residual=np.array(tf.compose_vector_fields(displacement_clean, inverse))
-    [d,invd,res]=rcommon.plotDiffeomorphism(displacement, inverse, residual, 'invertible', 7)
+    #inverse=np.array(tf.invert_vector_field(displacement, 0.1, 100, 1e-7))
+    inverse=np.array(tf.invert_vector_field_fixed_point(displacement, 100, 1e-6))
+    residual, stats=tf.compose_vector_fields(displacement_clean, inverse)
+    residual=np.array(residual)
+    [d,invd,res, detJ]=rcommon.plotDiffeomorphism(displacement, inverse, residual, 'invertible', 7)
     
 #python registrationDiffeomorphic.py IBSR_01_ana_strip.nii.gz t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt 100
 
