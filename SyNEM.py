@@ -3,11 +3,181 @@ import scipy as sp
 import tensorFieldUtils as tf
 import nibabel as nib
 import matplotlib.pyplot as plt
-from scipy import ndimage
 import registrationCommon as rcommon
-from registrationCommon import const_prefilter_map_coordinates
 import os
 import sys
+###############################################################
+####### Symmetric Monomodal registration - EM (2D)############
+###############################################################
+def estimateNewMonomodalSyNField2D(moving, fixed, fWarp, fInv, mWarp, mInv, lambdaParam, maxOuterIter):
+    '''
+    Warning: in the monomodal case, the parameter lambda must be significantly lower than in the multimodal case. Try lambdaParam=1,
+    as opposed as lambdaParam=150 used in the multimodal case
+    '''
+    innerTolerance=1e-4
+    outerTolerance=1e-3
+    
+    if(mWarp!=None):
+        totalM=mWarp
+        totalMInv=mInv
+    else:
+        totalM=np.zeros(shape=(fixed.shape)+(2,), dtype=np.float64)
+        totalMInv=np.zeros(shape=(fixed.shape)+(2,), dtype=np.float64)
+    if(fWarp!=None):
+        totalF=fWarp
+        totalFInv=fInv
+    else:
+        totalF=np.zeros(shape=(moving.shape)+(2,), dtype=np.float64)
+        totalFInv=np.zeros(shape=(moving.shape)+(2,), dtype=np.float64)
+    outerIter=0
+    framesToCapture=5
+    maxOuterIter=framesToCapture*((maxOuterIter+framesToCapture-1)/framesToCapture)
+    itersPerCapture=maxOuterIter/framesToCapture
+    plt.figure()
+    while(outerIter<maxOuterIter):
+        outerIter+=1
+        print 'Outer iter:', outerIter
+        wmoving=np.array(tf.warp_image(moving, totalMInv))
+        wfixed=np.array(tf.warp_image(fixed, totalFInv))
+        if((outerIter==1) or (outerIter%itersPerCapture==0)):
+            plt.subplot(1,framesToCapture+1, 1+outerIter/itersPerCapture)
+            rcommon.overlayImages(wmoving, wfixed, False)
+            plt.title('Iter:'+str(outerIter-1))
+        #Compute forward update
+        sigmaField=np.ones_like(wmoving, dtype=np.float64)
+        deltaField=wfixed-wmoving
+        movingGradient    =np.empty(shape=(wmoving.shape)+(2,), dtype=np.float64)
+        movingGradient[:,:,0], movingGradient[:,:,1]=sp.gradient(wmoving)
+        maxVariation=1+innerTolerance
+        innerIter=0
+        fw     =np.zeros(shape=(fixed.shape)+(2,), dtype=np.float64)
+        maxInnerIter=1000
+        while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
+            innerIter+=1
+            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, movingGradient,  lambdaParam, totalF, fw, None)
+        #fw*=0.5
+        totalF, stats=tf.compose_vector_fields(fw, totalF)
+        totalF=np.array(totalF);
+        meanDispF=np.mean(np.abs(fw))
+        #Compute backward field
+        sigmaField=np.ones_like(wfixed, dtype=np.float64)
+        deltaField=wmoving-wfixed
+        fixedGradient    =np.empty(shape=(wfixed.shape)+(2,), dtype=np.float64)
+        fixedGradient[:,:,0], fixedGradient[:,:,1]=sp.gradient(wfixed)
+        maxVariation=1+innerTolerance
+        innerIter=0
+        mw     =np.zeros(shape=(fixed.shape)+(2,), dtype=np.float64)
+        maxInnerIter=1000
+        while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
+            innerIter+=1
+            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, fixedGradient,  lambdaParam, totalM, mw, None)
+        #mw*=0.5
+        totalM, stats=tf.compose_vector_fields(mw, totalM)
+        totalM=np.array(totalM);
+        meanDispM=np.mean(np.abs(mw))
+        #totalFInv=np.array(tf.invert_vector_field_fixed_point(totalF, 20, 1e-6))
+        #totalMInv=np.array(tf.invert_vector_field_fixed_point(totalM, 20, 1e-6))
+        #totalF=np.array(tf.invert_vector_field_fixed_point(totalFInv, 20, 1e-6))
+        #totalM=np.array(tf.invert_vector_field_fixed_point(totalMInv, 20, 1e-6))
+        totalFInv=np.array(tf.invert_vector_field(totalF, 0.75, 100, 1e-6))
+        totalMInv=np.array(tf.invert_vector_field(totalM, 0.75, 100, 1e-6))
+        totalF=np.array(tf.invert_vector_field(totalFInv, 0.75, 100, 1e-6))
+        totalM=np.array(tf.invert_vector_field(totalMInv, 0.75, 100, 1e-6))
+        if(meanDispM+meanDispF<2*outerTolerance):
+            break
+    print "Iter: ",innerIter, "Mean lateral displacement:", 0.5*(meanDispM+meanDispF), "Max variation:",maxVariation
+    return totalF, totalFInv, totalM, totalMInv
+
+def estimateMonomodalSyNField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level, displacementList):
+    n=len(movingPyramid)
+    if(level==(n-1)):
+        totalF, totalFInv, totalM, totalMInv=estimateNewMonomodalSyNField2D(movingPyramid[level], fixedPyramid[level], None, None, None, None, lambdaParam, maxOuterIter[level])
+        if(displacementList!=None):
+            displacementList.insert(0,totalM)
+        return totalF, totalFInv, totalM, totalMInv
+    subF, subFInv, subM, subMInv=estimateMonomodalSyNField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, level+1, displacementList)
+    sh=np.array(fixedPyramid[level].shape).astype(np.int32)
+    upF=np.array(tf.upsample_displacement_field(subF, sh))*2
+    upFInv=np.array(tf.upsample_displacement_field(subFInv, sh))*2
+    upM=np.array(tf.upsample_displacement_field(subM, sh))*2
+    upMInv=np.array(tf.upsample_displacement_field(subMInv, sh))*2
+    totalF, totalFInv, totalM, totalMInv=estimateNewMonomodalSyNField2D(movingPyramid[level], fixedPyramid[level], upF, upFInv, upM, upMInv, lambdaParam, maxOuterIter[level])
+    if(displacementList!=None):
+        displacementList.insert(0, totalM)
+    if(level==0):
+        totalF=np.array(tf.compose_vector_fields(totalF, totalMInv))
+        totalM=np.array(tf.compose_vector_fields(totalM, totalFInv))
+        return totalM, totalF
+    return totalF, totalFInv, totalM, totalMInv
+
+def testEstimateMonomodalSyNField2DMultiScale(lambdaParam):
+    fname0='IBSR_01_to_02.nii.gz'
+    fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
+    nib_moving = nib.load(fname0)
+    nib_fixed= nib.load(fname1)
+    moving=nib_moving.get_data().squeeze()
+    fixed=nib_fixed.get_data().squeeze()
+    moving=np.copy(moving, order='C')
+    fixed=np.copy(fixed, order='C')
+    sl=moving.shape
+    sr=fixed.shape
+    level=5
+    #---sagital---
+    moving=moving[sl[0]//2,:,:].copy()
+    fixed=fixed[sr[0]//2,:,:].copy()
+    #---coronal---
+    #moving=moving[:,sl[1]//2,:].copy()
+    #fixed=fixed[:,sr[1]//2,:].copy()
+    #---axial---
+    #moving=moving[:,:,sl[2]//2].copy()
+    #fixed=fixed[:,:,sr[2]//2].copy()
+    maskMoving=moving>0
+    maskFixed=fixed>0
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(fixed, level, maskFixed)]
+    rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
+    displacementList=[]
+    maxIter=200
+    displacement=estimateMonomodalSyNField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxIter, 0,displacementList)
+    warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
+    rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
+    rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
+    rcommon.plotDeformationField(displacement)
+    nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
+    maxNorm=np.max(nrm)
+    displacement[...,0]*=(maskMoving + maskFixed)
+    displacement[...,1]*=(maskMoving + maskFixed)
+    rcommon.plotDeformationField(displacement)
+    #nrm=np.sqrt(displacement[...,0]**2 + displacement[...,1]**2)
+    #plt.figure()
+    #plt.imshow(nrm)
+    print 'Max global displacement: ', maxNorm
+
+def testCircleToCMonomodalSyNEM(lambdaParam, maxOuterIter):
+    fname0='data/circle.png'
+    #fname0='data/C_trans.png'
+    fname1='data/C.png'
+    nib_moving=plt.imread(fname0)
+    nib_fixed=plt.imread(fname1)
+    moving=nib_moving[:,:,0]
+    fixed=nib_fixed[:,:,1]
+    moving=(moving-moving.min())/(moving.max() - moving.min())
+    fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
+    level=3
+    maskMoving=moving>0
+    maskFixed=fixed>0
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(fixed, level, maskFixed)]
+    rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
+    displacementList=[]
+    displacement, dinv=estimateMonomodalSyNField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0,displacementList)
+    inverse=np.array(tf.invert_vector_field(displacement, 0.75, 300, 1e-7))
+    residual, stats=tf.compose_vector_fields(displacement, inverse)
+    residual=np.array(residual)
+    warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
+    rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
+    rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
+    rcommon.plotDiffeomorphism(displacement, inverse, residual, '',7)
 
 def estimateNewMultimodalSyNField3D(moving, fixed, fWarp, fInv, mWarp, mInv, initAffine, lambdaDisplacement, quantizationLevels, maxOuterIter, reportProgress=False):
     '''
@@ -223,3 +393,5 @@ if __name__=='__main__':
     warpDir=sys.argv[4]
     lambdaParam=np.float(sys.argv[5])
     testEstimateMultimodalSyN3DMultiScale(moving, fixed, affine, warpDir, lambdaParam)
+    #testCircleToCMonomodalSyNEM(5,[100,100,100,100])
+    #testCircleToCMonomodalSyNEM(5,[50,50,50,50])

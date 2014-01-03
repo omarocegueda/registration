@@ -44,7 +44,13 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void consecutiveLabelMap(int *v, int n, int *out)
     int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp)
     int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv)
+    int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc)
     int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
+    int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *warped, int nrRef, int ncRef)
+    int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped)
+    int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped)
+    int warpDiscreteImageNNAffine(int *img, int nrImg, int ncImg, double *affine, int *warped, int nrRef, int ncRef)
+    int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, int *warped)
     int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *affine, double *warped, int nsRef, int nrRef, int ncRef)
     int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped)
     int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped)
@@ -230,7 +236,10 @@ cpdef iterateDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigma
     checkFortran(previousDisplacement)
     checkFortran(displacementField)
     checkFortran(residuals)
-    maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], &residuals[0,0])
+    if residuals==None:
+        maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], NULL)
+    else:
+        maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], &residuals[0,0])
     return maxDisplacement
 
 cpdef iterateMaskedDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  int[:,:] mask, double lambdaParam, double[:,:,:] previousDisplacement, double[:,:,:] displacementField, double[:,:] residuals):
@@ -429,6 +438,16 @@ cpdef count_supporting_data_per_pixel(double[:,:,:] forward):
     countSupportingDataPerPixel(&forward[0,0,0], nrows, ncols, &counts[0,0])
     return counts
 
+def upsample_displacement_field(double[:,:,:] field, int[:] targetShape):
+    cdef int nr=field.shape[0]
+    cdef int nc=field.shape[1]
+    cdef int nrows=targetShape[0]
+    cdef int ncols=targetShape[1]
+    checkFortran(field)
+    cdef double[:,:,:] up = np.ndarray((nrows, ncols,2), dtype=np.float64)
+    upsampleDisplacementField(&field[0,0,0], nr, nc, &up[0,0,0],nrows, ncols);
+    return up
+
 def upsample_displacement_field3D(double[:,:,:,:] field, int[:] targetShape):
     cdef int ns=field.shape[0]
     cdef int nr=field.shape[1]
@@ -440,6 +459,69 @@ def upsample_displacement_field3D(double[:,:,:,:] field, int[:] targetShape):
     cdef double[:,:,:,:] up = np.ndarray((nslices, nrows, ncols,3), dtype=np.float64)
     upsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &up[0,0,0,0],nslices, nrows, ncols);
     return up
+
+def warp_image_affine(double[:,:] img, int[:]refShape, double[:,:] affine):
+    cdef int nrImg=img.shape[0]
+    cdef int ncImg=img.shape[1]
+    cdef double[:,:] warped = np.ndarray((refShape[0], refShape[1]), dtype=np.float64)
+    checkFortran(img)
+    checkFortran(affine)
+    warpImageAffine(&img[0,0], nrImg, ncImg, &affine[0,0], &warped[0,0], refShape[0], refShape[1])
+    return warped
+
+def warp_image(double[:,:] img, double[:,:,:] displacement, double[:,:] affine=None):
+    cdef int nrows=displacement.shape[0]
+    cdef int ncols=displacement.shape[1]
+    cdef int nrImg=img.shape[0]
+    cdef int ncImg=img.shape[1]
+    cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
+    checkFortran(img)
+    checkFortran(displacement)
+    checkFortran(affine)
+    if affine==None:
+        warpImage(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, NULL, &warped[0,0]);
+    else:
+        warpImage(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, &affine[0,0], &warped[0,0])
+    return warped
+
+def warp_imageNN(double[:,:] img, double[:,:,:] displacement, double[:,:] affine=None):
+    cdef int nrows=displacement.shape[0]
+    cdef int ncols=displacement.shape[1]
+    cdef int nrImg=img.shape[0]
+    cdef int ncImg=img.shape[1]
+    cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
+    checkFortran(img)
+    checkFortran(displacement)
+    checkFortran(affine)
+    if affine==None:
+        warpImageNN(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, NULL, &warped[0,0])
+    else:
+        warpImageNN(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, &affine[0,0], &warped[0,0])
+    return warped
+
+def warp_discrete_imageNNAffine(int[:,:] img, int[:] refShape, double[:,:] affine=None):
+    cdef int nrImg=img.shape[0]
+    cdef int ncImg=img.shape[1]
+    cdef int[:,:] warped = np.ndarray((refShape[0], refShape[1]), dtype=np.int32)
+    checkFortran(img)
+    checkFortran(affine)
+    warpDiscreteImageNNAffine(&img[0,0], nrImg, ncImg, &affine[0,0], &warped[0,0], refShape[0], refShape[1])
+    return warped
+
+def warp_discrete_imageNN(int[:,:] img, double[:,:,:] displacement, double[:,:] affine=None):
+    cdef int nrows=displacement.shape[0]
+    cdef int ncols=displacement.shape[1]
+    cdef int nrImg=img.shape[0]
+    cdef int ncImg=img.shape[1]
+    cdef int[:,:] warped = np.ndarray((nrows, ncols), dtype=np.int32)
+    checkFortran(img)
+    checkFortran(displacement)
+    checkFortran(affine)
+    if affine==None:
+        warpDiscreteImageNN(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, NULL, &warped[0,0])
+    else:
+        warpDiscreteImageNN(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, &affine[0,0], &warped[0,0])
+    return warped
 
 def warp_volume_affine(double[:,:,:] volume, int[:]refShape, double[:,:] affine=None):
     cdef int nsVol=volume.shape[0]

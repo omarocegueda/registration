@@ -42,7 +42,15 @@ void consecutiveLabelMap(int *v, int n, int *out);
 int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp);
 int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv);
 
+int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc);
 int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols);
+
+int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *warped, int nrRef, int ncRef);
+int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped);
+int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped);
+int warpDiscreteImageNNAffine(int *img, int nrImg, int ncImg, double *affine, int *warped, int nrRef, int ncRef);
+int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, int *warped);
+
 int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *affine, double *warped, int nsRef, int nrRef, int ncRef);
 int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped);
 int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped);

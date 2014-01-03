@@ -458,7 +458,9 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
                 if(maxDisplacement<opt){
                     maxDisplacement=opt;
                 }
-                residual[pos]=0;
+                if(residual!=NULL){
+                    residual[pos]=0;
+                }
             }else{
 #ifdef GLOBAL_FIELD_CORRECTION
                 y[0]=(delta*g[0]) + sigma*lambdaParam*(y[0]-nn*prevd[0]);
@@ -472,7 +474,11 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
                 A[2]=g[1]*g[1] + sigma*lambdaParam*(nn);
                 double xx=d[0];
                 double yy=d[1];
-                solve2DSymmetricPositiveDefiniteSystem(A,y,d, &residual[pos]);
+                if(residual!=NULL){
+                    solve2DSymmetricPositiveDefiniteSystem(A,y,d, &residual[pos]);
+                }else{
+                    solve2DSymmetricPositiveDefiniteSystem(A,y,d, NULL);
+                }
                 xx-=d[0];
                 yy-=d[1];
                 double opt=xx*xx+yy*yy;
@@ -1451,6 +1457,56 @@ int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int nc
     return 0;
 }
 
+
+int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc){
+    double *res=up;
+    memset(up, 0, sizeof(double)*nr*nc*2);
+        for(int i=0;i<nr;++i){
+            for(int j=0;j<nc;++j, res+=2){
+                double dii=(i&1)?0.5*i:i/2;
+                double djj=(j&1)?0.5*j:j/2;
+                if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){//no one is affected
+                    continue;
+                }
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (ii>=nrows)||(jj>=ncols)){//no one is affected
+                    continue;
+                }
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                //---top-left
+                double *z=&d1[2*(ii*ncols+jj)];
+                res[0]+=alpha*beta*z[0];
+                res[1]+=alpha*beta*z[1];
+                //---top-right
+                ++jj;
+                if(jj<ncols){
+                    z=&d1[2*(ii*ncols+jj)];
+                    res[0]+=alpha*cbeta*z[0];
+                    res[1]+=alpha*cbeta*z[1];
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&d1[2*(ii*ncols+jj)];
+                    res[0]+=calpha*cbeta*z[0];
+                    res[1]+=calpha*cbeta*z[1];
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&d1[2*(ii*ncols+jj)];
+                    res[0]+=calpha*beta*z[0];
+                    res[1]+=calpha*beta*z[1];
+                }
+            }
+        }
+    return 0;
+}
+
 /*
     It assumes that up was already allocated: (nslices)x(nrows)x(ncols)x3
     nslices, nrows, ncols are the dimensions of the upsampled field
@@ -1544,6 +1600,241 @@ int upsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, d
             }
         }
     }
+    return 0;
+}
+
+#define APPLY_AFFINE_2D_X0(x0,x1,affine) (affine[0]*(x0) + affine[1]*(x1) + affine[2])
+#define APPLY_AFFINE_2D_X1(x0,x1,affine) (affine[3]*(x0) + affine[4]*(x1) + affine[5])
+int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *warped, int nrRef, int ncRef){
+    double *res=warped;
+    memset(warped, 0, sizeof(double)*nrRef*ncRef);
+        for(int i=0;i<nrRef;++i){
+            for(int j=0;j<ncRef;++j, ++res){
+                double dii=APPLY_AFFINE_2D_X0(i,j,affine);
+                double djj=APPLY_AFFINE_2D_X1(i,j,affine);
+                if((dii<0) || (djj<0) || (dii>nrImg-1)||(djj>ncImg-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (ii>=nrImg)||(jj>=ncImg)){//no one is affected
+                    continue;
+                }
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                //---top-left
+                (*res)=0;
+                double *z=&img[ii*ncImg+jj];
+                (*res)+=alpha*beta*(*z);
+                //---top-right
+                ++jj;
+                if(jj<ncImg){
+                    z=&img[ii*ncImg+jj];
+                    (*res)+=alpha*cbeta*(*z);
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nrImg)&&(jj<ncImg)){
+                    z=&img[ii*ncImg+jj];
+                    (*res)+=calpha*cbeta*(*z);
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nrImg)&&(jj<ncImg)){
+                    z=&img[ii*ncImg+jj];
+                    (*res)+=calpha*beta*(*z);
+                }
+            }
+        }
+    return 0;
+}
+
+int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped){
+    double *dx=d1;
+    double *res=warped;
+    memset(warped, 0, sizeof(double)*nrows*ncols); 
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=2, ++res){
+                double dii,djj;
+                if(affine!=NULL){
+                    dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
+                    djj=APPLY_AFFINE_2D_X1(i,j,affine)+dx[1];
+                }else{
+                    dii=i+dx[0];
+                    djj=j+dx[1];
+                }
+                if((dii<0) || (djj<0) || (dii>nrImg-1)||(djj>ncImg-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (ii>=nrImg)||(jj>=ncImg)){//no one is affected
+                    continue;
+                }
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                //---top-left
+                (*res)=0;
+                double *z=&img[ii*ncImg+jj];
+                (*res)+=alpha*beta*(*z);
+                //---top-right
+                ++jj;
+                if(jj<ncImg){
+                    z=&img[ii*ncImg+jj];
+                    (*res)+=alpha*cbeta*(*z);
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nrImg)&&(jj<ncImg)){
+                    z=&img[ii*ncImg+jj];
+                    (*res)+=calpha*cbeta*(*z);
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nrImg)&&(jj<ncImg)){
+                    z=&img[ii*ncImg+jj];
+                    (*res)+=calpha*beta*(*z);
+                }
+            }
+        }
+    return 0;
+}
+
+int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped){
+    double *dx=d1;
+    double *res=warped;
+    memset(warped, 0, sizeof(double)*nrows*ncols); 
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=2, ++res){
+                double dii,djj;
+                if(affine!=NULL){
+                    dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
+                    djj=APPLY_AFFINE_2D_X1(i,j,affine)+dx[1];
+                }else{
+                    dii=i+dx[0];
+                    djj=j+dx[1];
+                }
+                if((dii<0) || (djj<0) || (dii>nrImg-1)||(djj>ncImg-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (ii>=nrImg)||(jj>=ncImg)){//no one is affected
+                    continue;
+                }
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                if(alpha<calpha){
+                    ++ii;
+                }
+                if(beta<cbeta){
+                    ++jj;
+                }
+                if((ii<0) || (jj<0) || (ii>=nrImg)||(jj>=ncImg)){//no one is affected
+                    continue;
+                }else{
+                    (*res)=img[ii*ncImg + jj];
+                }
+            }
+        }
+    return 0;
+}
+
+int warpDiscreteImageNNAffine(int *img, int nrImg, int ncImg, double *affine, int *warped, int nrRef, int ncRef){
+    int *res=warped;
+    memset(warped, 0, sizeof(int)*nrRef*ncRef);
+        for(int i=0;i<nrRef;++i){
+            for(int j=0;j<ncRef;++j, ++res){
+                double dkk,dii,djj;
+                if(affine!=NULL){
+                    dii=APPLY_AFFINE_2D_X0(i,j,affine);
+                    djj=APPLY_AFFINE_2D_X1(i,j,affine);
+                }else{
+                    dii=i;
+                    djj=j;
+                }
+                if((dii<0) || (djj<0) || (dii>nrImg-1)||(djj>ncImg-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (ii>=nrImg)||(jj>=ncImg)){//no one is affected
+                    continue;
+                }
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                if(alpha<calpha){
+                    ++ii;
+                }
+                if(beta<cbeta){
+                    ++jj;
+                }
+                if((ii<0) || (jj<0) || (ii>=nrImg)||(jj>=ncImg)){//no one is affected
+                    continue;
+                }else{
+                    (*res)=img[ii*ncImg + jj];
+                }
+            }
+        }
+    return 0;
+}
+
+
+/*
+    Warp volume using Nearest Neighbor interpolation
+*/
+int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, int *warped){
+    double *dx=d1;
+    int *res=warped;
+    memset(warped, 0, sizeof(int)*nrows*ncols); 
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=2, ++res){
+                double dii,djj;
+                if(affine!=NULL){
+                    dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
+                    djj=APPLY_AFFINE_2D_X1(i,j,affine)+dx[1];
+                }else{
+                    dii=i+dx[0];
+                    djj=j+dx[1];
+                }
+                if((dii<0) || (djj<0) || (dii>nrImg-1)||(djj>ncImg-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0) || (jj<0) || (ii>=nrImg)||(jj>=ncImg)){//no one is affected
+                    continue;
+                }
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                if(alpha<calpha){
+                    ++ii;
+                }
+                if(beta<cbeta){
+                    ++jj;
+                }
+                if((ii<0) || (jj<0) || (ii>=nrImg)||(jj>=ncImg)){//no one is affected
+                    continue;
+                }else{
+                    (*res)=img[ii*ncImg + jj];
+                }
+            }
+        }
     return 0;
 }
 
