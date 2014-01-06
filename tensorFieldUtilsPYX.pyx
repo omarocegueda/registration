@@ -10,6 +10,7 @@ from cython.view cimport memoryview
 from cython.view cimport array as cvarray
 from cpython cimport bool
 import numpy as np
+import scipy as sp
 
 cdef extern from "tensorFieldUtilsCPP.h":
     void integrateTensorFieldProductsCPP(double *q, int *dims, double *diff, double *A, double *b)
@@ -23,11 +24,12 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void computeMaskedVolumeClassStatsCPP(int *masked, double *v, int *dims, int numLabels, int *labels, double *means, double *variances)
     void integrateWeightedTensorFieldProductsCPP(double *q, int *dims, double *diff, int numLabels, int *labels, double *weights, double *Aw, double *bw)
     void integrateMaskedWeightedTensorFieldProductsCPP(int *mask, double *q, int *dims, double *diff, int numLabels, int *labels, double *weights, double *Aw, double *bw)
-    double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
-    double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
+    double computeDemonsStep2D(double *deltaField, double *gradientField, int *dims, double maxStepSize, double scale, double *demonsStep)
+    double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField, double *residual)
+    double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField, double *residual)
     void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, int numLabels, double *probs, double *means, double *variances)
     void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
-    double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual)
+    double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *displacementField, double *residual)
     int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats)
     int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats)
     int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats)
@@ -226,23 +228,34 @@ cpdef integrateMaskedWeightedTensorFieldProductsCYTHON(int[:,:,:] mask, double[:
     integrateMaskedWeightedTensorFieldProductsCPP(&mask[0,0,0], &q[0,0,0,0], &dims[0], &diff[0,0,0], numLabels, &labels[0,0,0], &weights[0], &Aw[0,0], &bw[0])
     return Aw,bw
 
-cpdef iterateDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double lambdaParam, double[:,:,:] previousDisplacement, double[:,:,:] displacementField, double[:,:] residuals):
+cpdef compute_demons_step2D(double[:,:] deltaField, double[:,:,:] gradientField,  double maxStepSize, double scale):
+    cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    cdef double[:,:,:] demonsStep=np.empty(shape=(dims[0], dims[1], 2), dtype=np.double)
+    cdef double maxNorm
+    maxNorm=computeDemonsStep2D(&deltaField[0,0], &gradientField[0,0,0], &dims[0], maxStepSize, scale, &demonsStep[0,0,0])
+    return demonsStep
+
+cpdef iterateDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double lambdaParam, double[:,:,:] displacementField, double[:,:] residuals):
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
     dims[0]=deltaField.shape[0]
     dims[1]=deltaField.shape[1]
     checkFortran(deltaField)
     checkFortran(sigmaField)
     checkFortran(gradientField)
-    checkFortran(previousDisplacement)
     checkFortran(displacementField)
     checkFortran(residuals)
-    if residuals==None:
-        maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], NULL)
-    else:
-        maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], &residuals[0,0])
+    cdef double *sigmaFieldPointer=NULL 
+    if sigmaField!=None:
+        sigmaFieldPointer=&sigmaField[0,0]
+    cdef double *residualsPointer=NULL 
+    if residuals!=None:
+        residualsPointer=&residuals[0,0]
+    maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], sigmaFieldPointer, &gradientField[0,0,0], &dims[0], lambdaParam, &displacementField[0,0,0], residualsPointer)
     return maxDisplacement
 
-cpdef iterateMaskedDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  int[:,:] mask, double lambdaParam, double[:,:,:] previousDisplacement, double[:,:,:] displacementField, double[:,:] residuals):
+cpdef iterateMaskedDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  int[:,:] mask, double lambdaParam, double[:,:,:] displacementField, double[:,:] residuals):
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
     dims[0]=deltaField.shape[0]
     dims[1]=deltaField.shape[1]
@@ -250,13 +263,15 @@ cpdef iterateMaskedDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:]
     checkFortran(sigmaField)
     checkFortran(gradientField)
     checkFortran(mask)
-    checkFortran(previousDisplacement)
     checkFortran(displacementField)
     checkFortran(residuals)
-    maxDisplacement=iterateMaskedDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &mask[0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0], &displacementField[0,0,0], &residuals[0,0])
+    if residuals==None:
+        maxDisplacement=iterateMaskedDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &mask[0,0], &dims[0], lambdaParam, &displacementField[0,0,0], NULL)
+    else:
+        maxDisplacement=iterateMaskedDisplacementField2DCPP(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], &mask[0,0], &dims[0], lambdaParam, &displacementField[0,0,0], &residuals[0,0])
     return maxDisplacement
 
-cpdef iterateDisplacementField3DCYTHON(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double lambdaParam, double[:,:,:,:] previousDisplacement, double[:,:,:,:] displacementField, double[:,:,:] residuals):
+cpdef iterateDisplacementField3DCYTHON(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double lambdaParam, double[:,:,:,:] displacementField, double[:,:,:] residuals):
     cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
     dims[0]=deltaField.shape[0]
     dims[1]=deltaField.shape[1]
@@ -264,13 +279,12 @@ cpdef iterateDisplacementField3DCYTHON(double[:,:,:] deltaField, double[:,:,:] s
     checkFortran(deltaField)
     checkFortran(sigmaField)
     checkFortran(gradientField)
-    checkFortran(previousDisplacement)
     checkFortran(displacementField)
     checkFortran(residuals)
     if residuals==None:
-        maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0,0], &displacementField[0,0,0,0], NULL)
+        maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &displacementField[0,0,0,0], NULL)
     else:
-        maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &previousDisplacement[0,0,0,0], &displacementField[0,0,0,0], &residuals[0,0,0])
+        maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &displacementField[0,0,0,0], &residuals[0,0,0])
     return maxDisplacement
 
 cpdef computeMaskedVolumeClassStatsProbsCYTHON(int[:,:] mask, double[:,:] img, double[:,:,:] probs):
@@ -386,27 +400,30 @@ cpdef vector_field_adjoint_interpolation(double[:,:,:] d1, double[:,:,:] d2):
     retVal=vectorFieldAdjointInterpolation(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &sol[0,0,0])
     return sol
 
-cpdef vector_field_exponential(double[:,:,:] v):
+cpdef vector_field_exponential(double[:,:,:] v, bool computeInverse):
     cdef double[:,:,:] expv = np.zeros_like(v)
-    cdef double[:,:,:] invexpv = np.zeros_like(v)
+    cdef double[:,:,:] invexpv = None
     cdef int retVal
     cdef int nrows=v.shape[0]
     cdef int ncols=v.shape[1]
     checkFortran(v)
-    retVal=vectorFieldExponential(&v[0,0,0], nrows, ncols, &expv[0,0,0], &invexpv[0,0,0])
+    if computeInverse:
+        invexpv = np.zeros_like(v)
+        retVal=vectorFieldExponential(&v[0,0,0], nrows, ncols, &expv[0,0,0], &invexpv[0,0,0])
+    else:
+        retVal=vectorFieldExponential(&v[0,0,0], nrows, ncols, &expv[0,0,0], NULL)
     return expv, invexpv
 
 cpdef vector_field_exponential3D(double[:,:,:,:] v, bool computeInverse):
     cdef double[:,:,:,:] expv = np.zeros_like(v)
     cdef double[:,:,:,:] invexpv=None
-    if(computeInverse):
-        invexpv = np.zeros_like(v)
     cdef int retVal
     cdef int nslices=v.shape[0]
     cdef int nrows=v.shape[1]
     cdef int ncols=v.shape[2]
     checkFortran(v)
     if(computeInverse):
+        invexpv = np.zeros_like(v)
         retVal=vectorFieldExponential3D(&v[0,0,0,0], nslices, nrows, ncols, &expv[0,0,0,0], &invexpv[0,0,0,0])
     else:
         retVal=vectorFieldExponential3D(&v[0,0,0,0], nslices, nrows, ncols, &expv[0,0,0,0], NULL)
@@ -470,18 +487,20 @@ def warp_image_affine(double[:,:] img, int[:]refShape, double[:,:] affine):
     return warped
 
 def warp_image(double[:,:] img, double[:,:,:] displacement, double[:,:] affine=None):
-    cdef int nrows=displacement.shape[0]
-    cdef int ncols=displacement.shape[1]
     cdef int nrImg=img.shape[0]
     cdef int ncImg=img.shape[1]
+    cdef int nrows=img.shape[0]
+    cdef int ncols=img.shape[1]
+    cdef double *displacementPointer=NULL
+    cdef double *affinePointer=NULL
+    if displacement!=None:
+        displacementPointer=&displacement[0,0,0]
+        nrows=displacement.shape[0]
+        ncols=displacement.shape[1]
+    if affine!=None:
+        affinePointer=&affine[0,0]
     cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
-    checkFortran(img)
-    checkFortran(displacement)
-    checkFortran(affine)
-    if affine==None:
-        warpImage(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, NULL, &warped[0,0]);
-    else:
-        warpImage(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, &affine[0,0], &warped[0,0])
+    warpImage(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePointer, &warped[0,0]);
     return warped
 
 def warp_imageNN(double[:,:] img, double[:,:,:] displacement, double[:,:] affine=None):

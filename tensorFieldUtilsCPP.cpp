@@ -406,25 +406,58 @@ void solve3DSymmetricPositiveDefiniteSystem(double *A, double *y, double *x, dou
     }
 }
 
+double computeDemonsStep2D(double *deltaField, double *gradientField, int *dims, double maxStepSize, double scale, double *demonsStep){
+    int nrows=dims[0];
+    int ncols=dims[1];
+    double *g=gradientField;
+    double *res=demonsStep;
+    int pos=0;
+    double maxDisplacement=0;
+    memset(demonsStep, 0, sizeof(double)*2*nrows*ncols);
+    for(int r=0;r<nrows;++r){
+        for(int c=0;c<ncols;++c, ++pos, g+=2, res+=2){
+            double nrm2=g[0]*g[0]+g[1]*g[1];
+            double delta=deltaField[pos];
+            double den=(nrm2 + delta*delta);
+            double factor=0;
+            if(den!=0){
+                factor=delta/(nrm2 + delta*delta);
+            }
+            res[0]=factor*g[0];
+            res[1]=factor*g[1];
+            nrm2=res[0]*res[0]+res[1]*res[1];
+            if(maxDisplacement<nrm2){
+                maxDisplacement=nrm2;
+            }
+        }//cols
+    }//rows
+    maxDisplacement=sqrt(maxDisplacement);
+    if(maxStepSize<maxDisplacement){
+        double factor=maxStepSize/maxDisplacement;
+        for(int p=2*nrows*ncols-1;p>=0;--p){
+            demonsStep[p]*=factor;
+        }
+        maxDisplacement=maxStepSize;
+    }
+    return maxDisplacement;
+}
 
-//#define GLOBAL_FIELD_CORRECTION
-double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual){
+double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField, double *residual){
     const static int numNeighbors=4;
     const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
     const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
     int nrows=dims[0];
     int ncols=dims[1];
     double *d=displacementField;
-    double *prevd=previousDisplacement;
     double *g=gradientField;
     double y[2];
     double A[3];
     int pos=0;
     double maxDisplacement=0;
     for(int r=0;r<nrows;++r){
-        for(int c=0;c<ncols;++c, ++pos, d+=2, prevd+=2, g+=2){
+        for(int c=0;c<ncols;++c, ++pos, d+=2, g+=2){
             double delta=deltaField[pos];
-            double sigma=sigmaField[pos];
+            double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
             int nn=0;
             y[0]=y[1]=0;
             for(int k=0;k<numNeighbors;++k){
@@ -438,14 +471,8 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
                 }
                 ++nn;
                 double *dneigh=&displacementField[2*(dr*ncols + dc)];
-#ifdef GLOBAL_FIELD_CORRECTION
-                double *prevNeigh=&previousDisplacement[2*(dr*ncols + dc)];
-                y[0]+=dneigh[0]+prevNeigh[0];
-                y[1]+=dneigh[1]+prevNeigh[1];
-#else
                 y[0]+=dneigh[0];
                 y[1]+=dneigh[1];
-#endif
             }
             if(isInfinite(sigma)){
                 double xx=d[0];
@@ -462,13 +489,8 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
                     residual[pos]=0;
                 }
             }else{
-#ifdef GLOBAL_FIELD_CORRECTION
-                y[0]=(delta*g[0]) + sigma*lambdaParam*(y[0]-nn*prevd[0]);
-                y[1]=(delta*g[1]) + sigma*lambdaParam*(y[1]-nn*prevd[1]);
-#else
                 y[0]=(delta*g[0]) + sigma*lambdaParam*y[0];
                 y[1]=(delta*g[1]) + sigma*lambdaParam*y[1];
-#endif
                 A[0]=g[0]*g[0] + sigma*lambdaParam*(nn);
                 A[1]=g[0]*g[1];
                 A[2]=g[1]*g[1] + sigma*lambdaParam*(nn);
@@ -491,14 +513,13 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
     return sqrt(maxDisplacement);
 }
 
-double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual){
+double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *displacementField, double *residual){
     const static int numNeighbors=4;
     const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
     const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
     int nrows=dims[0];
     int ncols=dims[1];
     double *d=displacementField;
-    double *prevd=previousDisplacement;
     double *g=gradientField;
     double y[2];
     double A[3];
@@ -506,7 +527,7 @@ double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaFiel
     double maxDisplacement=0;
     int *mm=mask;
     for(int r=0;r<nrows;++r){
-        for(int c=0;c<ncols;++c, ++pos, d+=2, prevd+=2, g+=2, ++mm){
+        for(int c=0;c<ncols;++c, ++pos, d+=2, g+=2, ++mm){
             if(!*mm){
                 d[0]=d[1]=0;
                 continue;
@@ -529,14 +550,8 @@ double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaFiel
                 }
                 ++nn;
                 double *dneigh=&displacementField[2*(dr*ncols + dc)];
-#ifdef GLOBAL_FIELD_CORRECTION
-                double *prevNeigh=&previousDisplacement[2*(dr*ncols + dc)];
-                y[0]+=dneigh[0]+prevNeigh[0];
-                y[1]+=dneigh[1]+prevNeigh[1];
-#else
                 y[0]+=dneigh[0];
                 y[1]+=dneigh[1];
-#endif
             }
             if(nn<2){
                 d[0]=d[1]=0;
@@ -555,13 +570,8 @@ double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaFiel
                 }
                 residual[pos]=0;
             }else{
-#ifdef GLOBAL_FIELD_CORRECTION
-                y[0]=(delta*g[0]) + sigma*lambdaParam*(y[0]-nn*prevd[0]);
-                y[1]=(delta*g[1]) + sigma*lambdaParam*(y[1]-nn*prevd[1]);
-#else
                 y[0]=(delta*g[0]) + sigma*lambdaParam*y[0];
                 y[1]=(delta*g[1]) + sigma*lambdaParam*y[1];
-#endif
                 A[0]=g[0]*g[0] + sigma*lambdaParam*(nn);
                 A[1]=g[0]*g[1];
                 A[2]=g[1]*g[1] + sigma*lambdaParam*(nn);
@@ -581,7 +591,7 @@ double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaFiel
 }
 
 
-double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *previousDisplacement, double *displacementField, double *residual){
+double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField, double *residual){
     const static int numNeighbors=6;
     const static int dSlice[numNeighbors]={-1,  0, 0, 0,  0, 1};
     const static int dRow[numNeighbors]  ={ 0, -1, 0, 1,  0, 0};
@@ -590,7 +600,6 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
     int nrows=dims[1];
     int ncols=dims[2];
     double *d=displacementField;
-    double *prevd=previousDisplacement;
     double *g=gradientField;
     int sliceSize=ncols*nrows;
     double y[3];
@@ -599,7 +608,7 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
     double maxDisplacement=0;
     for(int s=0;s<nslices;++s){
         for(int r=0;r<nrows;++r){
-            for(int c=0;c<ncols;++c, ++pos, d+=3, prevd+=3, g+=3){
+            for(int c=0;c<ncols;++c, ++pos, d+=3, g+=3){
                 double delta=deltaField[pos];
                 double sigma=sigmaField[pos];
                 int nn=0;
@@ -619,16 +628,9 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
                     }
                     ++nn;
                     double *dneigh=&displacementField[3*(ds*sliceSize + dr*ncols + dc)];
-#ifdef GLOBAL_FIELD_CORRECTION
-                    double *prevNeigh=&previousDisplacement[3*(ds*sliceSize + dr*ncols + dc)];
-                    y[0]+=dneigh[0]+prevNeigh[0];
-                    y[1]+=dneigh[1]+prevNeigh[1];
-                    y[2]+=dneigh[2]+prevNeigh[2];
-#else
                     y[0]+=dneigh[0];
                     y[1]+=dneigh[1];
                     y[2]+=dneigh[2];
-#endif
                 }
                 if(isInfinite(sigma)){
                     double xx=d[0];
@@ -658,15 +660,9 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
                         d[2]=(g[2]*delta)/nrm2;
                     }
                 }else{
-#ifdef GLOBAL_FIELD_CORRECTION
-                    y[0]=(delta*g[0]) + sigma*lambdaParam*(y[0]-nn*prevd[0]);
-                    y[1]=(delta*g[1]) + sigma*lambdaParam*(y[1]-nn*prevd[1]);
-                    y[1]=(delta*g[2]) + sigma*lambdaParam*(y[2]-nn*prevd[2]);
-#else
                     y[0]=(delta*g[0]) + sigma*lambdaParam*y[0];
                     y[1]=(delta*g[1]) + sigma*lambdaParam*y[1];
                     y[2]=(delta*g[2]) + sigma*lambdaParam*y[2];
-#endif
                     A[0]=g[0]*g[0] + sigma*lambdaParam*nn;
                     A[1]=g[0]*g[1];
                     A[2]=g[0]*g[2];
@@ -1653,11 +1649,17 @@ int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *w
 }
 
 int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped){
+    double zero[2]={0.0, 0.0};
     double *dx=d1;
+    int offset=2;
+    if(d1==NULL){
+        dx=zero;
+        offset=0;
+    }
     double *res=warped;
     memset(warped, 0, sizeof(double)*nrows*ncols); 
         for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=2, ++res){
+            for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dii,djj;
                 if(affine!=NULL){
                     dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
@@ -1707,11 +1709,17 @@ int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncol
 }
 
 int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped){
+    double zero[2]={0.0, 0.0};
     double *dx=d1;
+    int offset=2;
+    if(d1==NULL){
+        offset=0;
+        dx=zero;
+    }
     double *res=warped;
     memset(warped, 0, sizeof(double)*nrows*ncols); 
         for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=2, ++res){
+            for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dii,djj;
                 if(affine!=NULL){
                     dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
@@ -1754,7 +1762,7 @@ int warpDiscreteImageNNAffine(int *img, int nrImg, int ncImg, double *affine, in
     memset(warped, 0, sizeof(int)*nrRef*ncRef);
         for(int i=0;i<nrRef;++i){
             for(int j=0;j<ncRef;++j, ++res){
-                double dkk,dii,djj;
+                double dii,djj;
                 if(affine!=NULL){
                     dii=APPLY_AFFINE_2D_X0(i,j,affine);
                     djj=APPLY_AFFINE_2D_X1(i,j,affine);
@@ -1796,11 +1804,17 @@ int warpDiscreteImageNNAffine(int *img, int nrImg, int ncImg, double *affine, in
     Warp volume using Nearest Neighbor interpolation
 */
 int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, int *warped){
+    double zero[2]={0.0, 0.0};
     double *dx=d1;
+    int offset=2;
+    if(d1==NULL){
+        dx=zero;
+        offset=0;
+    }
     int *res=warped;
     memset(warped, 0, sizeof(int)*nrows*ncols); 
         for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=2, ++res){
+            for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dii,djj;
                 if(affine!=NULL){
                     dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
@@ -1919,13 +1933,19 @@ int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *af
 }
 
 int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped){
+    double zero[3]={0.0,0.0,0.0};
     int sliceSizeVol=nrVol*ncVol;
     double *dx=d1;
+    int offset=3;
+    if(d1==NULL){
+        dx=zero;
+        offset=0;
+    }
     double *res=warped;
     memset(warped, 0, sizeof(double)*nslices*nrows*ncols); 
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=3, ++res){
+            for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dkk,dii,djj;
                 if(affine!=NULL){
                     dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
@@ -2007,13 +2027,19 @@ int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int 
     Warp volume using Nearest Neighbor interpolation
 */
 int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped){
+    double zero[3]={0.0,0.0,0.0};
     int sliceSizeVol=nrVol*ncVol;
     double *dx=d1;
+    int offset=3;
+    if(d1==NULL){
+        dx=zero;
+        offset=0;
+    }
     double *res=warped;
     memset(warped, 0, sizeof(double)*nslices*nrows*ncols); 
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=3, ++res){
+            for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dkk,dii,djj;
                 if(affine!=NULL){
                     dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
@@ -2118,13 +2144,19 @@ int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, dou
     Warp volume using Nearest Neighbor interpolation
 */
 int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, int *warped){
+    double zero[3]={0.0,0.0,0.0};
     int sliceSizeVol=nrVol*ncVol;
     double *dx=d1;
+    int offset=3;
+    if(d1==NULL){
+        dx=zero;
+        offset=0;
+    }
     int *res=warped;
     memset(warped, 0, sizeof(int)*nslices*nrows*ncols); 
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
-            for(int j=0;j<ncols;++j, dx+=3, ++res){
+            for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dkk,dii,djj;
                 if(affine!=NULL){
                     dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
@@ -2641,7 +2673,9 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
     //---base case---
     if(n<1){
         memcpy(expv, v, sizeof(double)*2*nsites);
-        invertVectorField(v, nrows, ncols, 0.5, 100, 1e-4, invexpv, stats);
+        if(invexpv!=NULL){
+            invertVectorField(v, nrows, ncols, 0.5, 100, 1e-4, invexpv, stats);
+        }
         return 0;
     }
     //---prepare memory buffers---
@@ -2656,13 +2690,15 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
         composeVectorFields(tmp[i&1], tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
     }
     //---perform binary exponentiation: inverse---
-    tmp[1-n%2]=invexpv;
-    for(int i=2*nsites-1;i>=0;--i){
-        tmp[0][i]=v[i]*factor;
-    }
-    invertVectorField(tmp[0], nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
-    for(int i=1;i<=n;++i){
-        composeVectorFields(tmp[i&1], tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
+    if(invexpv!=NULL){
+        tmp[1-n%2]=invexpv;
+        for(int i=2*nsites-1;i>=0;--i){
+            tmp[0][i]=v[i]*factor;
+        }
+        invertVectorField(tmp[0], nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
+        for(int i=1;i<=n;++i){
+            composeVectorFields(tmp[i&1], tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
+        }
     }
     delete[] tmp[n%2];
     return 0;
