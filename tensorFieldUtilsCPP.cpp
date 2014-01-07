@@ -432,12 +432,46 @@ double computeDemonsStep2D(double *deltaField, double *gradientField, int *dims,
         }//cols
     }//rows
     maxDisplacement=sqrt(maxDisplacement);
-    if(maxStepSize<maxDisplacement){
-        double factor=maxStepSize/maxDisplacement;
-        for(int p=2*nrows*ncols-1;p>=0;--p){
-            demonsStep[p]*=factor;
-        }
-        maxDisplacement=maxStepSize;
+    double factor=maxStepSize/maxDisplacement;
+    for(int p=2*nrows*ncols-1;p>=0;--p){
+        demonsStep[p]*=factor;
+    }
+    return maxDisplacement;
+}
+
+double computeDemonsStep3D(double *deltaField, double *gradientField, int *dims, double maxStepSize, double scale, double *demonsStep){
+    int nslices=dims[0];
+    int nrows=dims[1];
+    int ncols=dims[2];
+    double *g=gradientField;
+    double *res=demonsStep;
+    int pos=0;
+    double maxDisplacement=0;
+    memset(demonsStep, 0, sizeof(double)*3*nslices*nrows*ncols);
+    for(int s=0;s<nslices;++s){
+        for(int r=0;r<nrows;++r){
+            for(int c=0;c<ncols;++c, ++pos, g+=3, res+=3){
+                double nrm2=g[0]*g[0]+g[1]*g[1]+g[2]*g[2];
+                double delta=deltaField[pos];
+                double den=(nrm2 + delta*delta);
+                double factor=0;
+                if(den!=0){
+                    factor=delta/(nrm2 + delta*delta);
+                }
+                res[0]=factor*g[0];
+                res[1]=factor*g[1];
+                res[2]=factor*g[2];
+                nrm2=res[0]*res[0]+res[1]*res[1]+res[2]*res[2];
+                if(maxDisplacement<nrm2){
+                    maxDisplacement=nrm2;
+                }
+            }//cols
+        }//rows
+    }//slices
+    maxDisplacement=sqrt(maxDisplacement);
+    double factor=maxStepSize/maxDisplacement;
+    for(int p=3*nslices*nrows*ncols-1;p>=0;--p){
+        demonsStep[p]*=factor;
     }
     return maxDisplacement;
 }
@@ -804,6 +838,160 @@ double computeInverseEnergy(double *d, double *invd, int nrows, int ncols, doubl
     
 }
 
+inline bool checkIsFinite(double *error, int nrows, int ncols, int r, int c){
+    if((r<0)||(c<0)||(r>=nrows)||(c>=ncols)){
+        return false;
+    }
+    if(isInfinite(error[r*ncols+c])){
+        return false;
+    }
+    return true;
+}
+
+void findNearesFinite(double *error, int nrows, int ncols, int r, int c, int &rr, int &cc){
+    int ring=1;
+    while(true){
+        rr=r-ring-1;
+        cc=c-1;
+        for(int k=0;k<=ring;++k){//top-right side of the diamond
+            ++rr;
+            ++cc;
+            if(checkIsFinite(error, nrows, ncols, rr, cc)){
+                return;
+            }
+        }
+        for(int k=0;k<ring;++k){//bottom-right side of the diamond
+            ++rr;
+            --cc;
+            if(checkIsFinite(error, nrows, ncols, rr, cc)){
+                return;
+            }
+        }
+        for(int k=0;k<ring;++k){//bottom-left side of the diamond
+            --rr;
+            --cc;
+            if(checkIsFinite(error, nrows, ncols, rr, cc)){
+                return;
+            }
+        }
+        for(int k=0;k<ring-1;++k){//top-left side of the diamond
+            --rr;
+            ++cc;
+            if(checkIsFinite(error, nrows, ncols, rr, cc)){
+                return;
+            }
+        }
+        ++ring;
+    }
+
+}
+
+void interpolateDisplacementFieldAt(double *forward, int nrows, int ncols, double pr, double pc, double &fr, double &fc){
+    int i=floor(pr);
+    int j=floor(pc);
+    if((i<0) || (j<0) || (i>=nrows) || (j>=ncols)){
+        fr=0;
+        fc=0;
+        return;
+    }
+    double alphac=pr-i;
+    double betac=pc-j;
+    double alpha=1.0-alphac;
+    double beta=1.0-betac;
+    double *ff=&forward[2*(i*ncols+j)];
+    fr=alpha*beta*ff[0];
+    fc=alpha*beta*ff[1];
+    ++j;
+    if(j<ncols){
+        ff=&forward[2*(i*ncols+j)];
+        fr+=alpha*betac*ff[0];
+        fc+=alpha*betac*ff[1];
+    }
+    ++i;
+    if((i<nrows)&&(j<ncols)){
+        ff=&forward[2*(i*ncols+j)];
+        fr+=alphac*betac*ff[0];
+        fc+=alphac*betac*ff[1];
+    }
+    --j;
+    if(i<nrows){
+        ff=&forward[2*(i*ncols+j)];
+        fr+=alphac*beta*ff[0];
+        fc+=alphac*beta*ff[1];
+    }
+}
+
+
+int initializeNearestNeighborInverseField(double *forward, int nrows, int ncols, double *inv, double *error){
+    const static int nRow[]={ 0, 0, 1, 1};
+    const static int nCol[]={ 0, 1, 0, 1};
+    bool needsDelete=false;
+    if(error==NULL){
+        needsDelete=true;
+        error=new double[nrows*ncols];
+    }
+    // Step 0: initialize delta, MAXLOOP and inverse computing error
+    for(int i=nrows*ncols-1;i>=0;--i){
+        error[i]=INF64;
+    }
+    //Step 1a: Map points from p in R, assign e(q) for points q in S which are immediately adjacent to f(p) if assignment reduces e(q)
+    double *f=forward;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, f+=2){//p=(i,j) in R
+            double dii=i+f[0];
+            double djj=j+f[1];//(dii, djj) = f(p)
+            if((dii<0) || (djj<0) || (dii>nrows-1)||(djj>ncols-1)){//no one is affected
+                continue;
+            }
+            //find the top left index and the interpolation coefficients
+            int ii=floor(dii);
+            int jj=floor(djj);
+            //assign all grid points immediately adjacent to f(p)
+            for(int k=0;k<4;++k){
+                int iii=ii+nRow[k];
+                int jjj=jj+nCol[k];//(iii, jjj)=q is a surrounding point
+                if((iii<0)||(jjj<0)||(iii>=nrows)||(jjj>=ncols)){
+                    continue;//the point is outside the lattice
+                }
+                double dr=dii-iii;
+                double dc=djj-jjj;//(dr,dc) = f(p) - q
+                double opt=sqrt(dr*dr+dc*dc);//||q-f(p)||
+                if(opt<error[iii*ncols+jjj]){//if(||q-f(p)||^2 < e(q))
+                    double *dq=&inv[2*(iii*ncols+jjj)];
+                    dq[0]=i-iii;
+                    dq[1]=j-jjj;//g(q)=p  <<==>>  q+inv[q] = p <<==>> inv[q]=p-q
+                    error[iii*ncols+jjj]=opt;
+                }
+            }
+        }
+    }
+    // Step 1b: map unmapped points in S via nearest neighbor
+    double *dq=inv;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j,dq+=2){//q=(i,j)
+            if(!isInfinite(error[i*ncols+j])){
+                continue;
+            }
+            //find nearest neighbor q’ in S with finite e(q’)
+            int ii,jj;
+            findNearesFinite(error, nrows, ncols, i, j, ii, jj);//(ii, jj)=q'
+            double *dqprime=&inv[2*(ii*ncols+jj)];
+            dq[0]=ii+dqprime[0]-i;
+            dq[1]=jj+dqprime[1]-j;//g(q)=g(q') <<==>> q+inv[q] = q'+inv[q']  <<==>>  inv[q]=q'+inv[q']-q
+            double fr,fc;
+            interpolateDisplacementFieldAt(forward, nrows, ncols, ii+dqprime[0], jj+dqprime[1], fr, fc);//(ii+dqprime[0], jj+dqprime[1])+(fr,fc) = f(g(q')) 
+            double dr=ii+dqprime[0]+fr-i;
+            double dc=jj+dqprime[1]+fc-j;//(dr, dc)=f(g(q'))-q
+            error[i*ncols+j]=sqrt(dr*dr+dc*dc);
+        }
+    }
+    if(needsDelete){
+        delete[] error;
+    }
+    return 0;
+}
+
+
 int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats){
     const static int numNeighbors=4;
     const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
@@ -815,7 +1003,8 @@ int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam,
     double *temp=new double[nrows*ncols*2];
     double *residual=new double[nrows*ncols*2];
     double *denom=new double[nrows*ncols];
-    memset(inv, 0, sizeof(double)*nrows*ncols*2);
+    //memset(inv, 0, sizeof(double)*nrows*ncols*2);
+    initializeNearestNeighborInverseField(forward, nrows, ncols, inv, NULL);
     double maxChange=tolerance+1;
     int iter;
     double substats[3];
@@ -1030,88 +1219,6 @@ int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, doub
 //==================================================================================================
 //==================================================================================================
 //==================================================================================================
-inline bool checkIsFinite(double *error, int nrows, int ncols, int r, int c){
-    if((r<0)||(c<0)||(r>=nrows)||(c>=ncols)){
-        return false;
-    }
-    if(isInfinite(error[r*ncols+c])){
-        return false;
-    }
-    return true;
-}
-
-void findNearesFinite(double *error, int nrows, int ncols, int r, int c, int &rr, int &cc){
-    int ring=1;
-    while(true){
-        rr=r-ring-1;
-        cc=c-1;
-        for(int k=0;k<=ring;++k){//top-right side of the diamond
-            ++rr;
-            ++cc;
-            if(checkIsFinite(error, nrows, ncols, rr, cc)){
-                return;
-            }
-        }
-        for(int k=0;k<ring;++k){//bottom-right side of the diamond
-            ++rr;
-            --cc;
-            if(checkIsFinite(error, nrows, ncols, rr, cc)){
-                return;
-            }
-        }
-        for(int k=0;k<ring;++k){//bottom-left side of the diamond
-            --rr;
-            --cc;
-            if(checkIsFinite(error, nrows, ncols, rr, cc)){
-                return;
-            }
-        }
-        for(int k=0;k<ring-1;++k){//top-left side of the diamond
-            --rr;
-            ++cc;
-            if(checkIsFinite(error, nrows, ncols, rr, cc)){
-                return;
-            }
-        }
-        ++ring;
-    }
-
-}
-
-void interpolateDisplacementFieldAt(double *forward, int nrows, int ncols, double pr, double pc, double &fr, double &fc){
-    int i=floor(pr);
-    int j=floor(pc);
-    if((i<0) || (j<0) || (i>=nrows) || (j>=ncols)){
-        fr=0;
-        fc=0;
-        return;
-    }
-    double alphac=pr-i;
-    double betac=pc-j;
-    double alpha=1.0-alphac;
-    double beta=1.0-betac;
-    double *ff=&forward[2*(i*ncols+j)];
-    fr=alpha*beta*ff[0];
-    fc=alpha*beta*ff[1];
-    ++j;
-    if(j<ncols){
-        ff=&forward[2*(i*ncols+j)];
-        fr+=alpha*betac*ff[0];
-        fc+=alpha*betac*ff[1];
-    }
-    ++i;
-    if((i<nrows)&&(j<ncols)){
-        ff=&forward[2*(i*ncols+j)];
-        fr+=alphac*betac*ff[0];
-        fc+=alphac*betac*ff[1];
-    }
-    --j;
-    if(i<nrows){
-        ff=&forward[2*(i*ncols+j)];
-        fr+=alphac*beta*ff[0];
-        fc+=alphac*beta*ff[1];
-    }
-}
 
 int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, double tolerance, double *inv){
     const int numNeighbors=4;
@@ -2572,17 +2679,23 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
 }
 
 
-int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats){
+int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats){
     double error=1+tolerance;
     double substats[3];
     double *temp[3];
     temp[0]=new double[nrows*ncols*2];
     temp[1]=invd;
     temp[2]=new double[nrows*ncols*2];
-    memset(temp[0], 0, sizeof(double)*2*nrows*ncols);
+    //memset(temp[0], 0, sizeof(double)*2*nrows*ncols);
+    if(start!=NULL){
+        memcpy(temp[0], start, sizeof(double)*2*nrows*ncols);
+    }else{
+        initializeNearestNeighborInverseField(d, nrows, ncols, temp[0], NULL);
+    }
+    
     int nsites=2*nrows*ncols;
     int iter;
-    double epsilon=0.5;
+    double epsilon=0.125;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
         composeVectorFields(temp[iter&1], d, nrows, ncols, temp[1-(iter&1)], substats);
         double difmag=0;

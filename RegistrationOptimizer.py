@@ -5,6 +5,7 @@ import tensorFieldUtils as tf
 import UpdateRule
 from TransformationModel import TransformationModel
 from SSDMetric import SSDMetric
+from EMMetric import EMMetric
 
 class RegistrationOptimizer(object):
     def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None):
@@ -97,12 +98,15 @@ class RegistrationOptimizer(object):
         self.fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(self.fixed, self.levels-1, np.ones_like(self.fixed))]
         del maskFixed
         startingForward=np.zeros(shape=self.fixedPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
+        startingForwardInv=np.zeros(shape=self.fixedPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
         self.forwardModel.scaleAffines(0.5**(self.levels-1))
         self.forwardModel.setForward(startingForward)
-        
+        self.forwardModel.setBackward(startingForwardInv)
         startingBackward=np.zeros(shape=self.movingPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
+        startingBackwardInverse=np.zeros(shape=self.fixedPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
         self.backwardModel.scaleAffines(0.5**(self.levels-1))
         self.backwardModel.setForward(startingBackward)
+        self.backwardModel.setBackward(startingBackwardInverse)
 
     def __endOptimizer(self):
         del self.movingPyramid
@@ -111,6 +115,7 @@ class RegistrationOptimizer(object):
     def __iterate_asymmetric(self, showImages=False):
         wmoving=self.forwardModel.warpForward(self.currentMoving)
         self.similarityMetric.setMovingImage(wmoving)
+        self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.forwardModel, 1)
         self.similarityMetric.setFixedImage(self.currentFixed)
         self.similarityMetric.initializeIteration()
         fw=self.similarityMetric.computeForward()
@@ -127,6 +132,8 @@ class RegistrationOptimizer(object):
             print 'Processing level', level
             self.currentFixed=self.fixedPyramid[level]
             self.currentMoving=self.movingPyramid[level]
+            self.similarityMetric.useOriginalFixedImage(self.fixedPyramid[level])
+            self.similarityMetric.useOriginalMovingImage(self.movingPyramid[level])
             if level<self.levels-1:
                 self.forwardModel.upsample(self.currentFixed.shape, self.currentMoving.shape)
             error=1+self.tolerance
@@ -139,23 +146,21 @@ class RegistrationOptimizer(object):
         self.__endOptimizer()
 
     def __iterate_symmetric(self, showImages=False):
-        wmoving=self.forwardModel.warpForward(self.currentMoving)
-        wfixed=self.backwardModel.warpForward(self.currentFixed)
+        wmoving=self.backwardModel.warpBackward(self.currentMoving)
+        wfixed=self.forwardModel.warpBackward(self.currentFixed)
         self.similarityMetric.setMovingImage(wmoving)
+        self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.backwardModel, -1)
         self.similarityMetric.setFixedImage(wfixed)
+        self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
         self.similarityMetric.initializeIteration()
         fw=self.similarityMetric.computeForward()
         bw=self.similarityMetric.computeBackward()
-        forward, mdForward=self.updateRule.update(fw, self.forwardModel.getForward())
-        backward, mdBackward=self.updateRule.update(bw, self.backwardModel.getForward())
-        invForward=np.array(tf.invert_vector_field(forward, 0.5, 100, 1e-6))
-        invBackward=np.array(tf.invert_vector_field(backward, 0.5, 100, 1e-6))
-        forward=np.array(tf.invert_vector_field(invForward, 0.5, 100, 1e-6))
-        backward=np.array(tf.invert_vector_field(invBackward, 0.5, 100, 1e-6))
-        #invForward=np.array(tf.invert_vector_field_fixed_point(forward, 50, 1e-6))
-        #invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 50, 1e-6))
-        #forward=np.array(tf.invert_vector_field_fixed_point(invForward, 50, 1e-6))
-        #backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 50, 1e-6))
+        forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
+        backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
+        invForward=np.array(tf.invert_vector_field_fixed_point(forward, 50, 1e-3, self.forwardModel.getBackward()))
+        invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 50, 1e-3, self.backwardModel.getBackward()))
+        forward=np.array(tf.invert_vector_field_fixed_point(invForward, 50, 1e-3, self.forwardModel.getForward()))
+        backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 50, 1e-3, self.backwardModel.getForward()))
         self.forwardModel.setForward(forward)
         self.forwardModel.setBackward(invForward)
         self.backwardModel.setForward(backward)
@@ -171,6 +176,8 @@ class RegistrationOptimizer(object):
             print 'Processing level', level
             self.currentFixed=self.fixedPyramid[level]
             self.currentMoving=self.movingPyramid[level]
+            self.similarityMetric.useOriginalFixedImage(self.fixedPyramid[level])
+            self.similarityMetric.useOriginalMovingImage(self.movingPyramid[level])
             if level<self.levels-1:
                 self.forwardModel.upsample(self.currentFixed.shape, self.currentMoving.shape)
                 self.backwardModel.upsample(self.currentMoving.shape, self.currentFixed.shape)
@@ -197,7 +204,10 @@ class RegistrationOptimizer(object):
     def getForward(self):
         return self.forwardModel.getForward()
 
-def testRegistrationOptimizer2D():
+    def getBackward(self):
+        return self.forwardModel.getBackward()
+
+def testRegistrationOptimizerMonomodal2D():
     fname0='data/circle.png'
     fname1='data/C.png'
     nib_moving=plt.imread(fname0)
@@ -210,15 +220,15 @@ def testRegistrationOptimizer2D():
     fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
     ################Configure and run the Optimizer#####################
     maxIter=[i for i in [50,100,100,100]]
-    similarityMetric=SSDMetric({'lambda':5.0})
-    similarityMetric.updateType=SSDMetric.DEMONS_STEP
-    #updateRule=UpdateRule.Addition()
+    #similarityMetric=SSDMetric({'symmetric':True, 'lambda':5.0, 'stepType':SSDMetric.GAUSS_SEIDEL_STEP})
+    similarityMetric=EMMetric({'symmetric':True, 'lambda':5.0, 'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 'qLevels':256})
     updateRule=UpdateRule.Composition()
     #updateRule=UpdateRule.ProjectedComposition()
     registrationOptimizer=RegistrationOptimizer(fixed, moving, None, None, similarityMetric, updateRule, maxIter)
     registrationOptimizer.optimize()
     #######################show results#################################
     displacement=registrationOptimizer.getForward()
+    directInverse=registrationOptimizer.getBackward()
     X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
     detJacobian=rcommon.computeJacobianField(displacement)
     plt.figure()
@@ -227,7 +237,7 @@ def testRegistrationOptimizer2D():
     plt.clabel(CS, inline=1, fontsize=10)
     plt.title('det(J(displacement))')
     print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
-    directInverse=np.array(tf.invert_vector_field(displacement, 2.0, 500, 1e-7))
+    #directInverse=np.array(tf.invert_vector_field(displacement, 2.0, 500, 1e-7))
     detJacobianInverse=rcommon.computeJacobianField(directInverse)
     plt.figure()
     plt.imshow(detJacobianInverse)
@@ -239,8 +249,22 @@ def testRegistrationOptimizer2D():
     directResidual=np.array(directResidual)
     rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 'inv-direct', 7)
 
+def testRegistrationOptimizerMultimodal2D():
+    #fname0='IBSR_01_to_02.nii.gz'
+    #fname1='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
+    fnameMoving='IBSR_01_to_02.nii.gz'
+    fnameFixed='data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz'
+    nib_moving = nib.load(fnameMoving)
+    nib_fixed = nib.load(fnameFixed)
+    moving=nib_moving.get_data().squeeze().astype(np.float64)
+    fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+    moving=np.copy(moving, order='C')
+    moving=(moving-moving.min())/(moving.max()-moving.min())
+    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+    fixed=np.copy(fixed, order='C')
+
 if __name__=='__main__':
-    testRegistrationOptimizer2D()
+    testRegistrationOptimizerMonomodal2D()
     
     import nibabel as nib
     result=nib.load('data/circleToC.nii.gz')

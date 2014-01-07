@@ -31,7 +31,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
     double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *displacementField, double *residual)
     int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats)
-    int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats)
+    int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats)
     int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats)
     int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats)
     int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv)
@@ -237,6 +237,16 @@ cpdef compute_demons_step2D(double[:,:] deltaField, double[:,:,:] gradientField,
     maxNorm=computeDemonsStep2D(&deltaField[0,0], &gradientField[0,0,0], &dims[0], maxStepSize, scale, &demonsStep[0,0,0])
     return demonsStep
 
+cpdef compute_demons_step3D(double[:,:,:] deltaField, double[:,:,:,:] gradientField,  double maxStepSize, double scale):
+    cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    dims[2]=deltaField.shape[2]
+    cdef double[:,:,:,:] demonsStep=np.empty(shape=(dims[0], dims[1], dims[2], 3), dtype=np.double)
+    cdef double maxNorm
+    maxNorm=computeDemonsStep2D(&deltaField[0,0,0], &gradientField[0,0,0,0], &dims[0], maxStepSize, scale, &demonsStep[0,0,0,0])
+    return demonsStep
+
 cpdef iterateDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double lambdaParam, double[:,:,:] displacementField, double[:,:] residuals):
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
     dims[0]=deltaField.shape[0]
@@ -323,7 +333,7 @@ cpdef invert_vector_field(double[:,:,:] d, double lambdaParam, int maxIter, doub
     cdef double[:,:,:] invd=np.zeros_like(d)
     checkFortran(d)
     retVal=invertVectorField(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0], &stats[0])
-    print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
+    #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
 cpdef invert_vector_field_tv_l2(double[:,:,:] d, double lambdaParam, int maxIter, double tolerance):
@@ -345,15 +355,17 @@ cpdef invert_vector_field_Yan(double[:,:,:] d, int maxIter, double tolerance):
     retVal=invertVectorFieldYan(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0])
     return invd
 
-cpdef invert_vector_field_fixed_point(double[:,:,:] d, int maxIter, double tolerance):
+cpdef invert_vector_field_fixed_point(double[:,:,:] d, int maxIter, double tolerance, double[:,:,:] start=None):
     cdef int retVal
     cdef int nrows=d.shape[0]
     cdef int ncols=d.shape[1]
     cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
     cdef double[:,:,:] invd=np.zeros_like(d)
-    checkFortran(d)
-    retVal=invertVectorFieldFixedPoint(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0], &stats[0])
-    print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
+    cdef double *startPointer=NULL
+    if start!=None:
+        startPointer=&start[0,0,0]
+    retVal=invertVectorFieldFixedPoint(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0], startPointer, &stats[0])
+    #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
 cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
@@ -638,7 +650,7 @@ def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, do
     cdef double[:,:,:,:] invd=np.zeros_like(d)
     checkFortran(d)
     retVal=invertVectorField3D(&d[0,0,0,0], nslices, nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0,0], &stats[0])
-    print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
+    #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
 def invert_vector_field_fixed_point3D(double[:,:,:,:] d, int maxIter, double tolerance):
@@ -650,7 +662,7 @@ def invert_vector_field_fixed_point3D(double[:,:,:,:] d, int maxIter, double tol
     cdef double[:,:,:,:] invd=np.zeros_like(d)
     checkFortran(d)
     retVal=invertVectorFieldFixedPoint3D(&d[0,0,0,0], nslices, nrows, ncols, maxIter, tolerance, &invd[0,0,0,0], &stats[0])
-    print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
+    #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
 def prepend_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):

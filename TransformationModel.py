@@ -3,7 +3,7 @@ import tensorFieldUtils as tf
 
 class TransformationModel(object):
     def __init__(self, forward=None, backward=None, affineFixed=None, affineMoving=None):
-        print forward, backward, affineFixed, affineMoving
+        #print forward, backward, affineFixed, affineMoving
         self.forward=forward
         self.backward=backward
         self.affineFixed=affineFixed
@@ -35,16 +35,54 @@ class TransformationModel(object):
 
     def warpForward(self, image):
         if len(image.shape)==3:
-            warped=np.array(tf.warp_volume(image, self.forward, self.affineMoving))
+            if image.dtype is np.dtype('int32'):
+                warped=np.array(tf.warp_discrete_volume(image, self.forward, self.affineMoving))
+            elif image.dtype is np.dtype('float64'):
+                warped=np.array(tf.warp_volume(image, self.forward, self.affineMoving))
         else:
-            warped=np.array(tf.warp_image(image, self.forward, self.affineMoving))
+            if image.dtype is np.dtype('int32'):
+                warped=np.array(tf.warp_discrete_image(image, self.forward, self.affineMoving))
+            elif image.dtype is np.dtype('float64'):
+                warped=np.array(tf.warp_image(image, self.forward, self.affineMoving))
         return warped
 
     def warpBackward(self, image):
         if len(image.shape)==3:
-            warped=np.array(tf.warp_volume(image, self.backward, self.affineFixed))
+            if image.dtype is np.dtype('int32'):
+                warped=np.array(tf.warp_discrete_volume(image, self.backward, self.affineFixed))
+            elif image.dtype is np.dtype('float64'):
+                warped=np.array(tf.warp_volume(image, self.backward, self.affineFixed))
         else:
-            warped=np.array(tf.warp_image(image, self.backward, self.affineFixed))
+            if image.dtype is np.dtype('int32'):
+                warped=np.array(tf.warp_discrete_image(image, self.backward, self.affineFixed))
+            elif image.dtype is np.dtype('float64'):
+                warped=np.array(tf.warp_image(image, self.backward, self.affineFixed))
+        return warped
+
+    def warpForwardNN(self, image):
+        if len(image.shape)==3:
+            if image.dtype is np.dtype('int32'):
+                warped=np.array(tf.warp_discrete_volumeNN(image, self.forward, self.affineMoving))
+            elif image.dtype is np.dtype('float64'):
+                warped=np.array(tf.warp_volumeNN(image, self.forward, self.affineMoving))
+        else:
+            if image.dtype is np.dtype('int32'):
+                warped=np.array(tf.warp_discrete_imageNN(image, self.forward, self.affineMoving))
+            elif image.dtype is np.dtype('float64'):
+                warped=np.array(tf.warp_imageNN(image, self.forward, self.affineMoving))
+        return warped
+
+    def warpBackwardNN(self, image):
+        if len(image.shape)==3:
+            if image.dtype is np.dtype('int32'):
+                warped=np.array(tf.warp_discrete_volumeNN(image, self.backward, self.affineFixed))
+            elif image.dtype is np.dtype('float64'):
+                warped=np.array(tf.warp_volumeNN(image, self.backward, self.affineFixed))
+        else:
+            if image.dtype is np.dtype('int32'):
+                warped=np.array(tf.warp_discrete_imageNN(image, self.backward, self.affineFixed))
+            elif image.dtype is np.dtype('float64'):
+                warped=np.array(tf.warp_imageNN(image, self.backward, self.affineFixed))
         return warped
 
     def __scaleAffine(self, affine, factor):

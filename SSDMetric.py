@@ -5,22 +5,17 @@ from SimilarityMetric import SimilarityMetric
 class SSDMetric(SimilarityMetric):
     GAUSS_SEIDEL_STEP=0
     DEMONS_STEP=1
+    def getDefaultParameters(self):
+        return {'lambda':1.0, 'maxInnerIter':200, 'innerTolerance':1e-4, 
+                'scale':1, 'maxStepLength':0.25, 'sigmaDiff':3.0, 'stepType':0,
+                'symmetric':False}
+
     def __init__(self, parameters):
-        super(SSDMetric, self).__init__()
-        defaultParameters={'lambda':1.0, 'maxInnerIter':200, 'innerTolerance':1e-4, 
-                           'scale':1, 'maxStepLength':1.0, 'sigmaDiff':2.0}
-        for key, val in parameters.iteritems():
-            if key in defaultParameters:
-                defaultParameters[key]=val
-            else:
-                print "Warning: unknown parameter '",key,"' unknown"
-        parameters=defaultParameters
-        self.parameters=parameters
-        self.updateType=SSDMetric.GAUSS_SEIDEL_STEP
+        super(SSDMetric, self).__init__(parameters)
+        self.stepType=self.parameters['stepType']
+        self.setSymmetric(self.parameters['symmetric'])
 
     def initializeIteration(self):
-        self.sigmaField=np.ones_like(self.movingImage, dtype=np.float64)
-        self.deltaField=self.fixedImage-self.movingImage
         self.gradientMoving=np.empty(shape=(self.movingImage.shape)+(self.dim,), dtype=np.float64)
         i=0
         for grad in sp.gradient(self.movingImage):
@@ -33,16 +28,19 @@ class SSDMetric(SimilarityMetric):
             i+=1
 
     def computeForward(self):
-        if self.updateType==SSDMetric.GAUSS_SEIDEL_STEP:
+        if self.stepType==SSDMetric.GAUSS_SEIDEL_STEP:
             return self.computeGaussSeidelStep(True)
-        elif self.updateType==SSDMetric.DEMONS_STEP:
+        elif self.stepType==SSDMetric.DEMONS_STEP:
             return self.computeDemonsStep(True)
         return None
 
     def computeBackward(self):
-        if self.updateType==SSDMetric.GAUSS_SEIDEL_STEP:
+        if not self.symmetric:
+            print 'Error: SSDMetric was not set as symmetric'
+            return None
+        if self.stepType==SSDMetric.GAUSS_SEIDEL_STEP:
             return self.computeGaussSeidelStep(False)
-        elif self.updateType==SSDMetric.DEMONS_STEP:
+        elif self.stepType==SSDMetric.DEMONS_STEP:
             return self.computeDemonsStep(False)
         return None
 
@@ -50,9 +48,10 @@ class SSDMetric(SimilarityMetric):
         maxInnerIter=self.parameters['maxInnerIter']
         tolerance=self.parameters['innerTolerance']
         lambdaParam=self.parameters['lambda']
+        maxStepLength=self.parameters['maxStepLength']
         sh=self.fixedImage.shape if forwardStep else self.movingImage.shape
-        deltaField=self.deltaField if forwardStep else self.deltaField*-1.0
-        gradient=self.gradientMoving+self.gradientFixed if forwardStep else self.gradientFixed
+        deltaField=self.fixedImage-self.movingImage if forwardStep else self.movingImage - self.fixedImage
+        gradient=self.gradientMoving+self.gradientFixed
         displacement=np.zeros(shape=(sh)+(self.dim,), dtype=np.float64)
         error=1+tolerance
         innerIter=0
@@ -60,28 +59,63 @@ class SSDMetric(SimilarityMetric):
             while((error>tolerance)and(innerIter<maxInnerIter)):
                 innerIter+=1
                 error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradient,  lambdaParam, displacement, None)
+            maxNorm=np.sqrt(np.sum(displacement**2,2)).max()
+            #if maxNorm>maxStepLength:
+            displacement*=maxStepLength/maxNorm
         else:
             while((error>tolerance)and(innerIter<maxInnerIter)):
                 innerIter+=1
                 error=tf.iterateDisplacementField3DCYTHON(deltaField, None, gradient,  lambdaParam, displacement, None)
+            maxNorm=np.sqrt(np.sum(displacement**2,3)).max()
+            displacement*=maxStepLength/maxNorm
         return displacement
 
     def computeDemonsStep(self, forwardStep=True):
         sigmaDiff=self.parameters['sigmaDiff']
         maxStepLength=self.parameters['maxStepLength']
         scale=self.parameters['scale']
-        deltaField=self.deltaField if forwardStep else self.deltaField*-1.0
-        gradient=self.gradientMoving if forwardStep else self.gradientFixed
+        deltaField=self.fixedImage-self.movingImage if forwardStep else self.movingImage - self.fixedImage
+        gradient=self.gradientMoving+self.gradientFixed
         if self.dim==2:
             forward=tf.compute_demons_step2D(deltaField, gradient, maxStepLength, scale)
             forward[...,0]=sp.ndimage.filters.gaussian_filter(forward[...,0], sigmaDiff)
             forward[...,1]=sp.ndimage.filters.gaussian_filter(forward[...,1], sigmaDiff)
         else:
-            return NotImplemented
+            forward=tf.compute_demons_step2D(deltaField, gradient, maxStepLength, scale)
+            forward[...,0]=sp.ndimage.filters.gaussian_filter(forward[...,0], sigmaDiff)
+            forward[...,1]=sp.ndimage.filters.gaussian_filter(forward[...,1], sigmaDiff)
+            forward[...,2]=sp.ndimage.filters.gaussian_filter(forward[...,2], sigmaDiff)
         return forward
 
-    def setUpdateType(self, updateType):
-        self.updateType=updateType
+    def setStepType(self, stepType):
+        self.stepType=stepType
 
     def getEnergy(self):
+        return NotImplemented
+
+    def setSymmetric(self, symmetric=True):
+        self.symmetric=symmetric
+
+    def useOriginalFixedImage(self, originalFixedImage):
+        '''
+        SSDMetric does not take advantage of the original fixed image, just pass
+        '''
+        pass
+
+    def useOriginalMovingImage(self, originalMovingImage):
+        '''
+        SSDMetric does not take advantage of the original moving image just pass
+        '''
+        pass
+
+    def useFixedImageDynamics(self, originalFixedImage, transformation, direction):
+        '''
+        SSDMetric does not take advantage of the image dynamics, just pass
+        '''
+        pass
+
+    def useMovingImageDynamics(self, originalMovingImage, transformation, direction):
+        '''
+        SSDMetric does not take advantage of the image dynamics, just pass
+        '''
         pass
