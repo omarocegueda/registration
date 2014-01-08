@@ -117,3 +117,10 @@ class TransformationModel(object):
             if self.backward!=None:
                 self.backward=np.array(tf.upsample_displacement_field3D(self.backward, np.array(newDomainBackward).astype(np.int32)))*2
         self.scaleAffines(2.0)
+    
+    def computeInversionError(self):
+        if self.dim==2:
+            residual, stats=tf.compose_vector_fields(self.forward, self.backward)
+        else:
+            residual, stats=tf.compose_vector_fields3D(self.forward, self.backward)
+        return residual, stats

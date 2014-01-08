@@ -206,6 +206,8 @@ class RegistrationOptimizer(object):
         phiInv, mdInv=self.updateRule.update(phi2Inv, phi1Inv)
         self.forwardModel.setForward(phi)
         self.forwardModel.setBackward(phiInv)
+        residual, stats=self.forwardModel.computeInversionError()
+        print 'Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
         self.__endOptimizer()
 
     def optimize(self):

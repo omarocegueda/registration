@@ -1000,6 +1000,89 @@ int initializeNearestNeighborInverseField(double *forward, int nrows, int ncols,
 }
 
 
+/*int initializeNearestNeighborInverseField3D(double *forward, int nslices, int nrows, int ncols, double *inv, double *error){
+    const static int nSlice[]={0, 0, 0, 0, 1, 1, 1, 1};    
+    const static int nRow[]  ={0, 0, 1, 1, 0, 0, 1, 1};
+    const static int nCol[]  ={0, 1, 0, 1, 0, 1, 0, 1};
+    int sliceSize=nrows*ncols;
+    bool needsDelete=false;
+    if(error==NULL){
+        needsDelete=true;
+        error=new double[nslices*nrows*ncols];
+    }
+    // Step 0: initialize delta, MAXLOOP and inverse computing error
+    for(int i=nslices*nrows*ncols-1;i>=0;--i){
+        error[i]=INF64;
+    }
+    //Step 1a: Map points from p in R, assign e(q) for points q in S which are immediately adjacent to f(p) if assignment reduces e(q)
+    double *f=forward;
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, f+=3){//p=(k,i,j) in R
+                double dkk=k+f[0];  
+                double dii=i+f[1];
+                double djj=j+f[2];//(dkk, dii, djj) = f(p)
+                if((dkk<0) || (dii<0) || (djj<0) || (dkk>nslices-1) || (dii>nrows-1)||(djj>ncols-1)){//no one is affected
+                    continue;
+                }
+                //find the top left index and the interpolation coefficients
+                int kk=floor(dkk);
+                int ii=floor(dii);
+                int jj=floor(djj);
+                //assign all grid points immediately adjacent to f(p)
+                for(int idx=0;idx<8;++idx){
+                    int kkk=kk+nSlice[idx];
+                    int iii=ii+nRow[idx];
+                    int jjj=jj+nCol[idx];//(kkk, iii, jjj)=q is a surrounding point
+                    if((kkk<0)||(iii<0)||(jjj<0)||(kkk>=nslices)||(iii>=nrows)||(jjj>=ncols)){
+                        continue;//the point is outside the lattice
+                    }
+                    double ds=dkk-kkk;
+                    double dr=dii-iii;
+                    double dc=djj-jjj;//(ds, dr,dc) = f(p) - q
+                    double opt=sqrt(ds*ds+dr*dr+dc*dc);//||q-f(p)||
+                    if(opt<error[kkk*sliceSize+iii*ncols+jjj]){//if(||q-f(p)||^2 < e(q))
+                        double *dq=&inv[3*(kkk*sliceSize+iii*ncols+jjj)];
+                        dq[0]=k-kkk;
+                        dq[1]=i-iii;
+                        dq[2]=j-jjj;//g(q)=p  <<==>>  q+inv[q] = p <<==>> inv[q]=p-q
+                        error[kkk*sliceSize+iii*ncols+jjj]=opt;
+                    }
+                }
+            }
+        }
+    }
+    // Step 1b: map unmapped points in S via nearest neighbor
+    double *dq=inv;
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j,dq+=3){//q=(k,i,j)
+                if(!isInfinite(error[k*sliceSize+i*ncols+j])){
+                    continue;
+                }
+                //find nearest neighbor q’ in S with finite e(q’)
+                int kk,ii,jj;
+not implemented:findNearesFinite3D(error, nslices, nrows, ncols, k, i, j, kk, ii, jj);//(kk, ii, jj)=q'
+                double *dqprime=&inv[3*(kk*sliceSize+ii*ncols+jj)];
+                dq[0]=kk+dqprime[0]-k;
+                dq[1]=ii+dqprime[1]-i;
+                dq[2]=jj+dqprime[2]-j;//g(q)=g(q') <<==>> q+inv[q] = q'+inv[q']  <<==>>  inv[q]=q'+inv[q']-q
+                double fs, fr,fc;
+not implemented:interpolateDisplacementField3DAt(forward, nslices, nrows, ncols, kk+dqprime[0], ii+dqprime[1], jj+dqprime[2], fs, fr, fc);//(ii+dqprime[0], jj+dqprime[1])+(fr,fc) = f(g(q')) 
+                double ds=kk+dqprime[0]+fs-k;
+                double dr=ii+dqprime[1]+fr-i;
+                double dc=jj+dqprime[2]+fc-j;//(dr, dc)=f(g(q'))-q
+                error[k*sliceSize+i*ncols+j]=sqrt(ds*ds+dr*dr+dc*dc);
+            }
+        }
+    }
+    if(needsDelete){
+        delete[] error;
+    }
+    return 0;
+}
+
+*/
 int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats){
     const static int numNeighbors=4;
     const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
@@ -2776,7 +2859,7 @@ int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, do
 
 int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats){
     double error=1+tolerance;
-    double *temp[3];
+    double *temp[2];
     double substats[3];
     temp[0]=new double[nslices*nrows*ncols*3];
     temp[1]=invd;
@@ -2787,22 +2870,27 @@ int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, 
         memset(temp[0], 0, sizeof(double)*nsites);
     }
     int iter;
-    double epsilon=0.5;
+    double epsilon=0.125;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
         composeVectorFields3D(temp[iter&1], d, nslices, nrows, ncols, temp[1-(iter&1)], substats);
-        double *p=temp[1-(iter&1)];
-        double *q=temp[iter&1];
+        double difmag=0;
         error=0;
-        for(int i=0;i<nsites;i+=3){
-            double mag=0;
-            for(int j=0;j<3;++j,++p,++q){
-                mag+=(*p)*(*p);
-                *p=(*q)-epsilon*(*p);//this relaxation was introduced in ANTS
-            }
-            mag=sqrt(mag);
+        double *p=temp[1-(iter&1)];
+        for(int i=0;i<nsites;i+=3, p+=3){
+            double mag=sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);
             error+=mag;
+            if(difmag<mag){
+                difmag=mag;
+            }
         }
-        error/=(nslices*nrows*ncols);
+        error/=(nrows*ncols);
+        p=temp[1-(iter&1)];
+        double *q=temp[iter&1];
+        for(int i=0;i<nsites;i+=3,p+=3,q+=3){
+            p[0]=q[0]-epsilon*p[0];
+            p[1]=q[1]-epsilon*p[1];
+            p[2]=q[2]-epsilon*p[2];
+        }
     }
     if(iter&1){//then the last computation was stored at temp[0]
         memcpy(invd, temp[0], sizeof(double)*nsites);
