@@ -32,7 +32,6 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     else:
         T=rcommon.readAntsAffine(fnameAffine)
     initAffine=np.linalg.inv(M).dot(T.dot(F))
-    initAffineInverse=np.linalg.inv(initAffine)
     #print initAffine
     moving=moving.get_data().squeeze().astype(np.float64)
     fixed=fixed.get_data().squeeze().astype(np.float64)
@@ -40,8 +39,7 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     fixed=np.copy(fixed, order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    #maxOuterIter=[10,100,100]
-    maxOuterIter=[2,2,2]
+    maxOuterIter=[10,100,100]
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)
     ###################Run registration##################
@@ -51,9 +49,7 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     registrationOptimizer.optimize()
     #####################################################
     displacement=registrationOptimizer.getForward()
-    inverse=registrationOptimizer.getBackward()
     tf.prepend_affine_to_displacement_field(displacement, initAffine)
-    tf.apend_affine_to_displacement_field(inverse, initAffineInverse)
     #####Warp all requested volumes
     #---first the target using tri-linear interpolation---
     moving=nib.load(fnameMoving).get_data().squeeze().astype(np.float64)
@@ -81,14 +77,8 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
         warped=np.array(tf.warp_discrete_volumeNNAffine(toWarp, referenceShape, initAffine)).astype(np.int16)
         imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
         imgWarped.to_filename('warpedAffine_'+baseWarp+'_'+baseFixed+'.nii.gz')
-    #---finally, the deformed lattices (forward, inverse and resdidual)---        
-    residual, stats=tf.compose_vector_fields3D(displacement, inverse)
-    residual=np.array(residual)
+    #---finally, the deformed lattice
     saveDeformedLattice3D(displacement, 'latticeDispDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
-    saveDeformedLattice3D(inverse, 'latticeInvDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
-    saveDeformedLattice3D(residual, 'latticeResdiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
-    residual=np.sqrt(np.sum(residual**2,3))
-    print "Mean residual norm:", residual.mean()," (",residual.std(), "). Max residual norm:", residual.max()
 
 if __name__=='__main__':
     '''
