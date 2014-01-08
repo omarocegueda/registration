@@ -2420,23 +2420,16 @@ int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d
 }
 
 int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine){
+    if(affine==NULL){
+        return 0;
+    }
     double *dx=d1;
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=3){
-                double dkk,dii,djj;
-                if(affine!=NULL){
-                    dkk=APPLY_AFFINE_X0(k,i,j,affine);
-                    dii=APPLY_AFFINE_X1(k,i,j,affine);
-                    djj=APPLY_AFFINE_X2(k,i,j,affine);
-                }else{
-                    dkk=k;
-                    dii=i;
-                    djj=j;
-                }
-                dx[0]+=dkk-k;
-                dx[1]+=dii-i;
-                dx[2]+=djj-j;
+                dx[0]+=APPLY_AFFINE_X0(k,i,j,affine)-k;
+                dx[1]+=APPLY_AFFINE_X1(k,i,j,affine)-i;
+                dx[2]+=APPLY_AFFINE_X2(k,i,j,affine)-j;
             }
         }
     }
@@ -2444,20 +2437,17 @@ int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int nco
 }
 
 int apendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine){
+    if(affine==NULL){
+        return 0;
+    }
     double *dx=d1;
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=3){
                 double dkk=dx[0]+k,dii=dx[1]+i,djj=dx[2]+j;
-                if(affine!=NULL){
-                    dx[0]=APPLY_AFFINE_X0(dkk,dii,djj,affine);
-                    dx[1]=APPLY_AFFINE_X1(dkk,dii,djj,affine);
-                    dx[2]=APPLY_AFFINE_X2(dkk,dii,djj,affine);
-                }else{
-                    dx[0]=dkk;
-                    dx[1]=dii;
-                    dx[2]=djj;
-                }                
+                dx[0]=APPLY_AFFINE_X0(dkk,dii,djj,affine)-k;
+                dx[1]=APPLY_AFFINE_X1(dkk,dii,djj,affine)-i;
+                dx[2]=APPLY_AFFINE_X2(dkk,dii,djj,affine)-j;
             }
         }
     }
