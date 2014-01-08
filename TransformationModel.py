@@ -108,12 +108,12 @@ class TransformationModel(object):
     def upsample(self, newDomainForward, newDomainBackward):
         if self.dim==2:
             if self.forward!=None:
-                self.forward=np.array(tf.upsample_displacement_field(self.forward, np.array(newDomainForward)))*2
+                self.forward=np.array(tf.upsample_displacement_field(self.forward, np.array(newDomainForward).astype(np.int32)))*2
             if self.backward!=None:
-                self.backward=np.array(tf.upsample_displacement_field(self.backward, np.array(newDomainBackward)))*2
+                self.backward=np.array(tf.upsample_displacement_field(self.backward, np.array(newDomainBackward).astype(np.int32)))*2
         else:
             if self.forward!=None:
-                self.forward=np.array(tf.upsample_displacement_field3D(self.forward, np.array(newDomainForward)))*2
+                self.forward=np.array(tf.upsample_displacement_field3D(self.forward, np.array(newDomainForward).astype(np.int32)))*2
             if self.backward!=None:
-                self.backward=np.array(tf.upsample_displacement_field3D(self.backward, np.array(newDomainBackward)))*2
+                self.backward=np.array(tf.upsample_displacement_field3D(self.backward, np.array(newDomainBackward).astype(np.int32)))*2
         self.scaleAffines(2.0)
