@@ -27,7 +27,7 @@ double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaFiel
 
 int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats);
 int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats);
-int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats);
+int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats);
 int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats);
 int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv);
 
@@ -42,7 +42,7 @@ int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, doubl
 int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv);
 
 void consecutiveLabelMap(int *v, int n, int *out);
-int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp);
+int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp, double *stats);
 int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv);
 
 int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc);
@@ -61,6 +61,7 @@ int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, dou
 int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, int *warped);
 int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats);
 int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine);
+int apendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine);
 
 void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg);
 int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal);

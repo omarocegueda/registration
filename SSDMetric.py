@@ -2,6 +2,8 @@ import numpy as np
 import scipy as sp
 import tensorFieldUtils as tf
 from SimilarityMetric import SimilarityMetric
+import registrationCommon as rcommon
+import matplotlib.pyplot as plt
 class SSDMetric(SimilarityMetric):
     GAUSS_SEIDEL_STEP=0
     DEMONS_STEP=1
@@ -119,3 +121,7 @@ class SSDMetric(SimilarityMetric):
         SSDMetric does not take advantage of the image dynamics, just pass
         '''
         pass
+
+    def reportStatus(self):
+        plt.figure()
+        rcommon.overlayImages(self.movingImage, self.fixedImage, False)

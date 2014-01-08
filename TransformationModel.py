@@ -3,22 +3,30 @@ import tensorFieldUtils as tf
 
 class TransformationModel(object):
     def __init__(self, forward=None, backward=None, affineFixed=None, affineMoving=None):
-        #print forward, backward, affineFixed, affineMoving
-        self.forward=forward
-        self.backward=backward
-        self.affineFixed=affineFixed
-        self.affineMoving=affineMoving
+        self.dim=None
+        self.setForward(forward)
+        self.setBackward(backward)       
+        self.setAffineFixed(affineFixed)
+        self.setAffineMoving(affineMoving)
 
     def setAffineFixed(self, affineFixed):
+        if affineFixed!=None:
+            self.dim=affineFixed.shape[1]-1
         self.affineFixed=affineFixed
 
     def setAffineMoving(self, affineMoving):
+        if affineMoving!=None:
+            self.dim=affineMoving.shape[1]-1
         self.affineMoving=affineMoving
 
     def setForward(self, forward):
+        if forward!=None:
+            self.dim=len(forward.shape)-1
         self.forward=forward
 
     def setBackward(self, backward):
+        if backward!=None:
+            self.dim=len(backward.shape)-1
         self.backward=backward
 
     def getAffineFixed(self):
@@ -98,8 +106,14 @@ class TransformationModel(object):
             self.affineFixed=self.__scaleAffine(self.affineFixed, factor)
         
     def upsample(self, newDomainForward, newDomainBackward):
-        if self.forward!=None:
-            self.forward=np.array(tf.upsample_displacement_field(self.forward, np.array(newDomainForward)))*2
-        if self.backward!=None:
-            self.backward=np.array(tf.upsample_displacement_field(self.backward, np.array(newDomainBackward)))*2
+        if self.dim==2:
+            if self.forward!=None:
+                self.forward=np.array(tf.upsample_displacement_field(self.forward, np.array(newDomainForward)))*2
+            if self.backward!=None:
+                self.backward=np.array(tf.upsample_displacement_field(self.backward, np.array(newDomainBackward)))*2
+        else:
+            if self.forward!=None:
+                self.forward=np.array(tf.upsample_displacement_field3D(self.forward, np.array(newDomainForward)))*2
+            if self.backward!=None:
+                self.backward=np.array(tf.upsample_displacement_field3D(self.backward, np.array(newDomainBackward)))*2
         self.scaleAffines(2.0)

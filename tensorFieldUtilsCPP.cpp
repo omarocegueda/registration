@@ -522,6 +522,14 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
                 if(residual!=NULL){
                     residual[pos]=0;
                 }
+            }else if (sigma<1e-9){
+                    double nrm2=g[0]*g[0]+g[1]*g[1];
+                    if(nrm2<1e-9){
+                        d[0]=d[1]=0;
+                    }else{
+                        d[0]=(g[0]*delta)/nrm2;
+                        d[1]=(g[1]*delta)/nrm2;
+                    }
             }else{
                 y[0]=(delta*g[0]) + sigma*lambdaParam*y[0];
                 y[1]=(delta*g[1]) + sigma*lambdaParam*y[1];
@@ -1102,6 +1110,7 @@ int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, doub
     const static int nCol[]     ={0, 1, 0, 1, 0, 1, 0, 1};
     double gamma[8];
     double gamma2[8];
+    double substats[3];
     int nsites=nslices*nrows*ncols;
     int sliceSize=nrows*ncols;
     double *temp=new double[nsites*3];
@@ -1114,7 +1123,7 @@ int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, doub
         memset(temp, 0, sizeof(double)*nsites*3);
         memset(denom, 0, sizeof(double)*nsites);
         //---interpolate the current approximation and accumulate with the forward field---
-        composeVectorFields3D(forward, inv, nslices, nrows, ncols, residual);
+        composeVectorFields3D(forward, inv, nslices, nrows, ncols, residual,substats);
         double *r=residual;
         double *f=forward;
         for(int k=0;k<nslices;++k){
@@ -1465,10 +1474,14 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
 /*
     Computes comp(x)=d2(x+d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
 */
-int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp){
+int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp, double *stats){
     int sliceSize=nrows*ncols;
     double *dx=d1;
     double *res=comp;
+    double maxNorm=0;
+    double meanNorm=0;
+    double stdNorm=0;
+    int cnt=0;
     memset(comp, 0, sizeof(double)*nslices*sliceSize*3); 
     for(int k=0;k<nslices;++k){
         for(int i=0;i<nrows;++i){
@@ -1554,9 +1567,22 @@ int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int nc
                         res[2]+=calpha*beta*cgamma*z[2];
                     }
                 }
+                if((k+dx[0]>=0 && k+dx[0]<=nslices-1) && (i+dx[1]>=0 && i+dx[1]<=nrows-1) && (j+dx[2]>=0 && j+dx[2]<=ncols-1)){
+                    double nn=res[0]*res[0]+res[1]*res[1]+res[2]*res[2];
+                    if(maxNorm<nn){
+                        maxNorm=nn;
+                    }
+                    meanNorm+=nn;
+                    stdNorm+=nn*nn;
+                    ++cnt;
+                }
             }
         }
     }
+    meanNorm/=cnt;
+    stats[0]=sqrt(maxNorm);
+    stats[1]=sqrt(meanNorm);
+    stats[2]=sqrt(stdNorm/cnt - meanNorm*meanNorm);
     return 0;
 }
 
@@ -2334,6 +2360,27 @@ int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int nco
     return 0;
 }
 
+int apendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine){
+    double *dx=d1;
+    for(int k=0;k<nslices;++k){
+        for(int i=0;i<nrows;++i){
+            for(int j=0;j<ncols;++j, dx+=3){
+                double dkk=dx[0]+k,dii=dx[1]+i,djj=dx[2]+j;
+                if(affine!=NULL){
+                    dx[0]=APPLY_AFFINE_X0(dkk,dii,djj,affine);
+                    dx[1]=APPLY_AFFINE_X1(dkk,dii,djj,affine);
+                    dx[2]=APPLY_AFFINE_X2(dkk,dii,djj,affine);
+                }else{
+                    dkk=dkk;
+                    dii=dii;
+                    djj=djj;
+                }                
+            }
+        }
+    }
+    return 0;
+}
+
 /*
     Interpolates the vector field d2 at d1: d2(d1(x)) (i.e. applies first d1, then d2 to the result)
     Seen as a linear operator, it is defined by d1 and the input vector is d2
@@ -2727,17 +2774,22 @@ int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, do
 }
 
 
-int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *stats){
+int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats){
     double error=1+tolerance;
     double *temp[3];
+    double substats[3];
     temp[0]=new double[nslices*nrows*ncols*3];
     temp[1]=invd;
     int nsites=3*nslices*nrows*ncols;
-    memset(temp[0], 0, sizeof(double)*nsites);
+    if(start!=NULL){
+        memcpy(temp[0], start, sizeof(double)*nsites);
+    }else{
+        memset(temp[0], 0, sizeof(double)*nsites);
+    }
     int iter;
     double epsilon=0.5;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
-        composeVectorFields3D(temp[iter&1], d, nslices, nrows, ncols, temp[1-(iter&1)]);
+        composeVectorFields3D(temp[iter&1], d, nslices, nrows, ncols, temp[1-(iter&1)], substats);
         double *p=temp[1-(iter&1)];
         double *q=temp[iter&1];
         error=0;
@@ -2854,8 +2906,9 @@ int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, doubl
     for(int i=3*nsites-1;i>=0;--i){
         tmp[1][i]=v[i]*factor;
     }
+    double substats[3];
     for(int i=1;i<=n;++i){
-        composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)]);
+        composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)], substats);
     }
     //---perform binary exponentiation: inverse---
     if(invexpv!=NULL){
@@ -2865,7 +2918,7 @@ int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, doubl
         }
         invertVectorField3D(tmp[0], nslices, nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
         for(int i=1;i<=n;++i){
-            composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)]);
+            composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)],substats);
         }
     }
     delete[] tmp[n%2];

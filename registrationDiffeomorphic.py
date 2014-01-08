@@ -252,7 +252,7 @@ def estimateNewMonomodalDiffeomorphicField3D(moving, fixed, lambdaParam, maxOute
             if(maxResidual<opt):
                 maxResidual=opt
         maxDisplacement=np.max(np.abs(displacement))
-        totalDisplacement=tf.compose_vector_fields3D(displacement, totalDisplacement)
+        totalDisplacement, stats=tf.compose_vector_fields3D(displacement, totalDisplacement)
         if(maxDisplacement<outerTolerance):
             break
     print "Iter: ",outerIter, "Max lateral displacement:", maxDisplacement, "Max variation:",maxVariation, "Max residual:", maxResidual
@@ -381,7 +381,8 @@ def estimateNewMultimodalDiffeomorphicField3D(moving, fixed, initAffine, lambdaD
         #print "Range expd:", expd.min(), expd.max(), "Range TD:", totalDisplacement.min(), totalDisplacement.max()
         #print "Compose vector fields..."
         #sys.stdout.flush()
-        totalDisplacement=np.array(tf.compose_vector_fields3D(expd, totalDisplacement))
+        totalDisplacement, stats=tf.compose_vector_fields3D(expd, totalDisplacement)
+        totalDisplacement=np.array(totalDisplacement)
         #print "Composed rage:", totalDisplacement.min(), totalDisplacement.max()
         #sys.stdout.flush()
         #--check stop condition--
@@ -500,7 +501,8 @@ def testEstimateMultimodalDiffeomorphicField3DMultiScale(fnameMoving, fnameFixed
     tolerance=1e-4
     print 'Computing inverse...'
     inverse=np.array(tf.invert_vector_field3D(displacement, lambdaParam, maxIter, tolerance))
-    residual=np.array(tf.compose_vector_fields3D(displacement, inverse))
+    residual, stats=tf.compose_vector_fields3D(displacement, inverse)
+    residual=np.array(residual)
     saveDeformedLattice3D(displacement, 'latticeDispDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     saveDeformedLattice3D(inverse, 'latticeInvDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     saveDeformedLattice3D(residual, 'latticeResdiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
@@ -762,14 +764,7 @@ def testInversion_invertible():
     residual, stats=tf.compose_vector_fields(displacement_clean, inverse)
     residual=np.array(residual)
     [d,invd,res, detJ]=rcommon.plotDiffeomorphism(displacement, inverse, residual, 'invertible', 7)
-    
-#python registrationDiffeomorphic.py IBSR_01_ana_strip.nii.gz t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt 100
 
-#testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt', 100)
-
-#testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip_t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None, 100)
-
-#python registrationDiffeomorphic.py IBSR_01_ana_strip.nii.gz t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt 100
 #python registrationDiffeomorphic.py "/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz" "/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz" "IBSR_01_ana_strip_IBSR_02_ana_stripAffine.txt" "warp" 100.0
 if __name__=='__main__':
     moving=sys.argv[1]

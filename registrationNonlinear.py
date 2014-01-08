@@ -51,7 +51,7 @@ def estimateNewMonomodalDeformationField2DLarge(moving, fixed, lambdaParam, maxO
         maxInnerIter=1000
         while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
-            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, totalDisplacement, displacement, residuals)
+            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, residuals)
             opt=np.max(residuals)
             if(maxResidual<opt):
                 maxResidual=opt
@@ -94,7 +94,7 @@ def estimateNewMonomodalDeformationField2D(moving, fixed, lambdaParam, maxIter, 
     maxResidual=0
     while((maxVariation>epsilon)and(innerIter<maxIter)):
         innerIter+=1
-        maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, totalDisplacement, displacement, residuals)
+        maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, residuals)
         opt=np.max(residuals)
         if(maxResidual<opt):
             maxResidual=opt
@@ -374,7 +374,7 @@ def estimateNewMultimodalDeformationField2D(moving, fixed, lambdaDisplacement, q
         displacement[...]=0
         while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
-            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaDisplacement, totalDisplacement, displacement, residuals)
+            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaDisplacement, displacement, residuals)
             opt=np.max(residuals)
             if(maxResidual<opt):
                 maxResidual=opt
@@ -456,7 +456,8 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic):
     if(synthetic):
         print 'Generating synthetic field...'
         #----apply synthetic deformation field to fixed image
-        GT=rcommon.createDeformationField_type2(fixed.shape[0], fixed.shape[1], 8)
+        GT=rcommon.createDeformationField2D_type2(fixed.shape[0], fixed.shape[1], 8)
+        rcommon.plotDiffeomorphism(GT, GT, GT, 'inv-direct', 7)
         warpedFixed=rcommon.warpImage(fixed,GT)
     else:
         templateT1=nib.load('data/t1/IBSR_template_to_01.nii.gz')
@@ -489,8 +490,10 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic):
     level=3
     maskMoving=moving>0
     maskFixed=warpedFixed>0
-    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
-    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(warpedFixed, level, maskFixed)]
+#    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, maskMoving)]
+#    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(warpedFixed, level, maskFixed)]
+    movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(moving, level, np.ones_like(maskMoving))]
+    fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(warpedFixed, level, np.ones_like(maskFixed))]
     plt.figure()
     plt.subplot(1,2,1)
     plt.imshow(moving, cmap=plt.cm.gray)
@@ -501,6 +504,7 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic):
     rcommon.plotOverlaidPyramids(movingPyramid, fixedPyramid)
     displacementList=[]
     displacement=estimateMultimodalDeformationField2DMultiScale(movingPyramid, fixedPyramid, lambdaParam, maxOuterIter, 0, displacementList)
+    rcommon.plotDiffeomorphism(displacement, displacement, displacement, 'inv-direct', 7)
     warpPyramid=[rcommon.warpImage(movingPyramid[i], displacementList[i]) for i in range(level+1)]
     rcommon.plotOverlaidPyramids(warpPyramid, fixedPyramid)
     rcommon.overlayImages(warpPyramid[0], fixedPyramid[0])
@@ -514,6 +518,7 @@ def testEstimateMultimodalDeformationField2DMultiScale(lambdaParam, synthetic):
     residual=((displacement-GT))**2
     meanDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).mean()
     stdevDisplacementError=np.sqrt(residual.sum(2)*(maskFixed)).std()
+    
     print 'Max global displacement: ', maxNorm
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
@@ -697,7 +702,8 @@ def testEstimateMultimodalNonlinearField3DMultiScale(fnameMoving, fnameFixed, fn
     tolerance=1e-4
     print 'Computing inverse...'
     inverse=np.array(tf.invert_vector_field3D(displacement, lambdaParam, maxIter, tolerance))
-    residual=np.array(tf.compose_vector_fields3D(displacement, inverse))
+    residual, stats=tf.compose_vector_fields3D(displacement, inverse)
+    residual=np.array(residual)
     saveDeformedLattice3D(displacement, 'latticeDispDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     saveDeformedLattice3D(inverse, 'latticeInvDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     saveDeformedLattice3D(residual, 'latticeResdiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
@@ -1110,6 +1116,7 @@ def testBrainwebSegmentation():
     plt.subplot(1,3,3)
     plt.imshow(imgC)
 
+#testEstimateMultimodalDeformationField2DMultiScale(150, False):
 if __name__=="__main__":
     moving=sys.argv[1]
     fixed=sys.argv[2]

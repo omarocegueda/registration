@@ -17,6 +17,7 @@ class UpdateRule(object):
 class Addition(UpdateRule):
     def __init__(self):
         pass
+
     @staticmethod
     def update(newDisplacement, currentDisplacement):
         meanNorm=np.sqrt(np.sum(newDisplacement**2,-1)).mean()
@@ -26,14 +27,20 @@ class Addition(UpdateRule):
 class Composition(UpdateRule):
     def __init__(self):
         pass
+
     @staticmethod
     def update(newDisplacement, currentDisplacement):
-        updated, stats=tf.compose_vector_fields(newDisplacement, currentDisplacement)
+        dim=len(newDisplacement.shape)
+        if dim==2:
+            updated, stats=tf.compose_vector_fields(newDisplacement, currentDisplacement)
+        else:
+            updated, stats=tf.compose_vector_fields3D(newDisplacement, currentDisplacement)
         return updated, stats[0]
 
 class ProjectedComposition(UpdateRule):
     def __init__(self):
         pass
+
     @staticmethod
     def update(newDisplacement, currentDisplacement):
         expd, invexpd=tf.vector_field_exponential(newDisplacement, True)

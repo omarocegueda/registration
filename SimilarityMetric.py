@@ -138,3 +138,11 @@ class SimilarityMetric(object):
     @abc.abstractmethod
     def getDefaultParameters(self):
         return NotImplemented
+
+    @abc.abstractmethod
+    def reportStatus():
+        '''
+        This function is called mostly for debugging purposes. The metric
+        can for example show the overlaid images or print some statistics
+        '''
+        return NotImplemented
