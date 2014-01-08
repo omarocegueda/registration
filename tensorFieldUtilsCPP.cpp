@@ -2371,9 +2371,9 @@ int apendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols
                     dx[1]=APPLY_AFFINE_X1(dkk,dii,djj,affine);
                     dx[2]=APPLY_AFFINE_X2(dkk,dii,djj,affine);
                 }else{
-                    dkk=dkk;
-                    dii=dii;
-                    djj=djj;
+                    dx[0]=dkk;
+                    dx[1]=dii;
+                    dx[2]=djj;
                 }                
             }
         }
