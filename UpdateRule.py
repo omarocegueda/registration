@@ -30,7 +30,7 @@ class Composition(UpdateRule):
 
     @staticmethod
     def update(newDisplacement, currentDisplacement):
-        dim=len(newDisplacement.shape)
+        dim=len(newDisplacement.shape)-1
         if dim==2:
             updated, stats=tf.compose_vector_fields(newDisplacement, currentDisplacement)
         else:

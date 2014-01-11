@@ -1719,6 +1719,37 @@ int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int 
     return 0;
 }
 
+int downsampleDisplacementField(double *d1, int nr, int nc, double *down){
+    int nnr=(nr+1)/2;
+    int nnc=(nc+1)/2;
+    double *d=d1;
+    memset(down, 0, sizeof(double)*nnr*nnc*2);
+    for(int i=0;i<nr;++i){
+        for(int j=0;j<nc;++j,d+=2){
+            int ii=i/2;
+            int jj=j/2;
+            down[2*(ii*nnc+jj)]+=d[0];
+            down[2*(ii*nnc+jj)+1]+=d[1];
+        }
+    }
+    return 0;
+}
+
+int downsampleScalarField(double *d1, int nr, int nc, double *down){
+    int nnr=(nr+1)/2;
+    int nnc=(nc+1)/2;
+    double *d=d1;
+    memset(down, 0, sizeof(double)*nnr*nnc);
+    for(int i=0;i<nr;++i){
+        for(int j=0;j<nc;++j,d++){
+            int ii=i/2;
+            int jj=j/2;
+            down[ii*nnc+jj]+=d[0];
+        }
+    }
+    return 0;
+}
+
 /*
     It assumes that up was already allocated: (nslices)x(nrows)x(ncols)x3
     nslices, nrows, ncols are the dimensions of the upsampled field

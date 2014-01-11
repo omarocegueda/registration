@@ -267,6 +267,50 @@ def pyramid_gaussian_2D(image, max_layer, mask=None):
         image=newImage
         yield newImage
 
+def vCycle2D(n, k, deltaField, gradientField, lambdaParam, displacement):
+    #presmoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradientField,  lambdaParam, displacement, None)
+    if n==0:
+        return error
+    #solve at coarcer grid
+    subDeltaField=tf.downsample_scalar_field(deltaField)
+    subGradientField=tf.downsample_displacement_field(gradientField)
+    subDisplacement=tf.downsample_displacement_field(displacement)
+    subLambdaParam=0.25*lambdaParam
+    vCycle2D(n-1, k, subDeltaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=tf.upsample_displacement_field(subDisplacement, np.array(displacement.shape).astype(np.int32))
+    #post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradientField,  lambdaParam, displacement, None)
+    return displacement
+
+def wCycle2D(n, k, deltaField, gradientField, lambdaParam, displacement):
+    #presmoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradientField,  lambdaParam, displacement, None)
+    if n==0:
+        return error
+    #solve at coarcer grid
+    subDeltaField=tf.downsample_scalar_field(deltaField)
+    subGradientField=np.array(tf.downsample_displacement_field(gradientField))
+    subDisplacement=np.array(tf.downsample_displacement_field(displacement))
+    subLambdaParam=lambdaParam*0.25
+    wCycle2D(n-1, k, subDeltaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=np.array(tf.upsample_displacement_field(subDisplacement, np.array(displacement.shape).astype(np.int32)))
+    #post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradientField,  lambdaParam, displacement, None)
+    #second coarcer step
+    subDisplacement=np.array(tf.downsample_displacement_field(displacement))
+    wCycle2D(n-1, k, subDeltaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=np.array(tf.upsample_displacement_field(subDisplacement, np.array(displacement.shape).astype(np.int32)))
+    #second post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradientField,  lambdaParam, displacement, None)
+    return displacement
+    
+
 def overlayImages(img0, img1, createFig=True):
     colorImage=np.zeros(shape=(img0.shape)+(3,), dtype=np.int8)
     colorImage[...,0]=renormalizeImage(img0)

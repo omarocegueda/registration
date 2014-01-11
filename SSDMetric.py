@@ -16,6 +16,7 @@ class SSDMetric(SimilarityMetric):
         super(SSDMetric, self).__init__(parameters)
         self.stepType=self.parameters['stepType']
         self.setSymmetric(self.parameters['symmetric'])
+        self.levelsBelow=0
 
     def initializeIteration(self):
         self.gradientMoving=np.empty(shape=(self.movingImage.shape)+(self.dim,), dtype=np.float64)
@@ -58,12 +59,13 @@ class SSDMetric(SimilarityMetric):
         error=1+tolerance
         innerIter=0
         if self.dim==2:
-            while((error>tolerance)and(innerIter<maxInnerIter)):
-                innerIter+=1
-                error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradient,  lambdaParam, displacement, None)
-            maxNorm=np.sqrt(np.sum(displacement**2,2)).max()
-            #if maxNorm>maxStepLength:
-            displacement*=maxStepLength/maxNorm
+            #displacement=rcommon.vCycle2D(3, 5, deltaField, gradient, lambdaParam, displacement)
+            displacement=rcommon.wCycle2D(self.levelsBelow, 5, deltaField, gradient, lambdaParam, displacement)
+#            while((error>tolerance)and(innerIter<maxInnerIter)):
+#                innerIter+=1
+#                error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradient,  lambdaParam, displacement, None)
+#            maxNorm=np.sqrt(np.sum(displacement**2,2)).max()
+#            displacement*=maxStepLength/maxNorm
         else:
             while((error>tolerance)and(innerIter<maxInnerIter)):
                 innerIter+=1

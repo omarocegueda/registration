@@ -187,6 +187,7 @@ class RegistrationOptimizer(object):
             self.currentMoving=self.movingPyramid[level]
             self.similarityMetric.useOriginalFixedImage(self.fixedPyramid[level])
             self.similarityMetric.useOriginalMovingImage(self.movingPyramid[level])
+            self.similarityMetric.setLevelsBelow(self.levels-level)
             if level<self.levels-1:
                 self.forwardModel.upsample(self.currentFixed.shape, self.currentMoving.shape)
                 self.backwardModel.upsample(self.currentMoving.shape, self.currentFixed.shape)
@@ -232,7 +233,7 @@ def testRegistrationOptimizerMonomodal2D():
     moving=(moving-moving.min())/(moving.max() - moving.min())
     fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
     ################Configure and run the Optimizer#####################
-    maxIter=[i for i in [50,100,100,100]]
+    maxIter=[i for i in [25,50,100,100]]
     similarityMetric=SSDMetric({'symmetric':True, 'lambda':5.0, 'stepType':SSDMetric.GAUSS_SEIDEL_STEP})
     updateRule=UpdateRule.Composition()
     #updateRule=UpdateRule.ProjectedComposition()
@@ -243,7 +244,8 @@ def testRegistrationOptimizerMonomodal2D():
     directInverse=registrationOptimizer.getBackward()
     movingToFixed=np.array(tf.warp_image(moving, displacement))
     fixedToMoving=np.array(tf.warp_image(fixed, directInverse))
-    rcommon.overlayImages(movingToFixed, fixedToMoving, False)
+    rcommon.overlayImages(movingToFixed, fixed, True)
+    rcommon.overlayImages(fixedToMoving, moving, True)
     X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
     detJacobian=rcommon.computeJacobianField(displacement)
     plt.figure()
@@ -351,8 +353,8 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
 if __name__=='__main__':
-    testRegistrationOptimizerMultimodal2D(150, True)
-    #testRegistrationOptimizerMonomodal2D()
+    #testRegistrationOptimizerMultimodal2D(150, True)
+    testRegistrationOptimizerMonomodal2D()
     
 #    import nibabel as nib
 #    result=nib.load('data/circleToC.nii.gz')
