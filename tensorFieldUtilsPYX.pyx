@@ -499,7 +499,7 @@ def downsample_displacement_field3D(double[:,:,:,:] field):
     cdef int ns=field.shape[0]
     cdef int nr=field.shape[1]
     cdef int nc=field.shape[2]
-    cdef double[:,:,:,:] down = np.ndarray(((ns+1)//2, (nr+1)//2, (nc+1)//2,2), dtype=np.float64)
+    cdef double[:,:,:,:] down = np.ndarray(((ns+1)//2, (nr+1)//2, (nc+1)//2,3), dtype=np.float64)
     downsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &down[0,0,0,0]);
     return down
 
