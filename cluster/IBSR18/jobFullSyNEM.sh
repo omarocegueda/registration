@@ -3,9 +3,9 @@
 # Author: Omar Ocegueda (omar@cimat.mx)
 #PBS -l pmem=4gb
 #PBS -l nodes=1:ppn=1
-#PBS -l walltime=04:00:00
+#PBS -l walltime=06:00:00
 #PBS -N FullSyNEM
-#PBS -M jomaroceguedag@gmail.com
+#PBS -M omar@cimat.com
 export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
 export PATH=$HOME/opt:$PATH
@@ -31,5 +31,5 @@ else
     echo "Affine mapping found ($affine). Skipping affine registration."
 fi
 #Diffeomorphic registration
-python dipyreg.py target/$target reference/$reference $affine warp 75.0
+python dipyreg.py target/$target reference/$reference $affine warp 10.0
 date

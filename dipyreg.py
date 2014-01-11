@@ -35,11 +35,13 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     #print initAffine
     moving=moving.get_data().squeeze().astype(np.float64)
     fixed=fixed.get_data().squeeze().astype(np.float64)
-    moving=np.copy(moving, order='C')
-    fixed=np.copy(fixed, order='C')
+    #moving=np.copy(moving, order='C')
+    #fixed=np.copy(fixed, order='C')
+    moving=moving.copy(order='C')
+    fixed=fixed.copy(order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    maxOuterIter=[10,100,100]
+    maxOuterIter=[10,50,100]
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)
     ###################Run registration##################
@@ -53,13 +55,15 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     #####Warp all requested volumes
     #---first the target using tri-linear interpolation---
     moving=nib.load(fnameMoving).get_data().squeeze().astype(np.float64)
-    moving=np.copy(moving, order='C')
+    #moving=np.copy(moving, order='C')
+    moving=moving.copy(order='C')
     warped=np.array(tf.warp_volume(moving, displacement)).astype(np.int16)
     imgWarped=nib.Nifti1Image(warped, F)
     imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     #---warp using affine only
     moving=nib.load(fnameMoving).get_data().squeeze().astype(np.int32)
-    moving=np.copy(moving, order='C')
+    #moving=np.copy(moving, order='C')
+    moving=moving.copy(order='C')
     warped=np.array(tf.warp_discrete_volumeNNAffine(moving, referenceShape, initAffine)).astype(np.int16)
     imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
     imgWarped.to_filename('warpedAffine_'+baseMoving+'_'+baseFixed+'.nii.gz')
@@ -68,7 +72,8 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     for name in names:
         #---warp using the non-linear deformation
         toWarp=nib.load(name).get_data().squeeze().astype(np.int32)
-        toWarp=np.copy(toWarp, order='C')
+        #toWarp=np.copy(toWarp, order='C')
+        toWarp=toWarp.copy(order='C')
         baseWarp=rcommon.getBaseFileName(name)
         warped=np.array(tf.warp_discrete_volumeNN(toWarp, displacement)).astype(np.int16)
         imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
@@ -84,6 +89,7 @@ if __name__=='__main__':
     '''
     python dipyreg.py "/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz" "/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz" "IBSR_01_ana_strip_IBSR_02_ana_stripAffine.txt" "warp" 100.0
     '''
+    print sys.version
     moving=sys.argv[1]
     fixed=sys.argv[2]
     affine=sys.argv[3]

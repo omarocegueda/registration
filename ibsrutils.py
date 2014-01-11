@@ -7,7 +7,7 @@ import tensorFieldUtils as tf
 import sys
 import os
 import registrationCommon as rcommon
-import stats
+from scipy import stats
 def changeExtension(fname, newExt):
     '''
     changeExtension('/opt/registration/data/myfile.nii.gz', '.ext')
@@ -290,7 +290,7 @@ def getRohlfingResults(meanName, sdName):
     return rohlfing
 
 def pairedTTests(fnames, dirA, dirB):
-    labels, colors=getLabelingInfo('/opt/registration/data/IBSR_common_labels.txt')
+    labels, colors=getLabelingInfo('/home/omar/code/registration/data/IBSR_common_labels.txt')
     n=len(fnames)
     m=len(labels)
     baseline=np.ndarray(shape=(m,n), dtype=np.float64)
@@ -300,7 +300,8 @@ def pairedTTests(fnames, dirA, dirB):
         fb=np.loadtxt(dirB+'/'+fnames[i])
         baseline[:,i]=fa[labels.keys()]
         follow_up[:,i]=fb[labels.keys()]
-    pvalues=np.array(m, dtype=np.float64)
+    print n,',',m
+    pvalues=np.ndarray((m,), dtype=np.float64)
     for i in range(m):
         t,p=stats.ttest_rel(baseline[i,:], follow_up[i,:])
         pvalues[i]=p
@@ -445,7 +446,7 @@ if __name__=="__main__":
         if argc<3:
             print "Three arguments expected: names, dirA, dirB"
         with open(sys.argv[2]) as f:
-            fnames=[line.strip().split() for line in f.readlines()]
+            fnames=[line.strip() for line in f.readlines()]
         dirA=sys.argv[3]
         dirB=sys.argv[4]
         pvalues=pairedTTests(fnames, dirA, dirB)
