@@ -50,6 +50,8 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
     int downsampleDisplacementField(double *d1, int nr, int nc, double *down)
     int downsampleScalarField(double *d1, int nr, int nc, double *down)
+    int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *down)
+    int downsampleScalarField3D(double *d1, int ns, int nr, int nc, double *down)
     int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *warped, int nrRef, int ncRef)
     int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped)
     int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped)
@@ -483,6 +485,22 @@ def downsample_displacement_field(double[:,:,:] field):
     cdef int nc=field.shape[1]
     cdef double[:,:,:] down = np.ndarray(((nr+1)//2, (nc+1)//2,2), dtype=np.float64)
     downsampleDisplacementField(&field[0,0,0], nr, nc, &down[0,0,0]);
+    return down
+
+def downsample_scalar_field3D(double[:,:,:] field):
+    cdef int ns=field.shape[0]
+    cdef int nr=field.shape[1]
+    cdef int nc=field.shape[2]
+    cdef double[:,:,:] down = np.ndarray(((ns+1)//2, (nr+1)//2, (nc+1)//2), dtype=np.float64)
+    downsampleScalarField3D(&field[0,0,0], ns, nr, nc, &down[0,0,0]);
+    return down
+
+def downsample_displacement_field3D(double[:,:,:,:] field):
+    cdef int ns=field.shape[0]
+    cdef int nr=field.shape[1]
+    cdef int nc=field.shape[2]
+    cdef double[:,:,:,:] down = np.ndarray(((ns+1)//2, (nr+1)//2, (nc+1)//2,2), dtype=np.float64)
+    downsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &down[0,0,0,0]);
     return down
 
 def upsample_displacement_field(double[:,:,:] field, int[:] targetShape):

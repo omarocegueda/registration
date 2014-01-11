@@ -188,6 +188,7 @@ class RegistrationOptimizer(object):
             self.similarityMetric.useOriginalFixedImage(self.fixedPyramid[level])
             self.similarityMetric.useOriginalMovingImage(self.movingPyramid[level])
             self.similarityMetric.setLevelsBelow(self.levels-level)
+            self.similarityMetric.setLevelsAbove(level)
             if level<self.levels-1:
                 self.forwardModel.upsample(self.currentFixed.shape, self.currentMoving.shape)
                 self.backwardModel.upsample(self.currentMoving.shape, self.currentFixed.shape)
@@ -195,8 +196,8 @@ class RegistrationOptimizer(object):
             niter=0
             while (niter<self.maxIter[level]) and (self.tolerance<error):
                 niter+=1
-                print 'Iter',niter,'/',self.maxIter[level]
                 error=self.__iterate_symmetric()
+                print 'Iter',niter,'/',self.maxIter[level],'. Residual:',error
                 if(niter==self.maxIter[level] or error<=self.tolerance):
                     error=self.__iterate_symmetric(True)
         phi1=self.forwardModel.getForward()
@@ -282,8 +283,8 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
     fixed=fixed[:,sr[1]//2,:].copy()
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    maxIter=[i for i in [50,100,100,100]]
-    similarityMetric=EMMetric({'symmetric':True, 'lambda':250.0, 'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 'qLevels':256})    
+    maxIter=[i for i in [25,50,100,100]]
+    similarityMetric=EMMetric({'symmetric':True, 'lambda':250.0, 'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 'qLevels':256, 'maxInnerIter':5})    
     updateRule=UpdateRule.Composition()
     if(synthetic):
         print 'Generating synthetic field...'
@@ -326,7 +327,7 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
     directInverse=registrationOptimizer.getBackward()
     movingToFixed=np.array(tf.warp_image(moving, displacement))
     fixedToMoving=np.array(tf.warp_image(warpedFixed, directInverse))
-    rcommon.overlayImages(movingToFixed, fixedToMoving, False)
+    rcommon.overlayImages(movingToFixed, fixedToMoving, True)
     X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
     detJacobian=rcommon.computeJacobianField(displacement)
     plt.figure()

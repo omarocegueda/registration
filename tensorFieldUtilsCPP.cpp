@@ -1750,6 +1750,49 @@ int downsampleScalarField(double *d1, int nr, int nc, double *down){
     return 0;
 }
 
+
+int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *down){
+    int nns=(ns+1)/2;
+    int nnr=(nr+1)/2;
+    int nnc=(nc+1)/2;
+    int sliceSize=nnr*nnc;
+    double *d=d1;
+    memset(down, 0, sizeof(double)*nns*nnr*nnc*3);
+    for(int k=0;k<ns;++k){
+        for(int i=0;i<nr;++i){
+            for(int j=0;j<nc;++j,d+=3){
+                int kk=k/2;
+                int ii=i/2;
+                int jj=j/2;
+                down[3*(kk*sliceSize+ii*nnc+jj)]+=d[0];
+                down[3*(kk*sliceSize+ii*nnc+jj)+1]+=d[1];
+                down[3*(kk*sliceSize+ii*nnc+jj)+2]+=d[2];
+            }
+        }
+    }
+    return 0;
+}
+
+int downsampleScalarField3D(double *d1, int ns, int nr, int nc, double *down){
+    int nns=(ns+1)/2;
+    int nnr=(nr+1)/2;
+    int nnc=(nc+1)/2;
+    int sliceSize=nnr*nnc;
+    double *d=d1;
+    memset(down, 0, sizeof(double)*nns*nnr*nnc);
+    for(int k=0;k<ns;++k){
+        for(int i=0;i<nr;++i){
+            for(int j=0;j<nc;++j,d++){
+                int kk=k/2;
+                int ii=i/2;
+                int jj=j/2;
+                down[kk*sliceSize+ii*nnc+jj]+=d[0];
+            }
+        }
+    }
+    return 0;
+}
+
 /*
     It assumes that up was already allocated: (nslices)x(nrows)x(ncols)x3
     nslices, nrows, ncols are the dimensions of the upsampled field

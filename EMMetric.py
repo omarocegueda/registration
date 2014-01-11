@@ -4,12 +4,14 @@ import tensorFieldUtils as tf
 from SimilarityMetric import SimilarityMetric
 import matplotlib.pyplot as plt
 import registrationCommon as rcommon
+from SSDMetric import wCycle2D
+from SSDMetric import wCycle3D
 class EMMetric(SimilarityMetric):
     GAUSS_SEIDEL_STEP=0
     DEMONS_STEP=1
     def getDefaultParameters(self):
-        return {'lambda':1.0, 'maxInnerIter':200, 'innerTolerance':1e-4, 
-                'scale':1, 'maxStepLength':0.25, 'sigmaDiff':3.0, 'stepType':0,
+        return {'lambda':1.0, 'maxInnerIter':5, 'scale':1, 
+                'maxStepLength':0.25, 'sigmaDiff':3.0, 'stepType':0, 
                 'qLevels':256, 'symmetric':False}
 
     def __init__(self, parameters):
@@ -86,7 +88,7 @@ class EMMetric(SimilarityMetric):
 
     def computeGaussSeidelStep(self, forwardStep=True):
         maxInnerIter=self.parameters['maxInnerIter']
-        tolerance=self.parameters['innerTolerance']
+        #lambdaParam=self.parameters['lambda']*(0.5**self.levelsAbove)
         lambdaParam=self.parameters['lambda']
         maxStepLength=self.parameters['maxStepLength']
         sh=self.fixedImage.shape if forwardStep else self.movingImage.shape
@@ -94,22 +96,13 @@ class EMMetric(SimilarityMetric):
         sigmaField=self.fixedQSigmaField if forwardStep else self.movingQSigmaField
         gradient=self.gradientMoving if forwardStep else self.gradientFixed
         displacement=np.zeros(shape=(sh)+(self.dim,), dtype=np.float64)
-        error=1+tolerance
-        innerIter=0
         if self.dim==2:
-            while((error>tolerance)and(innerIter<maxInnerIter)):
-                innerIter+=1
-                error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradient,  lambdaParam, displacement, None)
-            maxNorm=np.sqrt(np.sum(displacement**2,2)).max()
-            if maxNorm>0:
-                displacement*=maxStepLength/maxNorm
+            displacement=wCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
         else:
-            while((error>tolerance)and(innerIter<maxInnerIter)):
-                innerIter+=1
-                error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradient,  lambdaParam, displacement, None)
-            maxNorm=np.sqrt(np.sum(displacement**2,3)).max()
-            if maxNorm>0:
-                displacement*=maxStepLength/maxNorm
+            displacement=wCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
+        maxNorm=np.sqrt(np.sum(displacement**2,-1)).max()
+        if maxNorm>maxStepLength:
+            displacement*=maxStepLength/maxNorm
         return displacement
 
     def computeDemonsStep(self, forwardStep=True):

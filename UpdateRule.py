@@ -31,11 +31,13 @@ class Composition(UpdateRule):
     @staticmethod
     def update(newDisplacement, currentDisplacement):
         dim=len(newDisplacement.shape)-1
+        mse=np.sqrt(np.sum((currentDisplacement**2),-1)).mean()
         if dim==2:
             updated, stats=tf.compose_vector_fields(newDisplacement, currentDisplacement)
         else:
             updated, stats=tf.compose_vector_fields3D(newDisplacement, currentDisplacement)
-        return updated, stats[0]
+        #mse=np.sqrt(np.sum(np.array(currentDisplacement-updated)**2,-1)).mean()
+        return updated, mse
 
 class ProjectedComposition(UpdateRule):
     def __init__(self):

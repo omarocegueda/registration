@@ -25,6 +25,9 @@ class SimilarityMetric(object):
     def setLevelsBelow(self, levels):
         self.levelsBelow=levels
 
+    def setLevelsAbove(self, levels):
+        self.levelsAbove=levels
+
     def setFixedImage(self, fixedImage):
         '''
         Sets the fixed image. The dimension the similarity metric operates on

@@ -4,13 +4,110 @@ import tensorFieldUtils as tf
 from SimilarityMetric import SimilarityMetric
 import registrationCommon as rcommon
 import matplotlib.pyplot as plt
+def vCycle2D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacement):
+    #presmoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    if n==0:
+        return error
+    #solve at coarcer grid
+    subSigmaField=None
+    if sigmaField!=None:
+        subSigmaField=tf.downsample_scalar_field(sigmaField)
+    subDeltaField=tf.downsample_scalar_field(deltaField)
+    subGradientField=tf.downsample_displacement_field(gradientField)
+    subDisplacement=tf.downsample_displacement_field(displacement)
+    subLambdaParam=0.25*lambdaParam
+    vCycle2D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=np.array(tf.upsample_displacement_field(subDisplacement, np.array(displacement.shape).astype(np.int32)))
+    #post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    return displacement
+
+def vCycle3D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacement):
+    #presmoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    if n==0:
+        return error
+    #solve at coarcer grid
+    subSigmaField=None
+    if sigmaField!=None:
+        subSigmaField=tf.downsample_scalar_field3D(sigmaField)
+    subDeltaField=tf.downsample_scalar_field3D(deltaField)
+    subGradientField=tf.downsample_displacement_field3D(gradientField)
+    subDisplacement=tf.downsample_displacement_field3D(displacement)
+    subLambdaParam=0.25*lambdaParam
+    vCycle3D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=tf.upsample_displacement_field3D(subDisplacement, np.array(displacement.shape).astype(np.int32))
+    #post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    return displacement
+
+def wCycle2D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacement):
+    #presmoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    if n==0:
+        return error
+    #solve at coarcer grid
+    subSigmaField=None
+    if sigmaField!=None:
+        subSigmaField=tf.downsample_scalar_field(sigmaField)
+    subDeltaField=tf.downsample_scalar_field(deltaField)
+    subGradientField=np.array(tf.downsample_displacement_field(gradientField))
+    subDisplacement=np.array(tf.downsample_displacement_field(displacement))
+    subLambdaParam=lambdaParam*0.25
+    wCycle2D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=np.array(tf.upsample_displacement_field(subDisplacement, np.array(displacement.shape).astype(np.int32)))
+    #post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    #second coarcer step
+    subDisplacement=np.array(tf.downsample_displacement_field(displacement))
+    wCycle2D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=np.array(tf.upsample_displacement_field(subDisplacement, np.array(displacement.shape).astype(np.int32)))
+    #second post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    return displacement
+    
+def wCycle3D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacement):
+    #presmoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    if n==0:
+        return error
+    #solve at coarcer grid
+    subSigmaField=None
+    if sigmaField!=None:
+        subSigmaField=tf.downsample_scalar_field3D(sigmaField)
+    subDeltaField=tf.downsample_scalar_field3D(deltaField)
+    subGradientField=np.array(tf.downsample_displacement_field3D(gradientField))
+    subDisplacement=np.array(tf.downsample_displacement_field3D(displacement))
+    subLambdaParam=lambdaParam*0.25
+    wCycle3D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=np.array(tf.upsample_displacement_field3D(subDisplacement, np.array(displacement.shape).astype(np.int32)))
+    #post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    #second coarcer step
+    subDisplacement=np.array(tf.downsample_displacement_field3D(displacement))
+    wCycle3D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
+    displacement=np.array(tf.upsample_displacement_field3D(subDisplacement, np.array(displacement.shape).astype(np.int32)))
+    #second post-smoothing
+    for i in range(k):
+        error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
+    return displacement
+
 class SSDMetric(SimilarityMetric):
     GAUSS_SEIDEL_STEP=0
     DEMONS_STEP=1
     def getDefaultParameters(self):
-        return {'lambda':1.0, 'maxInnerIter':200, 'innerTolerance':1e-4, 
-                'scale':1, 'maxStepLength':0.25, 'sigmaDiff':3.0, 'stepType':0,
-                'symmetric':False}
+        return {'lambda':1.0, 'maxInnerIter':5, 'scale':1, 'maxStepLength':0.25, 
+                'sigmaDiff':3.0, 'stepType':0, 'symmetric':False}
 
     def __init__(self, parameters):
         super(SSDMetric, self).__init__(parameters)
@@ -49,28 +146,19 @@ class SSDMetric(SimilarityMetric):
 
     def computeGaussSeidelStep(self, forwardStep=True):
         maxInnerIter=self.parameters['maxInnerIter']
-        tolerance=self.parameters['innerTolerance']
+        #lambdaParam=self.parameters['lambda']*(0.25**self.levelsAbove)
         lambdaParam=self.parameters['lambda']
         maxStepLength=self.parameters['maxStepLength']
         sh=self.fixedImage.shape if forwardStep else self.movingImage.shape
         deltaField=self.fixedImage-self.movingImage if forwardStep else self.movingImage - self.fixedImage
         gradient=self.gradientMoving+self.gradientFixed
         displacement=np.zeros(shape=(sh)+(self.dim,), dtype=np.float64)
-        error=1+tolerance
-        innerIter=0
         if self.dim==2:
-            #displacement=rcommon.vCycle2D(3, 5, deltaField, gradient, lambdaParam, displacement)
-            displacement=rcommon.wCycle2D(self.levelsBelow, 5, deltaField, gradient, lambdaParam, displacement)
-#            while((error>tolerance)and(innerIter<maxInnerIter)):
-#                innerIter+=1
-#                error=tf.iterateDisplacementField2DCYTHON(deltaField, None, gradient,  lambdaParam, displacement, None)
-#            maxNorm=np.sqrt(np.sum(displacement**2,2)).max()
-#            displacement*=maxStepLength/maxNorm
+            displacement=wCycle2D(self.levelsBelow, maxInnerIter, deltaField, None, gradient, lambdaParam, displacement)
         else:
-            while((error>tolerance)and(innerIter<maxInnerIter)):
-                innerIter+=1
-                error=tf.iterateDisplacementField3DCYTHON(deltaField, None, gradient,  lambdaParam, displacement, None)
-            maxNorm=np.sqrt(np.sum(displacement**2,3)).max()
+            displacement=wCycle3D(self.levelsBelow, maxInnerIter, deltaField, None, gradient, lambdaParam, displacement)
+        maxNorm=np.sqrt(np.sum(displacement**2,-1)).max()
+        if maxNorm>maxStepLength:
             displacement*=maxStepLength/maxNorm
         return displacement
 

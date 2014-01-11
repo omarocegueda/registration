@@ -50,6 +50,8 @@ int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, 
 
 int downsampleDisplacementField(double *d1, int nr, int nc, double *down);
 int downsampleScalarField(double *d1, int nr, int nc, double *down);
+int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *down);
+int downsampleScalarField3D(double *d1, int ns, int nr, int nc, double *down);
 
 int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *warped, int nrRef, int ncRef);
 int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped);
