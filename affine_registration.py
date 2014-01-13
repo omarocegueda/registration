@@ -65,7 +65,7 @@ if __name__ == '__main__':
         toWarp=nifti2nipy(toWarp)
         #toWarp=np.copy(toWarp, order='C')
         baseWarp=rcommon.getBaseFileName(name)
-        warped= resample(toWarp, T.inv(), reference=static)
+        warped= resample(toWarp, T.inv(), reference=static, interp_order=0)
         fmoved='warpedAffine_'+baseWarp+'_'+baseFixed+'.nii.gz'
         nib.save(nipy2nifti(warped, strict=True), fmoved)
 
