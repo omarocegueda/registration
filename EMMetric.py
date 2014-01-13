@@ -57,15 +57,6 @@ class EMMetric(SimilarityMetric):
         for grad in sp.gradient(self.fixedImage):
             self.gradientFixed[...,i]=grad
             i+=1
-        if self.useDoubleGradient:
-            i=0
-            for grad in sp.gradient(self.fixedQMeansField):
-                self.gradientMoving[...,i]+=grad
-                i+=1
-            i=0
-            for grad in sp.gradient(self.movingQMeansField):
-                self.gradientFixed[...,i]=grad
-                i+=1
         if self.dim==2:
             movingQ, self.movingQLevels, hist=tf.quantizePositiveImageCYTHON(self.movingImage, self.quantizationLevels)
             movingQ=np.array(movingQ, dtype=np.int32)
@@ -81,6 +72,15 @@ class EMMetric(SimilarityMetric):
         movingQVariances=np.array(movingQVariances)
         self.movingQSigmaField=movingQVariances[movingQ]
         self.movingQMeansField=movingQMeans[movingQ]
+        if self.useDoubleGradient:
+            i=0
+            for grad in sp.gradient(self.fixedQMeansField):
+                self.gradientMoving[...,i]+=grad
+                i+=1
+            i=0
+            for grad in sp.gradient(self.movingQMeansField):
+                self.gradientFixed[...,i]=grad
+                i+=1
 
     def computeForward(self):
         if self.stepType==EMMetric.GAUSS_SEIDEL_STEP:
