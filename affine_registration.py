@@ -3,15 +3,12 @@
 This script investigates the use of affine registration in registering 3D
 DWI volumes to the S0 volume as done in standard eddy current correction.
 """
-
+import os
 import time
-import numpy as np
 import nibabel as nib
 from nipy.algorithms.registration import HistogramRegistration, resample
 from nipy.io.files import nipy2nifti, nifti2nipy
-
-from dipy.segment.mask import median_otsu
-
+import registrationCommon as rcommon
 from dipy.fixes import argparse as arg
 
 parser = arg.ArgumentParser(description='Affine registration')
@@ -20,9 +17,6 @@ parser.add_argument('in_file', action='store', metavar='in_file',
                     help='Nifti1 image (*.nii or *.nii.gz) or other formats supported by Nibabel')
 
 parser.add_argument('reference', action='store', metavar='reference',
-                    help='Nifti1 image (*.nii or *.nii.gz) or other formats supported by Nibabel')
-
-parser.add_argument('out_file', action='store', metavar='out_file',
                     help='Nifti1 image (*.nii or *.nii.gz) or other formats supported by Nibabel')
 
 parser.add_argument('--similarity', action='store', metavar='String',
@@ -37,10 +31,9 @@ params = parser.parse_args()
 
 
 if __name__ == '__main__':
-
     fmoving = params.in_file
     fstatic = params.reference
-    fmoved = params.out_file
+    baseFixed=baseFixed=rcommon.getBaseFileName(fstatic)
 
     print(fmoving + ' --> ' + fstatic)
     static=nib.load(fstatic)
@@ -63,7 +56,19 @@ if __name__ == '__main__':
     T = R.optimize('affine', optimizer=optimizer)
     toc = time.time()
     print('Registration time: %f sec' % (toc - tic))
+    warpDir='warp'    
+    names=[os.path.join(warpDir,name) for name in os.listdir(warpDir)]
+    for name in names:
+        #---warp using the non-linear deformation
+        toWarp=nib.load(name)
+        toWarp=nib.Nifti1Image(toWarp.get_data().squeeze(), toWarp.get_affine())
+        toWarp=nifti2nipy(toWarp)
+        #toWarp=np.copy(toWarp, order='C')
+        baseWarp=rcommon.getBaseFileName(name)
+        warped= resample(toWarp, T.inv(), reference=static)
+        fmoved='warpedAffine_'+baseWarp+'_'+baseFixed+'.nii.gz'
+        nib.save(nipy2nifti(warped, strict=True), fmoved)
 
-    moving_new = resample(moving, T.inv(), reference=static)
+    
 
-    nib.save(nipy2nifti(moving_new, strict=True), fmoved)
+    
