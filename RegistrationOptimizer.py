@@ -223,10 +223,10 @@ class RegistrationOptimizer(object):
         return self.forwardModel.getBackward()
 
 def testRegistrationOptimizerMonomodal2D():
-    fname0='data/circle.png'
-    fname1='data/C.png'
-    nib_moving=plt.imread(fname0)
-    nib_fixed=plt.imread(fname1)
+    fnameMoving='data/circle.png'
+    fnameFixed='data/C.png'
+    nib_moving=plt.imread(fnameMoving)
+    nib_fixed=plt.imread(fnameFixed)
     moving=nib_moving[:,:,0].astype(np.float64)
     fixed=nib_fixed[:,:,1].astype(np.float64)
     moving=np.copy(moving, order='C')
@@ -271,20 +271,39 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
     displacementGTName='templateToIBSR01_GT.npy'
     fnameMoving='data/t2/IBSR_t2template_to_01.nii.gz'
     fnameFixed='data/t1/IBSR_template_to_01.nii.gz'
-    nib_moving = nib.load(fnameMoving)
-    nib_fixed = nib.load(fnameFixed)
-    moving=nib_moving.get_data().squeeze().astype(np.float64)
-    fixed=nib_fixed.get_data().squeeze().astype(np.float64)
-    moving=np.copy(moving, order='C')
-    fixed=np.copy(fixed, order='C')
-    sl=moving.shape
-    sr=fixed.shape    
-    moving=moving[:,sl[1]//2,:].copy()
-    fixed=fixed[:,sr[1]//2,:].copy()
-    moving=(moving-moving.min())/(moving.max()-moving.min())
-    fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    maxIter=[i for i in [25,50,100,100]]
-    similarityMetric=EMMetric({'symmetric':True, 'lambda':250.0, 'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 'qLevels':256, 'maxInnerIter':5})    
+#    fnameMoving='data/circle.png'
+#    fnameFixed='data/C.png'
+    nifti=True
+    if nifti:
+        nib_moving = nib.load(fnameMoving)
+        nib_fixed = nib.load(fnameFixed)
+        moving=nib_moving.get_data().squeeze().astype(np.float64)
+        fixed=nib_fixed.get_data().squeeze().astype(np.float64)
+        moving=np.copy(moving, order='C')
+        fixed=np.copy(fixed, order='C')
+        sl=moving.shape
+        sr=fixed.shape    
+        moving=moving[:,sl[1]//2,:].copy()
+        fixed=fixed[:,sr[1]//2,:].copy()
+        moving=(moving-moving.min())/(moving.max()-moving.min())
+        fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+    else:
+        nib_moving=plt.imread(fnameMoving)
+        nib_fixed=plt.imread(fnameFixed)
+        moving=nib_moving[:,:,0].astype(np.float64)
+        fixed=nib_fixed[:,:,1].astype(np.float64)
+        moving=np.copy(moving, order='C')
+        fixed=np.copy(fixed, order='C')
+        moving=(moving-moving.min())/(moving.max() - moving.min())
+        fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
+    #maxIter=[i for i in [25,50,100,100]]
+    maxIter=[i for i in [10,13,25,25]]
+    similarityMetric=EMMetric({'symmetric':True, 
+                               'lambda':250.0, 
+                               'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 
+                               'qLevels':256, 
+                               'maxInnerIter':5,
+                               'useDoubleGradient':True})    
     updateRule=UpdateRule.Composition()
     if(synthetic):
         print 'Generating synthetic field...'
@@ -354,8 +373,8 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
 if __name__=='__main__':
-    #testRegistrationOptimizerMultimodal2D(150, True)
-    testRegistrationOptimizerMonomodal2D()
+    testRegistrationOptimizerMultimodal2D(150, True)
+    #testRegistrationOptimizerMonomodal2D()
     
 #    import nibabel as nib
 #    result=nib.load('data/circleToC.nii.gz')

@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import scipy as sp
 import tensorFieldUtils as tf
@@ -12,19 +13,21 @@ class EMMetric(SimilarityMetric):
     def getDefaultParameters(self):
         return {'lambda':1.0, 'maxInnerIter':5, 'scale':1, 
                 'maxStepLength':0.25, 'sigmaDiff':3.0, 'stepType':0, 
-                'qLevels':256, 'symmetric':False}
+                'qLevels':256, 'symmetric':False,'useDoubleGradient':False}
 
     def __init__(self, parameters):
         super(EMMetric, self).__init__(parameters)
         self.setSymmetric(self.parameters['symmetric'])
         self.stepType=self.parameters['stepType']
         self.quantizationLevels=self.parameters['qLevels']
+        self.useDoubleGradient=self.parameters['useDoubleGradient']
         self.fixedImageMask=None
         self.movingImageMask=None
         self.fixedQMeansField=None
         self.movingQMeansField=None
         self.movingQLevels=None
         self.fixedQLevels=None
+        
 
     def initializeIteration(self):
         samplingMask=self.fixedImageMask*self.movingImageMask
@@ -54,8 +57,15 @@ class EMMetric(SimilarityMetric):
         for grad in sp.gradient(self.fixedImage):
             self.gradientFixed[...,i]=grad
             i+=1
-        if not self.symmetric:#Quantization of the moving image and its corresponding statistics are used only for the backward step
-            return
+        if self.useDoubleGradient:
+            i=0
+            for grad in sp.gradient(self.fixedQMeansField):
+                self.gradientMoving[...,i]+=grad
+                i+=1
+            i=0
+            for grad in sp.gradient(self.movingQMeansField):
+                self.gradientFixed[...,i]=grad
+                i+=1
         if self.dim==2:
             movingQ, self.movingQLevels, hist=tf.quantizePositiveImageCYTHON(self.movingImage, self.quantizationLevels)
             movingQ=np.array(movingQ, dtype=np.int32)

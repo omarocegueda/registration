@@ -171,6 +171,10 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
         
         showRegistrationResultMidSlices('warpedAffine_IBSR_16_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
         showRegistrationResultMidSlices('warpedDiff_IBSR_16_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_IBSR_08_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_08/IBSR_08_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_08/IBSR_08_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_13_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_13/IBSR_13_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
         
         showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_IBSR_02_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
         
@@ -200,6 +204,11 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     rcommon.overlayImages(warped[:,:,sh[2]//2], fixed[:,:,sh[2]//2])    
 
 def computeJacard(aname, bname):
+    '''
+    computeJacard('warpedDiff_IBSR_15_segTRI_fill_ana_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_segTRI_fill_ana.nii.gz' )
+    computeJacard('warpedDiff_IBSR_13_segTRI_fill_ana_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_segTRI_fill_ana.nii.gz' )
+    
+    '''
     baseA=rcommon.getBaseFileName(aname)
     baseB=rcommon.getBaseFileName(bname)
     oname="jacard_"+baseA+"_"+baseB+".txt"

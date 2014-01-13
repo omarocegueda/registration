@@ -1158,6 +1158,7 @@ int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam,
         double *tmp=temp;
         double *den=denom;
         maxChange=0;
+        double theta=0;
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, id+=2, tmp+=2, den++){
                 tmp[0]/=(*den);
@@ -1166,8 +1167,8 @@ int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam,
                 if(maxChange<nrm){
                     maxChange=nrm;
                 }
-                id[0]=tmp[0];
-                id[1]=tmp[1];
+                id[0]=theta*id[0]+(1-theta)*tmp[0];
+                id[1]=theta*id[1]+(1-theta)*tmp[1];
             }
         }
     }//for iter
@@ -2771,8 +2772,13 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
     double theta=0.8;
     double error=1+tolerance;
     int iter=0;
-    memset(sbarr, 0, sizeof(double)*nrows*ncols);//initialize the inverse field
-    memset(sbarc, 0, sizeof(double)*nrows*ncols);
+    /*memset(sbarr, 0, sizeof(double)*nrows*ncols);//initialize the inverse field
+    memset(sbarc, 0, sizeof(double)*nrows*ncols);*/
+    initializeNearestNeighborInverseField(forward, nrows, ncols, inv, NULL);
+    for(int i=0;i<nsites;++i){
+        sbarr[i]=inv[2*i];
+        sbarc[i]=inv[2*i+1];
+    }
     memset(sr, 0, sizeof(double)*nrows*ncols);//initialize the inverse field
     memset(sc, 0, sizeof(double)*nrows*ncols);
     memset(prr, 0, sizeof(double)*nrows*ncols);//initialize the dual Jacobian
@@ -2889,7 +2895,8 @@ int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, do
     
     int nsites=2*nrows*ncols;
     int iter;
-    double epsilon=0.125;
+    //double epsilon=0.125;
+    double epsilon=0.5;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
         composeVectorFields(temp[iter&1], d, nrows, ncols, temp[1-(iter&1)], substats);
         double difmag=0;

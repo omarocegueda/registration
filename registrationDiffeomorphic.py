@@ -726,7 +726,7 @@ def testInversion(lambdaParam):
         np.save(circleToCDisplacementName, displacement)
         np.save(circleToCDisplacementInverseName, inverse)
     print 'vector field exponential'
-    expd, invexpd=tf.vector_field_exponential(displacement)
+    expd, invexpd=tf.vector_field_exponential(displacement, True)
     print 'vector field inversion'
     directInverse=tf.invert_vector_field(displacement, 1.0, 10000, 1e-7)
     print 'vector field inversion'
@@ -747,7 +747,7 @@ def testInversion(lambdaParam):
     tf.write_double_buffer(np.array(displacement).reshape(-1), '../inverse/experiments/displacement_clean.bin')
 
 def testInversion_invertible():
-    displacement_clean=tf.create_invertible_displacement_field(256, 256, 0.05, 8)
+    displacement_clean=tf.create_invertible_displacement_field(256, 256, 0.5, 8)
     detJacobian=rcommon.computeJacobianField(displacement_clean)
     plt.figure()
     plt.imshow(detJacobian)
@@ -756,14 +756,30 @@ def testInversion_invertible():
     CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
     plt.clabel(CS, inline=1, fontsize=10)
     plt.title('det(J(displacement))')
-    #displacement=displacement_clean+np.random.normal(0.0, 0.0, displacement_clean.shape)
-    displacement=np.array(displacement_clean)
+    displacement=displacement_clean+np.random.normal(0.0, 1.1, displacement_clean.shape)
+    #displacement=np.array(displacement_clean)
     #inverse=rcommon.invert_vector_field_fixed_point(displacement, 100, 1e-7)
     #inverse=np.array(tf.invert_vector_field(displacement, 0.1, 100, 1e-7))
+    lambdaParam=5.0
+    #########Jacobi##########
+    inverse=np.array(tf.invert_vector_field(displacement, lambdaParam, 100, 1e-6))
+    residual, stats=tf.compose_vector_fields(displacement_clean, inverse)
+    residual=np.array(residual)
+    print 'Jacobi. Max:',stats[0], '. Mean:',stats[1],'Std:',stats[2]
+    [d,invd,res, detJ]=rcommon.plotDiffeomorphism(displacement, inverse, residual, 'Jacobi', 7)
+    #########Fixed point######
     inverse=np.array(tf.invert_vector_field_fixed_point(displacement, 100, 1e-6))
     residual, stats=tf.compose_vector_fields(displacement_clean, inverse)
     residual=np.array(residual)
-    [d,invd,res, detJ]=rcommon.plotDiffeomorphism(displacement, inverse, residual, 'invertible', 7)
+    print 'Fixed point. Max:',stats[0], '. Mean:',stats[1],'Std:',stats[2]
+    [d,invd,res, detJ]=rcommon.plotDiffeomorphism(displacement, inverse, residual, 'Fixed point', 7)
+    #########TV-L2###########
+    inverse=np.array(tf.invert_vector_field_tv_l2(displacement, lambdaParam, 3000, 1e-6))
+    residual, stats=tf.compose_vector_fields(displacement_clean, inverse)
+    residual=np.array(residual)
+    print 'TV-L2. Max:',stats[0], '. Mean:',stats[1],'Std:',stats[2]
+    [d,invd,res, detJ]=rcommon.plotDiffeomorphism(displacement, inverse, residual, 'TV-L2', 7)
+    
 
 #python registrationDiffeomorphic.py "/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz" "/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz" "IBSR_01_ana_strip_IBSR_02_ana_stripAffine.txt" "warp" 100.0
 if __name__=='__main__':
