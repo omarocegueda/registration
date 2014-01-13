@@ -2895,8 +2895,7 @@ int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, do
     
     int nsites=2*nrows*ncols;
     int iter;
-    //double epsilon=0.125;
-    double epsilon=0.5;
+    double epsilon=0.125;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
         composeVectorFields(temp[iter&1], d, nrows, ncols, temp[1-(iter&1)], substats);
         double difmag=0;

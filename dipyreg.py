@@ -41,7 +41,7 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     fixed=fixed.copy(order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    maxOuterIter=[10,50,100]
+    maxOuterIter=[25,50,100]
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)
     ###################Run registration##################
@@ -82,10 +82,10 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
         warped=np.array(tf.warp_discrete_volumeNN(toWarp, displacement)).astype(np.int16)
         imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
         imgWarped.to_filename('warpedDiff_'+baseWarp+'_'+baseFixed+'.nii.gz')
-        #---warp using affine inly
-        warped=np.array(tf.warp_discrete_volumeNNAffine(toWarp, referenceShape, initAffine)).astype(np.int16)
-        imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
-        imgWarped.to_filename('warpedAffine_'+baseWarp+'_'+baseFixed+'.nii.gz')
+        #---warp using affine only
+#        warped=np.array(tf.warp_discrete_volumeNNAffine(toWarp, referenceShape, initAffine)).astype(np.int16)
+#        imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
+#        imgWarped.to_filename('warpedAffine_'+baseWarp+'_'+baseFixed+'.nii.gz')
     #---finally, the deformed lattice
     saveDeformedLattice3D(displacement, 'latticeDispDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
 
