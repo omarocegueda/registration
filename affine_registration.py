@@ -43,9 +43,12 @@ if __name__ == '__main__':
     fmoved = params.out_file
 
     print(fmoving + ' --> ' + fstatic)
-
-    static = nifti2nipy(nib.load(fstatic))
-    moving = nifti2nipy(nib.load(fmoving))
+    static=nib.load(fstatic)
+    static=nib.Nifti1Image(static.get_data().squeeze(), static.get_affine())
+    static = nifti2nipy(static)
+    moving=nib.load(fmoving)
+    moving=nib.Nifti1Image(moving.get_data().squeeze(), moving.get_affine())
+    moving= nifti2nipy(moving)
 
     similarity = params.similarity #'crl1' 'cc', 'mi', 'nmi', 'cr', 'slr'
     interp = params.interp #'pv', 'tri',
