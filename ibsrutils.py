@@ -181,6 +181,8 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
         showRegistrationResultMidSlices('warpedAffine_IBSR_16_seg_ana_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_seg_ana.nii.gz', None)
         showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_16/IBSR_16_seg_ana.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_seg_ana.nii.gz', None)
         
+        showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_segTRI_fill_ana.nii.gz', 'warpedAffine_IBSR_10_segTRI_fill_ana_IBSR_01_ana_strip.nii.gz', None)
+        
         
     '''
     
@@ -208,6 +210,8 @@ def computeJacard(aname, bname):
     '''
     computeJacard('warpedDiff_IBSR_15_segTRI_fill_ana_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_segTRI_fill_ana.nii.gz' )
     computeJacard('warpedDiff_IBSR_13_segTRI_fill_ana_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_segTRI_fill_ana.nii.gz' )
+    computeJacard('warpedAffine_IBSR_16_segTRI_fill_ana_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_segTRI_fill_ana.nii.gz')
+    computeJacard('warpedAffine_IBSR_10_segTRI_fill_ana_IBSR_01_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_seg_ana.nii.gz',None)
     
     '''
     baseA=rcommon.getBaseFileName(aname)
@@ -287,6 +291,7 @@ def fullJacard(names, segIndex, warpedPreffix):
 def getRohlfingResults(meanName, sdName):
     '''
     R=getRohlfingResults('jacard_mean_warpedDiff_3.txt', 'jacard_std_warpedDiff_3.txt')
+    R=getRohlfingResults('jacard_mean_warpedAffine_3.txt', 'jacard_std_warpedAffine_3.txt')
     '''
     labels, colors=getLabelingInfo('/opt/registration/data/IBSR_common_labels.txt')
     r=np.loadtxt('data/rohlfing_table.txt')    

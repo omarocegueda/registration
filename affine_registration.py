@@ -49,6 +49,7 @@ if __name__ == '__main__':
     optimizer = 'powell'
 
     print('Setting up registration...')
+    print 'Similarity:',similarity
     tic = time.time()
     R = HistogramRegistration(moving, static, similarity=similarity,
                               interp=interp, renormalize=renormalize)
