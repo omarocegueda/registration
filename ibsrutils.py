@@ -198,7 +198,7 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     
     fixed=np.copy(fixed, order='C')
     moving=np.copy(moving, order='C')
-    warped=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape), initAffine))
+    warped=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape).astype(np.int32), initAffine))
     sh=warped.shape
     rcommon.overlayImages(warped[:,sh[1]//2,:], fixed[:,sh[1]//2,:])
     rcommon.overlayImages(warped[sh[0]//2,:,:], fixed[sh[0]//2,:,:])
