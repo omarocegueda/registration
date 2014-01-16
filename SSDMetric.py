@@ -47,8 +47,9 @@ def vCycle3D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacem
     return displacement
 
 def wCycle2D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacement):
+    iterFactor=2**n
     #presmoothing
-    for i in range(k):
+    for i in range(k*iterFactor):
         error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
     if n==0:
         return error
@@ -63,20 +64,22 @@ def wCycle2D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacem
     wCycle2D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
     displacement=np.array(tf.upsample_displacement_field(subDisplacement, np.array(displacement.shape).astype(np.int32)))
     #post-smoothing
-    for i in range(k):
+    for i in range(k*iterFactor):
         error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
     #second coarcer step
     subDisplacement=np.array(tf.downsample_displacement_field(displacement))
     wCycle2D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
     displacement=np.array(tf.upsample_displacement_field(subDisplacement, np.array(displacement.shape).astype(np.int32)))
     #second post-smoothing
-    for i in range(k):
+    for i in range(k*iterFactor):
         error=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
     return displacement
     
 def wCycle3D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacement):
+    iterFactor=4**n
+    #iterFactor=1
     #presmoothing
-    for i in range(k):
+    for i in range(k*iterFactor):
         error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
     if n==0:
         return error
@@ -91,14 +94,14 @@ def wCycle3D(n, k, deltaField, sigmaField, gradientField, lambdaParam, displacem
     wCycle3D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
     displacement=np.array(tf.upsample_displacement_field3D(subDisplacement, np.array(displacement.shape).astype(np.int32)))
     #post-smoothing
-    for i in range(k):
+    for i in range(k*iterFactor):
         error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
     #second coarcer step
     subDisplacement=np.array(tf.downsample_displacement_field3D(displacement))
     wCycle3D(n-1, k, subDeltaField, subSigmaField, subGradientField, subLambdaParam, subDisplacement)
     displacement=np.array(tf.upsample_displacement_field3D(subDisplacement, np.array(displacement.shape).astype(np.int32)))
     #second post-smoothing
-    for i in range(k):
+    for i in range(k*iterFactor):
         error=tf.iterateDisplacementField3DCYTHON(deltaField, sigmaField, gradientField,  lambdaParam, displacement, None)
     return displacement
 

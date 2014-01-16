@@ -1,3 +1,4 @@
+import time
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -150,6 +151,7 @@ class RegistrationOptimizer(object):
         self.__endOptimizer()
 
     def __iterate_symmetric(self, showImages=False):
+        tic=time.time()
         wmoving=self.backwardModel.warpBackward(self.currentMoving)
         wfixed=self.forwardModel.warpBackward(self.currentFixed)
         self.similarityMetric.setMovingImage(wmoving)
@@ -177,6 +179,8 @@ class RegistrationOptimizer(object):
         self.backwardModel.setBackward(invBackward)
         if showImages:
             self.similarityMetric.reportStatus()
+        toc=time.time()
+        print('Iter time: %f sec' % (toc - tic))
         return mdForward+mdBackward
 
     def __optimize_symmetric(self):
@@ -297,13 +301,14 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
         moving=(moving-moving.min())/(moving.max() - moving.min())
         fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
     #maxIter=[i for i in [25,50,100,100]]
-    maxIter=[i for i in [10,13,25,25]]
+    maxIter=[i for i in [5,10,20]]
     similarityMetric=EMMetric({'symmetric':True, 
-                               'lambda':250.0, 
+                               'lambda':lambdaParam, 
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 
                                'qLevels':256, 
-                               'maxInnerIter':5,
-                               'useDoubleGradient':True})    
+                               'maxInnerIter':10,
+                               'useDoubleGradient':True,
+                               'maxStepLength':0.25})    
     updateRule=UpdateRule.Composition()
     if(synthetic):
         print 'Generating synthetic field...'
@@ -373,7 +378,10 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
     print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
 
 if __name__=='__main__':
-    testRegistrationOptimizerMultimodal2D(150, True)
+    tic=time.time()
+    testRegistrationOptimizerMultimodal2D(50, True)
+    toc=time.time()
+    print('Registration time: %f sec' % (toc - tic))
     #testRegistrationOptimizerMonomodal2D()
     
 #    import nibabel as nib
