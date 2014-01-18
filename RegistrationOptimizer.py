@@ -160,21 +160,27 @@ class RegistrationOptimizer(object):
         self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
         self.similarityMetric.initializeIteration()
         fw=self.similarityMetric.computeForward()
-        bw=self.similarityMetric.computeBackward()
         forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
-        backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
         if self.dim==2:
             invForward=np.array(tf.invert_vector_field_fixed_point(forward, 25, 1e-3, self.forwardModel.getBackward()))
-            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 25, 1e-3, self.backwardModel.getBackward()))
             forward=np.array(tf.invert_vector_field_fixed_point(invForward, 25, 1e-3, self.forwardModel.getForward()))
-            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 25, 1e-3, self.backwardModel.getForward()))
         else:
             invForward=np.array(tf.invert_vector_field_fixed_point3D(forward, 25, 1e-3, self.forwardModel.getBackward()))
-            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 25, 1e-3, self.backwardModel.getBackward()))
             forward=np.array(tf.invert_vector_field_fixed_point3D(invForward, 25, 1e-3, self.forwardModel.getForward()))
-            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 25, 1e-3, self.backwardModel.getForward()))
         self.forwardModel.setForward(forward)
         self.forwardModel.setBackward(invForward)
+        wfixed=self.forwardModel.warpBackward(self.currentFixed)
+        self.similarityMetric.setFixedImage(wfixed)
+        self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
+        self.similarityMetric.initializeIteration()
+        bw=self.similarityMetric.computeBackward()
+        backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
+        if self.dim==2:
+            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 25, 1e-3, self.backwardModel.getBackward()))
+            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 25, 1e-3, self.backwardModel.getForward()))
+        else:
+            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 25, 1e-3, self.backwardModel.getBackward()))
+            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 25, 1e-3, self.backwardModel.getForward()))
         self.backwardModel.setForward(backward)
         self.backwardModel.setBackward(invBackward)
         if showImages:
@@ -182,6 +188,37 @@ class RegistrationOptimizer(object):
         toc=time.time()
         print('Iter time: %f sec' % (toc - tic))
         return mdForward+mdBackward
+#        tic=time.time()
+#        wmoving=self.backwardModel.warpBackward(self.currentMoving)
+#        wfixed=self.forwardModel.warpBackward(self.currentFixed)
+#        self.similarityMetric.setMovingImage(wmoving)
+#        self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.backwardModel, -1)
+#        self.similarityMetric.setFixedImage(wfixed)
+#        self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
+#        self.similarityMetric.initializeIteration()
+#        fw=self.similarityMetric.computeForward()
+#        bw=self.similarityMetric.computeBackward()
+#        forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
+#        backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
+#        if self.dim==2:
+#            invForward=np.array(tf.invert_vector_field_fixed_point(forward, 25, 1e-3, self.forwardModel.getBackward()))
+#            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 25, 1e-3, self.backwardModel.getBackward()))
+#            forward=np.array(tf.invert_vector_field_fixed_point(invForward, 25, 1e-3, self.forwardModel.getForward()))
+#            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 25, 1e-3, self.backwardModel.getForward()))
+#        else:
+#            invForward=np.array(tf.invert_vector_field_fixed_point3D(forward, 25, 1e-3, self.forwardModel.getBackward()))
+#            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 25, 1e-3, self.backwardModel.getBackward()))
+#            forward=np.array(tf.invert_vector_field_fixed_point3D(invForward, 25, 1e-3, self.forwardModel.getForward()))
+#            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 25, 1e-3, self.backwardModel.getForward()))
+#        self.forwardModel.setForward(forward)
+#        self.forwardModel.setBackward(invForward)
+#        self.backwardModel.setForward(backward)
+#        self.backwardModel.setBackward(invBackward)
+#        if showImages:
+#            self.similarityMetric.reportStatus()
+#        toc=time.time()
+#        print('Iter time: %f sec' % (toc - tic))
+#        return mdForward+mdBackward
 
     def __optimize_symmetric(self):
         self.__initOptimizer()
