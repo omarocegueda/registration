@@ -990,7 +990,7 @@ double iterateResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaFi
                     double *dneigh=&displacementField[3*(ds*sliceSize+dr*ncols + dc)];
                     y[0]+=dneigh[0];
                     y[1]+=dneigh[1];
-                    y[2]+=dneigh[3];
+                    y[2]+=dneigh[2];
                 }
                 if(isInfinite(sigma)){
                     double xx=d[0];
