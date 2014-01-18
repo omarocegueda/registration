@@ -9,6 +9,7 @@ import UpdateRule
 from TransformationModel import TransformationModel
 from SSDMetric import SSDMetric
 from EMMetric import EMMetric
+import scipy.interpolate as inter
 
 class RegistrationOptimizer(object):
     def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None):
@@ -26,6 +27,7 @@ class RegistrationOptimizer(object):
         self.moving=moving
         self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
         self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
+        self.energyList=None
 
     def __checkReady(self):
         ready=True
@@ -151,7 +153,7 @@ class RegistrationOptimizer(object):
         self.__endOptimizer()
 
     def __iterate_symmetric(self, showImages=False):
-        tic=time.time()
+        #tic=time.time()
         wmoving=self.backwardModel.warpBackward(self.currentMoving)
         wfixed=self.forwardModel.warpBackward(self.currentFixed)
         self.similarityMetric.setMovingImage(wmoving)
@@ -160,65 +162,51 @@ class RegistrationOptimizer(object):
         self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
         self.similarityMetric.initializeIteration()
         fw=self.similarityMetric.computeForward()
-        forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
-        if self.dim==2:
-            invForward=np.array(tf.invert_vector_field_fixed_point(forward, 25, 1e-3, self.forwardModel.getBackward()))
-            forward=np.array(tf.invert_vector_field_fixed_point(invForward, 25, 1e-3, self.forwardModel.getForward()))
-        else:
-            invForward=np.array(tf.invert_vector_field_fixed_point3D(forward, 25, 1e-3, self.forwardModel.getBackward()))
-            forward=np.array(tf.invert_vector_field_fixed_point3D(invForward, 25, 1e-3, self.forwardModel.getForward()))
-        self.forwardModel.setForward(forward)
-        self.forwardModel.setBackward(invForward)
-        wfixed=self.forwardModel.warpBackward(self.currentFixed)
-        self.similarityMetric.setFixedImage(wfixed)
-        self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
-        self.similarityMetric.initializeIteration()
+        try:
+            fwEnergy=self.similarityMetric.energy
+        except NameError:
+            pass
         bw=self.similarityMetric.computeBackward()
+        try:
+            bwEnergy=self.similarityMetric.energy
+        except NameError:
+            pass
+        try:
+            print fwEnergy,'\t',bwEnergy,'\t',fwEnergy+bwEnergy
+            self.energyList.append(fwEnergy+bwEnergy)
+        except NameError:
+            pass
+        if len(self.energyList)>=20:
+            der=self.__getEnergyDerivative()
+            if(der>=0):
+                return -1
+        forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
         backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
         if self.dim==2:
-            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 25, 1e-3, self.backwardModel.getBackward()))
-            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 25, 1e-3, self.backwardModel.getForward()))
+            invForward=np.array(tf.invert_vector_field_fixed_point(forward, 20, 1e-3, self.forwardModel.getBackward()))
+            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 20, 1e-3, self.backwardModel.getBackward()))
+            forward=np.array(tf.invert_vector_field_fixed_point(invForward, 20, 1e-3, self.forwardModel.getForward()))
+            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 20, 1e-3, self.backwardModel.getForward()))
         else:
-            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 25, 1e-3, self.backwardModel.getBackward()))
-            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 25, 1e-3, self.backwardModel.getForward()))
+            invForward=np.array(tf.invert_vector_field_fixed_point3D(forward, 20, 1e-3, self.forwardModel.getBackward()))
+            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 20, 1e-3, self.backwardModel.getBackward()))
+            forward=np.array(tf.invert_vector_field_fixed_point3D(invForward, 20, 1e-3, self.forwardModel.getForward()))
+            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 20, 1e-3, self.backwardModel.getForward()))
+        self.forwardModel.setForward(forward)
+        self.forwardModel.setBackward(invForward)
         self.backwardModel.setForward(backward)
         self.backwardModel.setBackward(invBackward)
         if showImages:
             self.similarityMetric.reportStatus()
-        toc=time.time()
-        print('Iter time: %f sec' % (toc - tic))
+        #toc=time.time()
+        #print('Iter time: %f sec' % (toc - tic))
         return mdForward+mdBackward
-#        tic=time.time()
-#        wmoving=self.backwardModel.warpBackward(self.currentMoving)
-#        wfixed=self.forwardModel.warpBackward(self.currentFixed)
-#        self.similarityMetric.setMovingImage(wmoving)
-#        self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.backwardModel, -1)
-#        self.similarityMetric.setFixedImage(wfixed)
-#        self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
-#        self.similarityMetric.initializeIteration()
-#        fw=self.similarityMetric.computeForward()
-#        bw=self.similarityMetric.computeBackward()
-#        forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
-#        backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
-#        if self.dim==2:
-#            invForward=np.array(tf.invert_vector_field_fixed_point(forward, 25, 1e-3, self.forwardModel.getBackward()))
-#            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 25, 1e-3, self.backwardModel.getBackward()))
-#            forward=np.array(tf.invert_vector_field_fixed_point(invForward, 25, 1e-3, self.forwardModel.getForward()))
-#            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 25, 1e-3, self.backwardModel.getForward()))
-#        else:
-#            invForward=np.array(tf.invert_vector_field_fixed_point3D(forward, 25, 1e-3, self.forwardModel.getBackward()))
-#            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 25, 1e-3, self.backwardModel.getBackward()))
-#            forward=np.array(tf.invert_vector_field_fixed_point3D(invForward, 25, 1e-3, self.forwardModel.getForward()))
-#            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 25, 1e-3, self.backwardModel.getForward()))
-#        self.forwardModel.setForward(forward)
-#        self.forwardModel.setBackward(invForward)
-#        self.backwardModel.setForward(backward)
-#        self.backwardModel.setBackward(invBackward)
-#        if showImages:
-#            self.similarityMetric.reportStatus()
-#        toc=time.time()
-#        print('Iter time: %f sec' % (toc - tic))
-#        return mdForward+mdBackward
+
+    def __getEnergyDerivative(self):
+        n=len(self.energyList)
+        q = np.poly1d(np.polyfit(range(n), self.energyList,2)).deriv()
+        der=q(n-1)
+        return der
 
     def __optimize_symmetric(self):
         self.__initOptimizer()
@@ -235,10 +223,10 @@ class RegistrationOptimizer(object):
                 self.backwardModel.upsample(self.currentMoving.shape, self.currentFixed.shape)
             error=1+self.tolerance
             niter=0
+            self.energyList=[]
             while (niter<self.maxIter[level]) and (self.tolerance<error):
                 niter+=1
                 error=self.__iterate_symmetric()
-                print 'Iter',niter,'/',self.maxIter[level],'. Residual:',error
                 if(niter==self.maxIter[level] or error<=self.tolerance):
                     error=self.__iterate_symmetric(True)
         phi1=self.forwardModel.getForward()
@@ -288,22 +276,22 @@ def testRegistrationOptimizerMonomodal2D():
     fixedToMoving=np.array(tf.warp_image(fixed, directInverse))
     rcommon.overlayImages(movingToFixed, fixed, True)
     rcommon.overlayImages(fixedToMoving, moving, True)
-    X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
-    detJacobian=rcommon.computeJacobianField(displacement)
-    plt.figure()
-    plt.imshow(detJacobian)
-    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
-    plt.clabel(CS, inline=1, fontsize=10)
-    plt.title('det(J(displacement))')
-    print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
+#    X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
+#    detJacobian=rcommon.computeJacobianField(displacement)
+#    plt.figure()
+#    plt.imshow(detJacobian)
+#    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
+#    plt.clabel(CS, inline=1, fontsize=10)
+#    plt.title('det(J(displacement))')
+#    print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
     #directInverse=np.array(tf.invert_vector_field(displacement, 2.0, 500, 1e-7))
-    detJacobianInverse=rcommon.computeJacobianField(directInverse)
-    plt.figure()
-    plt.imshow(detJacobianInverse)
-    CS=plt.contour(X0,X1,detJacobianInverse, levels=[0.0],colors='w')
-    plt.clabel(CS, inline=1, fontsize=10)
-    plt.title('det(J(displacement^-1))')
-    print 'J^-1 range:', '[', detJacobianInverse.min(), detJacobianInverse.max(),']'
+#    detJacobianInverse=rcommon.computeJacobianField(directInverse)
+#    plt.figure()
+#    plt.imshow(detJacobianInverse)
+#    CS=plt.contour(X0,X1,detJacobianInverse, levels=[0.0],colors='w')
+#    plt.clabel(CS, inline=1, fontsize=10)
+#    plt.title('det(J(displacement^-1))')
+#    print 'J^-1 range:', '[', detJacobianInverse.min(), detJacobianInverse.max(),']'
     directResidual,stats=tf.compose_vector_fields(displacement, directInverse)
     directResidual=np.array(directResidual)
     rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 'inv-direct', 7)
@@ -338,12 +326,12 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
         moving=(moving-moving.min())/(moving.max() - moving.min())
         fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
     #maxIter=[i for i in [25,50,100,100]]
-    maxIter=[i for i in [10,20,40,40]]
+    maxIter=[i for i in [10,20,40]]
     similarityMetric=EMMetric({'symmetric':True, 
                                'lambda':lambdaParam, 
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 
                                'qLevels':256, 
-                               'maxInnerIter':4,
+                               'maxInnerIter':5,
                                'useDoubleGradient':True,
                                'maxStepLength':0.25})    
     updateRule=UpdateRule.Composition()
@@ -389,22 +377,22 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
     movingToFixed=np.array(tf.warp_image(moving, displacement))
     fixedToMoving=np.array(tf.warp_image(warpedFixed, directInverse))
     rcommon.overlayImages(movingToFixed, fixedToMoving, True)
-    X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
-    detJacobian=rcommon.computeJacobianField(displacement)
-    plt.figure()
-    plt.imshow(detJacobian)
-    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
-    plt.clabel(CS, inline=1, fontsize=10)
-    plt.title('det(J(displacement))')
-    print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
+#    X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
+#    detJacobian=rcommon.computeJacobianField(displacement)
+#    plt.figure()
+#    plt.imshow(detJacobian)
+#    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
+#    plt.clabel(CS, inline=1, fontsize=10)
+#    plt.title('det(J(displacement))')
+#    print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
     #directInverse=np.array(tf.invert_vector_field(displacement, 2.0, 500, 1e-7))
-    detJacobianInverse=rcommon.computeJacobianField(directInverse)
-    plt.figure()
-    plt.imshow(detJacobianInverse)
-    CS=plt.contour(X0,X1,detJacobianInverse, levels=[0.0],colors='w')
-    plt.clabel(CS, inline=1, fontsize=10)
-    plt.title('det(J(displacement^-1))')
-    print 'J^-1 range:', '[', detJacobianInverse.min(), detJacobianInverse.max(),']'
+#    detJacobianInverse=rcommon.computeJacobianField(directInverse)
+#    plt.figure()
+#    plt.imshow(detJacobianInverse)
+#    CS=plt.contour(X0,X1,detJacobianInverse, levels=[0.0],colors='w')
+#    plt.clabel(CS, inline=1, fontsize=10)
+#    plt.title('det(J(displacement^-1))')
+#    print 'J^-1 range:', '[', detJacobianInverse.min(), detJacobianInverse.max(),']'
     directResidual,stats=tf.compose_vector_fields(displacement, directInverse)
     directResidual=np.array(directResidual)
     rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 'inv-direct', 7)

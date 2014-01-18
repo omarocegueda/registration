@@ -108,11 +108,11 @@ class EMMetric(SimilarityMetric):
         displacement=np.zeros(shape=(sh)+(self.dim,), dtype=np.float64)
         if self.dim==2:
             #singleCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
-            #vCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
-            wCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
+            self.energy=vCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
+            #wCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
         else:
             #singleCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
-            vCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
+            self.energy=vCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
             #wCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
         maxNorm=np.sqrt(np.sum(displacement**2,-1)).max()
         if maxNorm>maxStepLength:
