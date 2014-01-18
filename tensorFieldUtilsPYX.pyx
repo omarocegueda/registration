@@ -26,7 +26,13 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void integrateMaskedWeightedTensorFieldProductsCPP(int *mask, double *q, int *dims, double *diff, int numLabels, int *labels, double *weights, double *Aw, double *bw)
     double computeDemonsStep2D(double *deltaField, double *gradientField, int *dims, double maxStepSize, double scale, double *demonsStep)
     double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField, double *residual)
+    double computeEnergySSD2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField)
     double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField, double *residual)
+    double iterateResidualDisplacementFieldSSD2D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField)
+    int computeResidualDisplacementFieldSSD2D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField, double *residual)
+    double iterateResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField)
+    int computeResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField, double *residual)
+    double computeEnergySSD3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField)
     void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, int numLabels, double *probs, double *means, double *variances)
     void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
     double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *displacementField, double *residual)
@@ -256,11 +262,6 @@ cpdef iterateDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigma
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
     dims[0]=deltaField.shape[0]
     dims[1]=deltaField.shape[1]
-    checkFortran(deltaField)
-    checkFortran(sigmaField)
-    checkFortran(gradientField)
-    checkFortran(displacementField)
-    checkFortran(residuals)
     cdef double *sigmaFieldPointer=NULL 
     if sigmaField!=None:
         sigmaFieldPointer=&sigmaField[0,0]
@@ -269,6 +270,66 @@ cpdef iterateDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigma
         residualsPointer=&residuals[0,0]
     maxDisplacement=iterateDisplacementField2DCPP(&deltaField[0,0], sigmaFieldPointer, &gradientField[0,0,0], &dims[0], lambdaParam, &displacementField[0,0,0], residualsPointer)
     return maxDisplacement
+
+cpdef iterate_residual_displacement_field_SSD2D(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double[:,:,:] target, double lambdaParam, double[:,:,:] displacementField):
+    cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    cdef double retVal
+    cdef double *targetPointer=NULL
+    if target!=None:
+        targetPointer=&target[0,0,0]
+    retVal=iterateResidualDisplacementFieldSSD2D(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0]);
+
+cpdef compute_residual_displacement_field_SSD3D(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double[:,:,:,:] target, double lambdaParam, double[:,:,:,:] displacementField, double[:,:,:,:] residual):
+    cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    dims[2]=deltaField.shape[2]
+    cdef int retVal
+    cdef double *targetPointer=NULL
+    if target!=None:
+        targetPointer=&target[0,0,0,0]
+    if residual==None:
+        residual=np.empty(shape=(dims[0], dims[1], dims[2], 3), dtype=np.double)
+    retVal=computeResidualDisplacementFieldSSD3D(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0,0], &residual[0,0,0,0]);    
+    return residual
+
+cpdef iterate_residual_displacement_field_SSD3D(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double[:,:,:,:] target, double lambdaParam, double[:,:,:,:] displacementField):
+    cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    dims[2]=deltaField.shape[2]
+    cdef double retVal
+    cdef double *targetPointer=NULL
+    if target!=None:
+        targetPointer=&target[0,0,0,0]
+    retVal=iterateResidualDisplacementFieldSSD3D(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0,0]);
+
+cpdef compute_residual_displacement_field_SSD2D(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double[:,:,:] target, double lambdaParam, double[:,:,:] displacementField, double[:,:,:] residual):
+    cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    cdef int retVal
+    cdef double *targetPointer=NULL
+    if target!=None:
+        targetPointer=&target[0,0,0]
+    if residual==None:
+        residual=np.empty(shape=(dims[0], dims[1], 2), dtype=np.double)
+    retVal=computeResidualDisplacementFieldSSD2D(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0], &residual[0,0,0]);    
+    return residual
+
+cpdef compute_energy_SSD2D(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double lambdaParam, double[:,:,:] displacementField):
+    cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    cdef double *sigmaFieldPointer=NULL 
+    cdef double energy
+    if sigmaField!=None:
+        sigmaFieldPointer=&sigmaField[0,0]
+    energy=computeEnergySSD2DCPP(&deltaField[0,0], sigmaFieldPointer, &gradientField[0,0,0], &dims[0], lambdaParam, &displacementField[0,0,0])
+    return energy
+
 
 cpdef iterateMaskedDisplacementField2DCYTHON(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  int[:,:] mask, double lambdaParam, double[:,:,:] displacementField, double[:,:] residuals):
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
@@ -301,6 +362,16 @@ cpdef iterateDisplacementField3DCYTHON(double[:,:,:] deltaField, double[:,:,:] s
     else:
         maxDisplacement=iterateDisplacementField3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &displacementField[0,0,0,0], &residuals[0,0,0])
     return maxDisplacement
+
+cpdef compute_energy_SSD3D(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double lambdaParam, double[:,:,:,:] displacementField):
+    cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
+    dims[0]=deltaField.shape[0]
+    dims[1]=deltaField.shape[1]
+    dims[2]=deltaField.shape[2]
+    cdef double energy
+    energy=computeEnergySSD3DCPP(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], &dims[0], lambdaParam, &displacementField[0,0,0,0])
+    return energy
+
 
 cpdef computeMaskedVolumeClassStatsProbsCYTHON(int[:,:] mask, double[:,:] img, double[:,:,:] probs):
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")

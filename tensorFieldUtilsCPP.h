@@ -19,7 +19,13 @@ double computeDemonsStep2D(double *deltaField, double *gradientField, int *dims,
 double computeDemonsStep3D(double *deltaField, double *gradientField, int *dims, double maxStepSize, double scale, double *demonsStep);
 
 double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField, double *residual);
+double computeEnergySSD2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField);
 double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField, double *residual);
+double computeEnergySSD3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField);
+double iterateResidualDisplacementFieldSSD2D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField);
+int computeResidualDisplacementFieldSSD2D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField, double *residual);
+double iterateResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField);
+int computeResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField, double *residual);
 
 void computeMaskedVolumeClassStatsProbsCPP(int *mask, double *img, int *dims, int nclasses, double *probs, double *means, double *variances);
 void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw);

@@ -164,15 +164,15 @@ class RegistrationOptimizer(object):
         forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
         backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
         if self.dim==2:
-            invForward=np.array(tf.invert_vector_field_fixed_point(forward, 50, 1e-3, self.forwardModel.getBackward()))
-            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 50, 1e-3, self.backwardModel.getBackward()))
-            forward=np.array(tf.invert_vector_field_fixed_point(invForward, 50, 1e-3, self.forwardModel.getForward()))
-            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 50, 1e-3, self.backwardModel.getForward()))
+            invForward=np.array(tf.invert_vector_field_fixed_point(forward, 25, 1e-3, self.forwardModel.getBackward()))
+            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 25, 1e-3, self.backwardModel.getBackward()))
+            forward=np.array(tf.invert_vector_field_fixed_point(invForward, 25, 1e-3, self.forwardModel.getForward()))
+            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 25, 1e-3, self.backwardModel.getForward()))
         else:
-            invForward=np.array(tf.invert_vector_field_fixed_point3D(forward, 50, 1e-3, self.forwardModel.getBackward()))
-            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 50, 1e-3, self.backwardModel.getBackward()))
-            forward=np.array(tf.invert_vector_field_fixed_point3D(invForward, 50, 1e-3, self.forwardModel.getForward()))
-            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 50, 1e-3, self.backwardModel.getForward()))
+            invForward=np.array(tf.invert_vector_field_fixed_point3D(forward, 25, 1e-3, self.forwardModel.getBackward()))
+            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 25, 1e-3, self.backwardModel.getBackward()))
+            forward=np.array(tf.invert_vector_field_fixed_point3D(invForward, 25, 1e-3, self.forwardModel.getForward()))
+            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 25, 1e-3, self.backwardModel.getForward()))
         self.forwardModel.setForward(forward)
         self.forwardModel.setBackward(invForward)
         self.backwardModel.setForward(backward)
@@ -301,12 +301,12 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
         moving=(moving-moving.min())/(moving.max() - moving.min())
         fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
     #maxIter=[i for i in [25,50,100,100]]
-    maxIter=[i for i in [5,10,20]]
+    maxIter=[i for i in [10,20,40,40]]
     similarityMetric=EMMetric({'symmetric':True, 
                                'lambda':lambdaParam, 
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 
                                'qLevels':256, 
-                               'maxInnerIter':10,
+                               'maxInnerIter':4,
                                'useDoubleGradient':True,
                                'maxStepLength':0.25})    
     updateRule=UpdateRule.Composition()
