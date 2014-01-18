@@ -555,6 +555,211 @@ double iterateDisplacementField2DCPP(double *deltaField, double *sigmaField, dou
     return sqrt(maxDisplacement);
 }
 
+double iterateResidualDisplacementFieldSSD2D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField){
+    const static int numNeighbors=4;
+    const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
+    const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
+    double commonRes[2]={0,0};
+    double *b=target;
+    int offsetb=2;
+    if(b==NULL){
+        offsetb=0;
+        b=commonRes;
+    }
+    int nrows=dims[0];
+    int ncols=dims[1];
+    double *d=displacementField;
+    double *g=gradientField;
+    double y[2];
+    double A[3];
+    int pos=0;
+    double maxDisplacement=0;
+    for(int r=0;r<nrows;++r){
+        for(int c=0;c<ncols;++c, ++pos, d+=2, g+=2, b+=offsetb){
+            double delta=deltaField[pos];
+            double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
+            if(target==NULL){
+                b[0]=delta*g[0];
+                b[1]=delta*g[1];
+            }
+            int nn=0;
+            y[0]=y[1]=0;
+            for(int k=0;k<numNeighbors;++k){
+                int dr=r+dRow[k];
+                if((dr<0) || (dr>=nrows)){
+                    continue;
+                }
+                int dc=c+dCol[k];
+                if((dc<0) || (dc>=ncols)){
+                    continue;
+                }
+                ++nn;
+                double *dneigh=&displacementField[2*(dr*ncols + dc)];
+                y[0]+=dneigh[0];
+                y[1]+=dneigh[1];
+            }
+            if(isInfinite(sigma)){
+                double xx=d[0];
+                double yy=d[1];
+                d[0]=y[0]/nn;
+                d[1]=y[1]/nn;
+                xx-=d[0];
+                yy-=d[1];
+                double opt=xx*xx+yy*yy;
+                if(maxDisplacement<opt){
+                    maxDisplacement=opt;
+                }
+            }else if (sigma<1e-9){
+                    double nrm2=g[0]*g[0]+g[1]*g[1];
+                    if(nrm2<1e-9){
+                        d[0]=d[1]=0;
+                    }else{
+                        d[0]=(b[0])/nrm2;
+                        d[1]=(b[1])/nrm2;
+                    }
+            }else{
+                y[0]=b[0] + sigma*lambdaParam*y[0];
+                y[1]=b[1] + sigma*lambdaParam*y[1];
+                A[0]=g[0]*g[0] + sigma*lambdaParam*(nn);
+                A[1]=g[0]*g[1];
+                A[2]=g[1]*g[1] + sigma*lambdaParam*(nn);
+                double xx=d[0];
+                double yy=d[1];
+                solve2DSymmetricPositiveDefiniteSystem(A,y,d, NULL);
+                xx-=d[0];
+                yy-=d[1];
+                double opt=xx*xx+yy*yy;
+                if(maxDisplacement<opt){
+                    maxDisplacement=opt;
+                }
+            }//if
+        }//cols
+    }//rows
+    return sqrt(maxDisplacement);
+}
+
+int computeResidualDisplacementFieldSSD2D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField, double *residual){
+    const static int numNeighbors=4;
+    const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
+    const static int dCol[]={ 0, 1, 0, -1,  1, 1, -1, -1};
+    double commonRes[2]={0,0};
+    double *b=target;
+    double *res=residual;
+    int offsetRes=2;
+    if(b==NULL){
+        offsetRes=0;
+        b=commonRes;
+    }
+    int nrows=dims[0];
+    int ncols=dims[1];
+    double *d=displacementField;
+    double *g=gradientField;
+    double y[2];
+    int pos=0;
+    for(int r=0;r<nrows;++r){
+        for(int c=0;c<ncols;++c, ++pos, d+=2, g+=2, res+=2, b+=offsetRes){
+            double delta=deltaField[pos];
+            double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
+            if(target==NULL){
+                b[0]=delta*g[0];
+                b[1]=delta*g[1];
+            }
+            y[0]=y[1]=0;
+            for(int k=0;k<numNeighbors;++k){
+                int dr=r+dRow[k];
+                if((dr<0) || (dr>=nrows)){
+                    continue;
+                }
+                int dc=c+dCol[k];
+                if((dc<0) || (dc>=ncols)){
+                    continue;
+                }
+                double *dneigh=&displacementField[2*(dr*ncols + dc)];
+                y[0]+=d[0]-dneigh[0];
+                y[1]+=d[1]-dneigh[1];
+            }
+            if(isInfinite(sigma)){
+                res[0]=-lambdaParam*y[0];
+                res[1]=-lambdaParam*y[1];
+            }else{
+                double dotP=g[0]*d[0]+g[1]*d[1];
+                res[0]=b[0]-(g[0]*dotP+sigma*lambdaParam*y[0]);
+                res[1]=b[1]-(g[1]*dotP+sigma*lambdaParam*y[1]);
+            }//if
+        }//cols
+    }//rows
+    return 0;
+}
+
+double computeEnergySSD2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField){
+    int nrows=dims[0];
+    int ncols=dims[1];
+    double *d=displacementField;
+    double *g=gradientField;
+    int pos=0;
+    double energy=0;
+    for(int r=0;r<nrows;++r){
+        for(int c=0;c<ncols;++c, ++pos, d+=2, g+=2){
+            double delta=deltaField[pos];
+            double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
+            double dotp=d[0]*g[0]+d[1]*g[1];
+            double localEnergy=0;
+            if(r>0){
+                double *nd=&displacementField[2*((r-1)*ncols+c)];
+                double dst=(nd[0]-d[0])*(nd[0]-d[0])+(nd[1]-d[1])*(nd[1]-d[1]);
+                localEnergy+=dst;
+            }
+            if(c>0){
+                double *nd=&displacementField[2*(r*ncols+c-1)];
+                double dst=(nd[0]-d[0])*(nd[0]-d[0])+(nd[1]-d[1])*(nd[1]-d[1]);
+                localEnergy+=dst;
+            }
+            localEnergy=0.5*lambdaParam*localEnergy + 0.5*(delta-dotp)*(delta-dotp)/sigma;
+            energy+=localEnergy;
+        }//cols
+    }//rows
+    return energy;
+}
+
+double computeEnergySSD3DCPP(double *deltaField, double *sigmaField, double *gradientField, int *dims, double lambdaParam, double *displacementField){
+    int nslices=dims[0];
+    int nrows=dims[1];
+    int ncols=dims[2];
+    int sliceSize=nrows*ncols;
+    double *d=displacementField;
+    double *g=gradientField;
+    int pos=0;
+    double energy=0;
+    for(int s=0;s<nslices;++s){
+        for(int r=0;r<nrows;++r){
+            for(int c=0;c<ncols;++c, ++pos, d+=3, g+=3){
+                double delta=deltaField[pos];
+                double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
+                double dotp=d[0]*g[0]+d[1]*g[1]+d[2]*g[2];
+                double localEnergy=0;
+                if(s>0){
+                    double *nd=&displacementField[3*((s-1)*sliceSize+r*ncols+c)];
+                    double dst=(nd[0]-d[0])*(nd[0]-d[0])+(nd[1]-d[1])*(nd[1]-d[1])+(nd[2]-d[2])*(nd[2]-d[2]);
+                    localEnergy+=dst;
+                }
+                if(r>0){
+                    double *nd=&displacementField[3*(s*sliceSize+(r-1)*ncols+c)];
+                    double dst=(nd[0]-d[0])*(nd[0]-d[0])+(nd[1]-d[1])*(nd[1]-d[1])+(nd[2]-d[2])*(nd[2]-d[2]);
+                    localEnergy+=dst;
+                }
+                if(c>0){
+                    double *nd=&displacementField[3*(s*sliceSize+r*ncols+c-1)];
+                    double dst=(nd[0]-d[0])*(nd[0]-d[0])+(nd[1]-d[1])*(nd[1]-d[1])+(nd[2]-d[2])*(nd[2]-d[2]);
+                    localEnergy+=dst;
+                }
+                localEnergy=0.5*lambdaParam*localEnergy + 0.5*(delta-dotp)*(delta-dotp)/sigma;
+                energy+=localEnergy;
+            }//cols
+        }//rows
+    }
+    return energy;
+}
+
 double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *displacementField, double *residual){
     const static int numNeighbors=4;
     const static int dRow[]={-1, 0, 1,  0, -1, 1,  1, -1};
@@ -734,6 +939,175 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
 }
 
 
+double iterateResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField){
+    const static int numNeighbors=6;
+    const static int dSlice[numNeighbors]={-1,  0, 0, 0,  0, 1};
+    const static int dRow[numNeighbors]  ={ 0, -1, 0, 1,  0, 0};
+    const static int dCol[numNeighbors]  ={ 0,  0, 1, 0, -1, 0};
+    double commonRes[3]={0,0,0};
+    double *b=target;
+    int offsetb=3;
+    if(b==NULL){
+        offsetb=0;
+        b=commonRes;
+    }
+    int nslices=dims[0];
+    int nrows=dims[1];
+    int ncols=dims[2];
+    int sliceSize=ncols*nrows;
+    double *d=displacementField;
+    double *g=gradientField;
+    double y[3];
+    double A[6];
+    int pos=0;
+    double maxDisplacement=0;
+    for(int s=0;s<nslices;++s){
+        for(int r=0;r<nrows;++r){
+            for(int c=0;c<ncols;++c, ++pos, d+=3, g+=3, b+=offsetb){
+                double delta=deltaField[pos];
+                double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
+                if(target==NULL){
+                    b[0]=delta*g[0];
+                    b[1]=delta*g[1];
+                    b[2]=delta*g[2];
+                }
+                int nn=0;
+                y[0]=y[1]=y[2]=0;
+                for(int k=0;k<numNeighbors;++k){
+                    int ds=s+dSlice[k];
+                    if((ds<0) || (ds>=nslices)){
+                        continue;
+                    }
+                    int dr=r+dRow[k];
+                    if((dr<0) || (dr>=nrows)){
+                        continue;
+                    }
+                    int dc=c+dCol[k];
+                    if((dc<0) || (dc>=ncols)){
+                        continue;
+                    }
+                    ++nn;
+                    double *dneigh=&displacementField[3*(ds*sliceSize+dr*ncols + dc)];
+                    y[0]+=dneigh[0];
+                    y[1]+=dneigh[1];
+                    y[2]+=dneigh[3];
+                }
+                if(isInfinite(sigma)){
+                    double xx=d[0];
+                    double yy=d[1];
+                    double zz=d[2];
+                    d[0]=y[0]/nn;
+                    d[1]=y[1]/nn;
+                    d[2]=y[2]/nn;
+                    xx-=d[0];
+                    yy-=d[1];
+                    zz-=d[2];
+                    double opt=xx*xx+yy*yy+zz*zz;
+                    if(maxDisplacement<opt){
+                        maxDisplacement=opt;
+                    }
+                }else if (sigma<1e-9){
+                        double nrm2=g[0]*g[0]+g[1]*g[1]+g[2]*g[2];
+                        if(nrm2<1e-9){
+                            d[0]=d[1]=d[2]=0;
+                        }else{
+                            d[0]=(b[0])/nrm2;
+                            d[1]=(b[1])/nrm2;
+                            d[2]=(b[2])/nrm2;
+                        }
+                }else{
+                    y[0]=b[0] + sigma*lambdaParam*y[0];
+                    y[1]=b[1] + sigma*lambdaParam*y[1];
+                    y[2]=b[2] + sigma*lambdaParam*y[2];
+                    A[0]=g[0]*g[0] + sigma*lambdaParam*nn;
+                    A[1]=g[0]*g[1];
+                    A[2]=g[0]*g[2];
+                    A[3]=g[1]*g[1] + sigma*lambdaParam*nn;
+                    A[4]=g[1]*g[2];
+                    A[5]=g[2]*g[2] + sigma*lambdaParam*nn;
+                    double xx=d[0];
+                    double yy=d[1];
+                    double zz=d[2];
+                    solve3DSymmetricPositiveDefiniteSystem(A,y,d, NULL);
+                    xx-=d[0];
+                    yy-=d[1];
+                    zz-=d[2];
+                    double opt=xx*xx+yy*yy+zz*zz;
+                    if(maxDisplacement<opt){
+                        maxDisplacement=opt;
+                    }
+                }//if
+            }//cols
+        }//rows
+    }//slices
+    return sqrt(maxDisplacement);
+}
+
+int computeResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField, double *residual){
+    const static int numNeighbors=6;
+    const static int dSlice[numNeighbors]={-1,  0, 0, 0,  0, 1};
+    const static int dRow[numNeighbors]  ={ 0, -1, 0, 1,  0, 0};
+    const static int dCol[numNeighbors]  ={ 0,  0, 1, 0, -1, 0};
+    double commonRes[3]={0,0,0};
+    double *b=target;
+    double *res=residual;
+    int offsetRes=3;
+    if(b==NULL){
+        offsetRes=0;
+        b=commonRes;
+    }
+    int nslices=dims[0];
+    int nrows=dims[1];
+    int ncols=dims[2];
+    int sliceSize=ncols*nrows;
+    double *d=displacementField;
+    double *g=gradientField;
+    double y[3];
+    int pos=0;
+    for(int s=0;s<nslices;++s){
+        for(int r=0;r<nrows;++r){
+            for(int c=0;c<ncols;++c, ++pos, d+=3, g+=3, res+=3, b+=offsetRes){
+                double delta=deltaField[pos];
+                double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
+                if(target==NULL){
+                    b[0]=delta*g[0];
+                    b[1]=delta*g[1];
+                    b[2]=delta*g[2];
+                }
+                y[0]=y[1]=y[2]=0;
+                for(int k=0;k<numNeighbors;++k){
+                    int ds=s+dSlice[k];
+                    if((ds<0) || (ds>=nslices)){
+                        continue;
+                    }
+                    int dr=r+dRow[k];
+                    if((dr<0) || (dr>=nrows)){
+                        continue;
+                    }
+                    int dc=c+dCol[k];
+                    if((dc<0) || (dc>=ncols)){
+                        continue;
+                    }
+                    double *dneigh=&displacementField[3*(ds*sliceSize+dr*ncols + dc)];
+                    y[0]+=d[0]-dneigh[0];
+                    y[1]+=d[1]-dneigh[1];
+                    y[2]+=d[2]-dneigh[2];
+                }
+                if(isInfinite(sigma)){
+                    res[0]=-lambdaParam*y[0];
+                    res[1]=-lambdaParam*y[1];
+                    res[2]=-lambdaParam*y[2];
+                }else{
+                    double dotP=g[0]*d[0]+g[1]*d[1]+g[2]*d[2];
+                    res[0]=b[0]-(g[0]*dotP+sigma*lambdaParam*y[0]);
+                    res[1]=b[1]-(g[1]*dotP+sigma*lambdaParam*y[1]);
+                    res[2]=b[2]-(g[2]*dotP+sigma*lambdaParam*y[2]);
+                }//if
+            }//cols
+        }//rows
+    }
+    return 0;
+}
 
 
 
@@ -2895,7 +3269,7 @@ int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, do
     
     int nsites=2*nrows*ncols;
     int iter;
-    double epsilon=0.125;
+    double epsilon=0.5;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
         composeVectorFields(temp[iter&1], d, nrows, ncols, temp[1-(iter&1)], substats);
         double difmag=0;
@@ -2940,7 +3314,7 @@ int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, 
         memset(temp[0], 0, sizeof(double)*nsites);
     }
     int iter;
-    double epsilon=0.125;
+    double epsilon=0.5;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
         composeVectorFields3D(temp[iter&1], d, nslices, nrows, ncols, temp[1-(iter&1)], substats);
         double difmag=0;

@@ -51,7 +51,7 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
                                'stepType':EMMetric.GAUSS_SEIDEL_STEP, 
                                'qLevels':256,
                                'useDoubleGradient':True,
-                               'maxInnerIter':2})
+                               'maxInnerIter':4})
     updateRule=UpdateRule.Composition()
     registrationOptimizer=RegistrationOptimizer(fixed, moving, None, initAffine, similarityMetric, updateRule, maxOuterIter)
     registrationOptimizer.optimize()

@@ -5,8 +5,8 @@ import tensorFieldUtils as tf
 from SimilarityMetric import SimilarityMetric
 import matplotlib.pyplot as plt
 import registrationCommon as rcommon
-from SSDMetric import wCycle2D
-from SSDMetric import wCycle3D
+from SSDMetric import singleCycle2D, vCycle2D, wCycle2D
+from SSDMetric import singleCycle3D, vCycle3D, wCycle3D
 class EMMetric(SimilarityMetric):
     GAUSS_SEIDEL_STEP=0
     DEMONS_STEP=1
@@ -107,9 +107,13 @@ class EMMetric(SimilarityMetric):
         gradient=self.gradientMoving if forwardStep else self.gradientFixed
         displacement=np.zeros(shape=(sh)+(self.dim,), dtype=np.float64)
         if self.dim==2:
-            displacement=wCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
+            #singleCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
+            #vCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
+            wCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
         else:
-            displacement=wCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
+            #singleCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
+            vCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
+            #wCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
         maxNorm=np.sqrt(np.sum(displacement**2,-1)).max()
         if maxNorm>maxStepLength:
             displacement*=maxStepLength/maxNorm
