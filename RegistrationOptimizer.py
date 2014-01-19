@@ -172,14 +172,15 @@ class RegistrationOptimizer(object):
         except NameError:
             pass
         try:
-            print fwEnergy,'\t',bwEnergy,'\t',fwEnergy+bwEnergy
+            n=len(self.energyList)
+            print n,':\t',fwEnergy,'\t',bwEnergy,'\t',fwEnergy+bwEnergy,'\t','-' if len(self.energyList)<3 else self.__getEnergyDerivative()
             self.energyList.append(fwEnergy+bwEnergy)
         except NameError:
             pass
-        if len(self.energyList)>=20:
-            der=self.__getEnergyDerivative()
-            if(der>=0):
-                return -1
+#        if len(self.energyList)>=15:
+#            der=self.__getEnergyDerivative()
+#            if(der>=0):
+#                return -1
         forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
         backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
         if self.dim==2:
@@ -228,7 +229,8 @@ class RegistrationOptimizer(object):
                 niter+=1
                 error=self.__iterate_symmetric()
                 if(niter==self.maxIter[level] or error<=self.tolerance):
-                    error=self.__iterate_symmetric(True)
+                    #error=self.__iterate_symmetric(True)
+                    self.similarityMetric.reportStatus()
         phi1=self.forwardModel.getForward()
         phi2=self.backwardModel.getBackward()
         phi1Inv=self.forwardModel.getBackward()
@@ -326,7 +328,7 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
         moving=(moving-moving.min())/(moving.max() - moving.min())
         fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
     #maxIter=[i for i in [25,50,100,100]]
-    maxIter=[i for i in [10,20,40]]
+    maxIter=[i for i in [25,50,100,100]]
     similarityMetric=EMMetric({'symmetric':True, 
                                'lambda':lambdaParam, 
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 

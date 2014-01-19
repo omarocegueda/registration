@@ -108,8 +108,8 @@ class EMMetric(SimilarityMetric):
         displacement=np.zeros(shape=(sh)+(self.dim,), dtype=np.float64)
         if self.dim==2:
             #singleCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
-            self.energy=vCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
-            #wCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
+            #self.energy=vCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
+            self.energy=wCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
         else:
             #singleCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
             self.energy=vCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)

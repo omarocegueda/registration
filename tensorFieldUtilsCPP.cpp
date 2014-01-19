@@ -609,9 +609,9 @@ double iterateResidualDisplacementFieldSSD2D(double *deltaField, double *sigmaFi
                 if(maxDisplacement<opt){
                     maxDisplacement=opt;
                 }
-            }else if (sigma<1e-9){
+            }else if (sigma==0){
                     double nrm2=g[0]*g[0]+g[1]*g[1];
-                    if(nrm2<1e-9){
+                    if(nrm2==0){
                         d[0]=d[1]=0;
                     }else{
                         d[0]=(b[0])/nrm2;
@@ -897,9 +897,9 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
                         residual[pos]=0;
                     }
                     
-                }else if (sigma<1e-9){
+                }else if (sigma==0){
                     double nrm2=g[0]*g[0]+g[1]*g[1]+g[2]*g[2];
-                    if(nrm2<1e-9){
+                    if(nrm2==0){
                         d[0]=d[1]=d[2]=0;
                     }else{
                         d[0]=(g[0]*delta)/nrm2;
@@ -1006,9 +1006,9 @@ double iterateResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaFi
                     if(maxDisplacement<opt){
                         maxDisplacement=opt;
                     }
-                }else if (sigma<1e-9){
+                }else if (sigma==0){
                         double nrm2=g[0]*g[0]+g[1]*g[1]+g[2]*g[2];
-                        if(nrm2<1e-9){
+                        if(nrm2==0){
                             d[0]=d[1]=d[2]=0;
                         }else{
                             d[0]=(b[0])/nrm2;
