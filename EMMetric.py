@@ -176,13 +176,13 @@ class EMMetric(SimilarityMetric):
             self.movingImageMask=transformation.warpBackwardNN(movingImageMask)
 
     def reportStatus(self):
-#        plt.figure()
-#        plt.subplot(1,3,1)
-#        plt.plot(self.fixedQLevels)
-#        plt.subplot(1,3,2)
-#        plt.imshow(self.samplingMask, cmap=plt.cm.gray)
-#        plt.subplot(1,3,3)
-#        plt.plot(self.movingQLevels)
         if self.dim==2:
             plt.figure()
             rcommon.overlayImages(self.movingQMeansField, self.fixedQMeansField, False)
+        else:
+            fixed=self.fixedImage
+            moving=self.movingImage
+            sh=self.fixedQMeansField.shape
+            rcommon.overlayImages(moving[:,sh[1]//2,:], fixed[:,sh[1]//2,:])
+            rcommon.overlayImages(moving[sh[0]//2,:,:], fixed[sh[0]//2,:,:])
+            rcommon.overlayImages(moving[:,:,sh[2]//2], fixed[:,:,sh[2]//2])    

@@ -2097,6 +2097,8 @@ int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int 
 int downsampleDisplacementField(double *d1, int nr, int nc, double *down){
     int nnr=(nr+1)/2;
     int nnc=(nc+1)/2;
+    unsigned char *cnt=new unsigned char[nnr*nnc];
+    memset(cnt, 0, sizeof(unsigned char)*nnr*nnc);
     double *d=d1;
     memset(down, 0, sizeof(double)*nnr*nnc*2);
     for(int i=0;i<nr;++i){
@@ -2105,14 +2107,25 @@ int downsampleDisplacementField(double *d1, int nr, int nc, double *down){
             int jj=j/2;
             down[2*(ii*nnc+jj)]+=d[0];
             down[2*(ii*nnc+jj)+1]+=d[1];
+            cnt[ii*nnc+jj]++;
         }
     }
+    d-=2;
+    for(int p=nnr*nnc-1;p>=0;--p, d-=2){
+        if(cnt[p]>0){
+            d[0]/=cnt[p];
+            d[1]/=cnt[p];
+        }
+    }
+    delete[] cnt;
     return 0;
 }
 
 int downsampleScalarField(double *d1, int nr, int nc, double *down){
     int nnr=(nr+1)/2;
     int nnc=(nc+1)/2;
+    unsigned char *cnt=new unsigned char[nnr*nnc];
+    memset(cnt, 0, sizeof(unsigned char)*nnr*nnc);
     double *d=d1;
     memset(down, 0, sizeof(double)*nnr*nnc);
     for(int i=0;i<nr;++i){
@@ -2120,8 +2133,15 @@ int downsampleScalarField(double *d1, int nr, int nc, double *down){
             int ii=i/2;
             int jj=j/2;
             down[ii*nnc+jj]+=d[0];
+            cnt[ii*nnc+jj]++;
         }
     }
+    for(int p=nnr*nnc-1;p>=0;--p){
+        if(cnt[p]>0){
+            down[p]/=cnt[p];
+        }
+    }
+    delete[] cnt;
     return 0;
 }
 
@@ -2131,6 +2151,8 @@ int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *do
     int nnr=(nr+1)/2;
     int nnc=(nc+1)/2;
     int sliceSize=nnr*nnc;
+    unsigned char *cnt=new unsigned char[nns*sliceSize];
+    memset(cnt, 0, sizeof(unsigned char)*nns*sliceSize);
     double *d=d1;
     memset(down, 0, sizeof(double)*nns*nnr*nnc*3);
     for(int k=0;k<ns;++k){
@@ -2142,9 +2164,19 @@ int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *do
                 down[3*(kk*sliceSize+ii*nnc+jj)]+=d[0];
                 down[3*(kk*sliceSize+ii*nnc+jj)+1]+=d[1];
                 down[3*(kk*sliceSize+ii*nnc+jj)+2]+=d[2];
+                cnt[kk*sliceSize+ii*nnc+jj]++;
             }
         }
     }
+    d-=3;
+    for(int p=sliceSize*nns-1;p>=0;--p, d-=3){
+        if(cnt[p]>0){
+            d[0]/=cnt[p];
+            d[1]/=cnt[p];
+            d[2]/=cnt[p];
+        }
+    }
+    delete[] cnt;
     return 0;
 }
 
@@ -2153,6 +2185,8 @@ int downsampleScalarField3D(double *d1, int ns, int nr, int nc, double *down){
     int nnr=(nr+1)/2;
     int nnc=(nc+1)/2;
     int sliceSize=nnr*nnc;
+    unsigned char *cnt=new unsigned char[nns*sliceSize];
+    memset(cnt, 0, sizeof(unsigned char)*nns*sliceSize);
     double *d=d1;
     memset(down, 0, sizeof(double)*nns*nnr*nnc);
     for(int k=0;k<ns;++k){
@@ -2162,9 +2196,16 @@ int downsampleScalarField3D(double *d1, int ns, int nr, int nc, double *down){
                 int ii=i/2;
                 int jj=j/2;
                 down[kk*sliceSize+ii*nnc+jj]+=d[0];
+                cnt[kk*sliceSize+ii*nnc+jj]++;
             }
         }
     }
+    for(int p=sliceSize*nns-1;p>=0;--p){
+        if(cnt[p]>0){
+            down[p]/=cnt[p];
+        }
+    }
+    delete[] cnt;
     return 0;
 }
 

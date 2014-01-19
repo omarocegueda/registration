@@ -55,8 +55,7 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     fixed=fixed.copy(order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    #maxOuterIter=[5,10,20]
-    maxOuterIter=[25,50,100]
+    maxOuterIter=[25,50,100,100]
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)
     ###################Run registration##################
@@ -105,6 +104,10 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     #---finally, the deformed lattice
     saveDeformedLattice3D(displacement, 'latticeDispDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
 
+'''
+import dipyreg
+dipyreg.registerMultimodalDiffeomorphic3D('target/IBSR_13_ana_strip.nii.gz', 'reference/IBSR_10_ana_strip.nii.gz', '../affine/IBSR_13_ana_strip_IBSR_10_ana_stripAffine.txt', 'warp', 50)
+'''
 if __name__=='__main__':
     '''
     python dipyreg.py "/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz" "/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz" "IBSR_01_ana_strip_IBSR_02_ana_stripAffine.txt" "warp" 100.0

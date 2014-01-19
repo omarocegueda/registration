@@ -30,6 +30,7 @@ class RegistrationOptimizer(object):
         self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
         self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
         self.energyList=None
+        self.reportStatus=False
 
     def __checkReady(self):
         ready=True
@@ -211,6 +212,16 @@ class RegistrationOptimizer(object):
         der=q(n-1.5)
         return der
 
+    def __report_status(self):
+        wmoving=self.backwardModel.warpBackward(self.currentMoving)
+        wfixed=self.forwardModel.warpBackward(self.currentFixed)
+        self.similarityMetric.setMovingImage(wmoving)
+        self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.backwardModel, -1)
+        self.similarityMetric.setFixedImage(wfixed)
+        self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
+        self.similarityMetric.initializeIteration()
+        self.similarityMetric.reportStatus()
+
     def __optimize_symmetric(self):
         self.__initOptimizer()
         for level in range(self.levels-1, -1, -1):
@@ -230,9 +241,8 @@ class RegistrationOptimizer(object):
             while (niter<self.maxIter[level]) and (self.tolerance<error):
                 niter+=1
                 error=self.__iterate_symmetric()
-                if(niter==self.maxIter[level] or error<=self.tolerance):
-                    #error=self.__iterate_symmetric(True)
-                    self.similarityMetric.reportStatus()
+            if self.reportStatus:
+                self.__report_status()
         phi1=self.forwardModel.getForward()
         phi2=self.backwardModel.getBackward()
         phi1Inv=self.forwardModel.getBackward()
