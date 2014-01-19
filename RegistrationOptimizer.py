@@ -9,7 +9,9 @@ import UpdateRule
 from TransformationModel import TransformationModel
 from SSDMetric import SSDMetric
 from EMMetric import EMMetric
-import scipy.interpolate as inter
+from PIL import Image, ImageSequence
+from images2gif import writeGif
+from scipy import interp
 
 class RegistrationOptimizer(object):
     def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None):
@@ -177,7 +179,7 @@ class RegistrationOptimizer(object):
             self.energyList.append(fwEnergy+bwEnergy)
         except NameError:
             pass
-#        if len(self.energyList)>=15:
+#        if len(self.energyList)>=22:
 #            der=self.__getEnergyDerivative()
 #            if(der>=0):
 #                return -1
@@ -206,7 +208,7 @@ class RegistrationOptimizer(object):
     def __getEnergyDerivative(self):
         n=len(self.energyList)
         q = np.poly1d(np.polyfit(range(n), self.energyList,2)).deriv()
-        der=q(n-1)
+        der=q(n-1.5)
         return der
 
     def __optimize_symmetric(self):
@@ -241,6 +243,10 @@ class RegistrationOptimizer(object):
         self.forwardModel.setBackward(phiInv)
         residual, stats=self.forwardModel.computeInversionError()
         print 'Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
+#        try:
+#            writeGif("evolution.gif", self.frames, duration=10.0, dither=0)
+#        except NameError:
+#            pass
         self.__endOptimizer()
 
     def optimize(self):
@@ -298,6 +304,17 @@ def testRegistrationOptimizerMonomodal2D():
     directResidual=np.array(directResidual)
     rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 'inv-direct', 7)
 
+def histeq(im,nbr_bins=256):
+  """  Histogram equalization of a grayscale image. """
+  print 'Equalizing'
+  # get image histogram
+  imhist,bins = np.histogram(im.flatten(),nbr_bins,normed=True)
+  cdf = imhist.cumsum() # cumulative distribution function
+  cdf = 255 * cdf / cdf[-1] # normalize
+  # use linear interpolation of cdf to find new pixel values
+  im2 = interp(im.flatten(),bins[:-1],cdf)
+  return im2.reshape(im.shape)
+
 def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
     displacementGTName='templateToIBSR01_GT.npy'
     fnameMoving='data/t2/IBSR_t2template_to_01.nii.gz'
@@ -316,11 +333,15 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
         sr=fixed.shape    
         moving=moving[:,sl[1]//2,:].copy()
         fixed=fixed[:,sr[1]//2,:].copy()
+        moving=histeq(moving)
+        fixed=histeq(fixed)
         moving=(moving-moving.min())/(moving.max()-moving.min())
         fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
     else:
         nib_moving=plt.imread(fnameMoving)
         nib_fixed=plt.imread(fnameFixed)
+        nib_moving=histeq(nib_moving)
+        nib_fixed=histeq(nib_fixed)
         moving=nib_moving[:,:,0].astype(np.float64)
         fixed=nib_fixed[:,:,1].astype(np.float64)
         moving=np.copy(moving, order='C')
@@ -328,7 +349,7 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
         moving=(moving-moving.min())/(moving.max() - moving.min())
         fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
     #maxIter=[i for i in [25,50,100,100]]
-    maxIter=[i for i in [25,50,100,100]]
+    maxIter=[i for i in [25,50,100]]
     similarityMetric=EMMetric({'symmetric':True, 
                                'lambda':lambdaParam, 
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 

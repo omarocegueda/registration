@@ -7,6 +7,7 @@ import tensorFieldUtils as tf
 from RegistrationOptimizer import RegistrationOptimizer
 from EMMetric import EMMetric
 import UpdateRule
+from scipy import interp
 
 def saveDeformedLattice3D(displacement, oname):
     minVal, maxVal=tf.get_displacement_range(displacement, None)
@@ -15,6 +16,17 @@ def saveDeformedLattice3D(displacement, oname):
     warped=np.array(tf.warp_volume(L, displacement, np.eye(4))).astype(np.int16)
     img=nib.Nifti1Image(warped, np.eye(4))
     img.to_filename(oname)
+
+def histeq(im,nbr_bins=256):
+  """  Histogram equalization of a grayscale image. """
+  print 'Equalizing'
+  # get image histogram
+  imhist,bins = np.histogram(im.flatten(),nbr_bins,normed=True)
+  cdf = imhist.cumsum() # cumulative distribution function
+  cdf = 255 * cdf / cdf[-1] # normalize
+  # use linear interpolation of cdf to find new pixel values
+  im2 = interp(im.flatten(),bins[:-1],cdf)
+  return im2.reshape(im.shape)
 
 def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warpDir, lambdaParam):
     '''
@@ -35,6 +47,8 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     #print initAffine
     moving=moving.get_data().squeeze().astype(np.float64)
     fixed=fixed.get_data().squeeze().astype(np.float64)
+    moving=histeq(moving)
+    fixed=histeq(fixed)
     #moving=np.copy(moving, order='C')
     #fixed=np.copy(fixed, order='C')
     moving=moving.copy(order='C')
