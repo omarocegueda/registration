@@ -9,8 +9,8 @@ import UpdateRule
 from TransformationModel import TransformationModel
 from SSDMetric import SSDMetric
 from EMMetric import EMMetric
-from PIL import Image, ImageSequence
-from images2gif import writeGif
+#from PIL import Image, ImageSequence
+#from images2gif import writeGif
 from scipy import interp
 
 class RegistrationOptimizer(object):
