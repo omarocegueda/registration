@@ -378,3 +378,6 @@ class SSDMetric(SimilarityMetric):
     def reportStatus(self):
         plt.figure()
         rcommon.overlayImages(self.movingImage, self.fixedImage, False)
+
+    def getMetricName(self):
+        return "SSDMetric"

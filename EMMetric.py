@@ -1,19 +1,21 @@
-import sys
 import numpy as np
 import scipy as sp
 import tensorFieldUtils as tf
 from SimilarityMetric import SimilarityMetric
 import matplotlib.pyplot as plt
 import registrationCommon as rcommon
-from SSDMetric import singleCycle2D, vCycle2D, wCycle2D
-from SSDMetric import singleCycle3D, vCycle3D, wCycle3D
+import SSDMetric
 class EMMetric(SimilarityMetric):
     GAUSS_SEIDEL_STEP=0
     DEMONS_STEP=1
+    SINGLECYCLE_ITER=0
+    VCYCLE_ITER=1
+    WCYCLE_ITER=2
     def getDefaultParameters(self):
         return {'lambda':1.0, 'maxInnerIter':5, 'scale':1, 
                 'maxStepLength':0.25, 'sigmaDiff':3.0, 'stepType':0, 
-                'qLevels':256, 'symmetric':False,'useDoubleGradient':False}
+                'qLevels':256, 'symmetric':False,'useDoubleGradient':False,
+                'iterationType':'vCycle'}
 
     def __init__(self, parameters):
         super(EMMetric, self).__init__(parameters)
@@ -27,21 +29,45 @@ class EMMetric(SimilarityMetric):
         self.movingQMeansField=None
         self.movingQLevels=None
         self.fixedQLevels=None
-        
+        if self.parameters['iterationType']=='singleCycle':
+            self.iterationType=EMMetric.SINGLECYCLE_ITER
+        elif self.parameters['iterationType']=='wCycle':
+            self.iterationType=EMMetric.WCYCLE_ITER
+        else:
+            self.iterationType=EMMetric.VCYCLE_ITER
+
+    def __connectFunctions(self):
+        if self.dim==2:
+            self.quantize=tf.quantizePositiveImageCYTHON
+            self.computeStats=tf.computeMaskedImageClassStatsCYTHON
+            if self.iterationType==EMMetric.SINGLECYCLE_ITER:
+                self.multiResolutionIteration=SSDMetric.singleCycle2D
+            elif self.iterationType==EMMetric.VCYCLE_ITER:
+                self.multiResolutionIteration=SSDMetric.vCycle2D
+            else:
+                self.multiResolutionIteration=SSDMetric.wCycle2D
+        else:
+            self.quantize=tf.quantizePositiveVolumeCYTHON
+            self.computeStats=tf.computeMaskedVolumeClassStatsCYTHON
+            if self.iterationType==EMMetric.SINGLECYCLE_ITER:
+                self.multiResolutionIteration=SSDMetric.singleCycle3D
+            elif self.iterationType==EMMetric.VCYCLE_ITER:
+                self.multiResolutionIteration=SSDMetric.vCycle3D
+            else:
+                self.multiResolutionIteration=SSDMetric.wCycle3D
+        if self.stepType==EMMetric.DEMONS_STEP:
+            self.computeStep=self.computeDemonsStep
+        else:
+            self.computeStep=self.computeGaussSeidelStep
 
     def initializeIteration(self):
+        self.__connectFunctions()
         samplingMask=self.fixedImageMask*self.movingImageMask
         self.samplingMask=samplingMask
-        if self.dim==2:
-            fixedQ, self.fixedQLevels, hist=tf.quantizePositiveImageCYTHON(self.fixedImage, self.quantizationLevels)
-            fixedQ=np.array(fixedQ, dtype=np.int32)
-            self.fixedQLevels=np.array(self.fixedQLevels)
-            fixedQMeans, fixedQVariances=tf.computeMaskedImageClassStatsCYTHON(samplingMask, self.movingImage, self.quantizationLevels, fixedQ)        
-        else:
-            fixedQ, self.fixedQLevels, hist=tf.quantizePositiveVolumeCYTHON(self.fixedImage, self.quantizationLevels)
-            fixedQ=np.array(fixedQ, dtype=np.int32)
-            self.fixedQLevels=np.array(self.fixedQLevels)
-            fixedQMeans, fixedQVariances=tf.computeMaskedVolumeClassStatsCYTHON(samplingMask, self.movingImage, self.quantizationLevels, fixedQ)        
+        fixedQ, self.fixedQLevels, hist=self.quantize(self.fixedImage, self.quantizationLevels)
+        fixedQ=np.array(fixedQ, dtype=np.int32)
+        self.fixedQLevels=np.array(self.fixedQLevels)
+        fixedQMeans, fixedQVariances=self.computeStats(samplingMask, self.movingImage, self.quantizationLevels, fixedQ)
         fixedQMeans[0]=0
         fixedQMeans=np.array(fixedQMeans)
         fixedQVariances=np.array(fixedQVariances)
@@ -57,16 +83,10 @@ class EMMetric(SimilarityMetric):
         for grad in sp.gradient(self.fixedImage):
             self.gradientFixed[...,i]=grad
             i+=1
-        if self.dim==2:
-            movingQ, self.movingQLevels, hist=tf.quantizePositiveImageCYTHON(self.movingImage, self.quantizationLevels)
-            movingQ=np.array(movingQ, dtype=np.int32)
-            self.movingQLevels=np.array(self.movingQLevels)
-            movingQMeans, movingQVariances=tf.computeMaskedImageClassStatsCYTHON(samplingMask, self.fixedImage, self.quantizationLevels, movingQ)        
-        else:
-            movingQ, self.movingQLevels, hist=tf.quantizePositiveVolumeCYTHON(self.movingImage, self.quantizationLevels)
-            movingQ=np.array(movingQ, dtype=np.int32)
-            self.movingQLevels=np.array(self.movingQLevels)
-            movingQMeans, movingQVariances=tf.computeMaskedVolumeClassStatsCYTHON(samplingMask, self.fixedImage, self.quantizationLevels, movingQ)        
+        movingQ, self.movingQLevels, hist=self.quantize(self.movingImage, self.quantizationLevels)
+        movingQ=np.array(movingQ, dtype=np.int32)
+        self.movingQLevels=np.array(self.movingQLevels)
+        movingQMeans, movingQVariances=self.computeStats(samplingMask, self.fixedImage, self.quantizationLevels, movingQ)        
         movingQMeans[0]=0
         movingQMeans=np.array(movingQMeans)
         movingQVariances=np.array(movingQVariances)
@@ -83,22 +103,13 @@ class EMMetric(SimilarityMetric):
                 i+=1
 
     def computeForward(self):
-        if self.stepType==EMMetric.GAUSS_SEIDEL_STEP:
-            return self.computeGaussSeidelStep(True)
-        elif self.stepType==EMMetric.DEMONS_STEP:
-            return self.computeDemonsStep(True)
-        return None
+        return self.computeStep(True)
 
     def computeBackward(self):
-        if self.stepType==EMMetric.GAUSS_SEIDEL_STEP:
-            return self.computeGaussSeidelStep(False)
-        elif self.stepType==EMMetric.DEMONS_STEP:
-            return self.computeDemonsStep(False)
-        return None
+        return self.computeStep(False)
 
     def computeGaussSeidelStep(self, forwardStep=True):
         maxInnerIter=self.parameters['maxInnerIter']
-        #lambdaParam=self.parameters['lambda']*(0.5**self.levelsAbove)
         lambdaParam=self.parameters['lambda']
         maxStepLength=self.parameters['maxStepLength']
         sh=self.fixedImage.shape if forwardStep else self.movingImage.shape
@@ -106,14 +117,7 @@ class EMMetric(SimilarityMetric):
         sigmaField=self.fixedQSigmaField if forwardStep else self.movingQSigmaField
         gradient=self.gradientMoving if forwardStep else self.gradientFixed
         displacement=np.zeros(shape=(sh)+(self.dim,), dtype=np.float64)
-        if self.dim==2:
-            #singleCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
-            #self.energy=vCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
-            self.energy=wCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
-        else:
-            #singleCycle2D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, lambdaParam, displacement)
-            self.energy=vCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
-            #wCycle3D(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
+        self.energy=self.multiResolutionIteration(self.levelsBelow, maxInnerIter, deltaField, sigmaField, gradient, None, lambdaParam, displacement)
         maxNorm=np.sqrt(np.sum(displacement**2,-1)).max()
         if maxNorm>maxStepLength:
             displacement*=maxStepLength/maxNorm
@@ -186,3 +190,6 @@ class EMMetric(SimilarityMetric):
             rcommon.overlayImages(moving[:,sh[1]//2,:], fixed[:,sh[1]//2,:])
             rcommon.overlayImages(moving[sh[0]//2,:,:], fixed[sh[0]//2,:,:])
             rcommon.overlayImages(moving[:,:,sh[2]//2], fixed[:,:,sh[2]//2])    
+
+    def getMetricName(self):
+        return "EMMetric"

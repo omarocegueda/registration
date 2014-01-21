@@ -32,6 +32,8 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     '''
         testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt', 100)
     '''
+    applyEqualization=True
+    maxOuterIter=[25,50,100]
     print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
     sys.stdout.flush()
     moving = nib.load(fnameMoving)
@@ -47,24 +49,26 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     #print initAffine
     moving=moving.get_data().squeeze().astype(np.float64)
     fixed=fixed.get_data().squeeze().astype(np.float64)
-    moving=histeq(moving)
-    fixed=histeq(fixed)
-    #moving=np.copy(moving, order='C')
-    #fixed=np.copy(fixed, order='C')
+    print 'Apply equalization', applyEqualization
+    if applyEqualization:
+        moving=histeq(moving)
+        fixed=histeq(fixed)
     moving=moving.copy(order='C')
     fixed=fixed.copy(order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    maxOuterIter=[25,50,100,100]
+    
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)
     ###################Run registration##################
-    similarityMetric=EMMetric({'symmetric':True, 
-                               'lambda':lambdaParam, 
-                               'stepType':EMMetric.GAUSS_SEIDEL_STEP, 
-                               'qLevels':256,
-                               'useDoubleGradient':True,
-                               'maxInnerIter':10})
+    metricParameters={'symmetric':True, 
+                      'lambda':lambdaParam, 
+                      'stepType':EMMetric.GAUSS_SEIDEL_STEP, 
+                      'qLevels':256,
+                      'useDoubleGradient':True,
+                      'maxInnerIter':20,
+                      'iterationType':'vCycle'}
+    similarityMetric=EMMetric(metricParameters)
     updateRule=UpdateRule.Composition()
     registrationOptimizer=RegistrationOptimizer(fixed, moving, None, initAffine, similarityMetric, updateRule, maxOuterIter)
     registrationOptimizer.optimize()
@@ -106,6 +110,7 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
 
 '''
 import dipyreg
+dipyreg.registerMultimodalDiffeomorphic3D('target/IBSR_07_ana_strip.nii.gz', 'reference/IBSR_17_ana_strip.nii.gz', '../affine/IBSR_07_ana_strip_IBSR_17_ana_stripAffine.txt', 'warp', 50)
 dipyreg.registerMultimodalDiffeomorphic3D('target/IBSR_13_ana_strip.nii.gz', 'reference/IBSR_10_ana_strip.nii.gz', '../affine/IBSR_13_ana_strip_IBSR_10_ana_stripAffine.txt', 'warp', 50)
 '''
 if __name__=='__main__':

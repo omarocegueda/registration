@@ -14,7 +14,13 @@ from EMMetric import EMMetric
 from scipy import interp
 
 class RegistrationOptimizer(object):
+    def getDefaultParameters(self):
+        return {'maxIter':[25,50,100], 'inversionIter':20,
+                'inversionTolerance':1e-3, 'tolerance':1e-6, 
+                'reportStatus':True}
+
     def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None):
+        self.parameters=self.getDefaultParameters();
         self.dim=0
         self.setFixedImage(fixed)
         self.setMovingImage(moving)
@@ -23,14 +29,25 @@ class RegistrationOptimizer(object):
         self.similarityMetric=similarityMetric
         self.updateRule=updateRule
         self.setMaxIter(maxIter)
-        self.tolerance=1e-6
-        self.symmetric=False
+        self.tolerance=self.parameters['tolerance']
+        self.inversionTolerance=self.parameters['inversionTolerance']
+        self.inversionIter=self.parameters['inversionIter']
+        if maxIter==None:
+            maxIter=self.parameters['maxIter']
         self.fixed=fixed
         self.moving=moving
         self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
         self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
         self.energyList=None
-        self.reportStatus=False
+        self.reportStatus=self.parameters['reportStatus']
+
+    def __connectFunctions(self):
+        if self.dim==2:
+            self.invertVectorField=tf.invert_vector_field_fixed_point
+            self.generatePyramid=rcommon.pyramid_gaussian_2D
+        else:
+            self.invertVectorField=tf.invert_vector_field_fixed_point3D
+            self.generatePyramid=rcommon.pyramid_gaussian_3D
 
     def __checkReady(self):
         ready=True
@@ -99,14 +116,11 @@ class RegistrationOptimizer(object):
 
     def __initOptimizer(self):
         ready=self.__checkReady()
+        self.__connectFunctions()
         if not ready:
             return False
-        if self.dim==2:
-            self.movingPyramid=[img for img in rcommon.pyramid_gaussian_2D(self.moving, self.levels-1, np.ones_like(self.moving))]
-            self.fixedPyramid=[img for img in rcommon.pyramid_gaussian_2D(self.fixed, self.levels-1, np.ones_like(self.fixed))]
-        else:
-            self.movingPyramid=[img for img in rcommon.pyramid_gaussian_3D(self.moving, self.levels-1, np.ones_like(self.moving))]
-            self.fixedPyramid=[img for img in rcommon.pyramid_gaussian_3D(self.fixed, self.levels-1, np.ones_like(self.fixed))]
+        self.movingPyramid=[img for img in self.generatePyramid(self.moving, self.levels-1, np.ones_like(self.moving))]
+        self.fixedPyramid=[img for img in self.generatePyramid(self.fixed, self.levels-1, np.ones_like(self.fixed))]
         startingForward=np.zeros(shape=self.fixedPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
         startingForwardInv=np.zeros(shape=self.fixedPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
         self.forwardModel.scaleAffines(0.5**(self.levels-1))
@@ -186,16 +200,12 @@ class RegistrationOptimizer(object):
 #                return -1
         forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
         backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
-        if self.dim==2:
-            invForward=np.array(tf.invert_vector_field_fixed_point(forward, 20, 1e-3, self.forwardModel.getBackward()))
-            invBackward=np.array(tf.invert_vector_field_fixed_point(backward, 20, 1e-3, self.backwardModel.getBackward()))
-            forward=np.array(tf.invert_vector_field_fixed_point(invForward, 20, 1e-3, self.forwardModel.getForward()))
-            backward=np.array(tf.invert_vector_field_fixed_point(invBackward, 20, 1e-3, self.backwardModel.getForward()))
-        else:
-            invForward=np.array(tf.invert_vector_field_fixed_point3D(forward, 20, 1e-3, self.forwardModel.getBackward()))
-            invBackward=np.array(tf.invert_vector_field_fixed_point3D(backward, 20, 1e-3, self.backwardModel.getBackward()))
-            forward=np.array(tf.invert_vector_field_fixed_point3D(invForward, 20, 1e-3, self.forwardModel.getForward()))
-            backward=np.array(tf.invert_vector_field_fixed_point3D(invBackward, 20, 1e-3, self.backwardModel.getForward()))
+        invIter=self.inversionIter
+        invTol=self.inversionTolerance
+        invForward=np.array(self.invertVectorField(forward, invIter, invTol, self.forwardModel.getBackward()))
+        invBackward=np.array(self.invertVectorField(backward, invIter, invTol, self.backwardModel.getBackward()))
+        forward=np.array(self.invertVectorField(invForward, invIter, invTol, self.forwardModel.getForward()))
+        backward=np.array(self.invertVectorField(invBackward, invIter, invTol, self.backwardModel.getForward()))
         self.forwardModel.setForward(forward)
         self.forwardModel.setBackward(invForward)
         self.backwardModel.setForward(backward)
@@ -260,6 +270,9 @@ class RegistrationOptimizer(object):
         self.__endOptimizer()
 
     def optimize(self):
+        print 'Outer iter:', self.maxIter
+        print 'Metric:',self.similarityMetric.getMetricName()
+        print 'Metric parameters:\n',self.similarityMetric.parameters
         self.__optimize_symmetric()
         #self.__optimize_asymmetric()
 
@@ -281,7 +294,7 @@ def testRegistrationOptimizerMonomodal2D():
     moving=(moving-moving.min())/(moving.max() - moving.min())
     fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
     ################Configure and run the Optimizer#####################
-    maxIter=[i for i in [25,50,100,100]]
+    maxIter=[i for i in [25,50,100]]
     similarityMetric=SSDMetric({'symmetric':True, 'lambda':5.0, 'stepType':SSDMetric.GAUSS_SEIDEL_STEP})
     updateRule=UpdateRule.Composition()
     #updateRule=UpdateRule.ProjectedComposition()
@@ -343,8 +356,8 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
         sr=fixed.shape    
         moving=moving[:,sl[1]//2,:].copy()
         fixed=fixed[:,sr[1]//2,:].copy()
-        moving=histeq(moving)
-        fixed=histeq(fixed)
+#        moving=histeq(moving)
+#        fixed=histeq(fixed)
         moving=(moving-moving.min())/(moving.max()-moving.min())
         fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
     else:
@@ -364,7 +377,7 @@ def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
                                'lambda':lambdaParam, 
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 
                                'qLevels':256, 
-                               'maxInnerIter':5,
+                               'maxInnerIter':20,
                                'useDoubleGradient':True,
                                'maxStepLength':0.25})    
     updateRule=UpdateRule.Composition()

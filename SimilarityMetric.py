@@ -38,6 +38,13 @@ class SimilarityMetric(object):
         self.fixedImage=fixedImage
     
     @abc.abstractmethod
+    def getMetricName(self):
+        '''
+        Must return the name of the metric that specializes this generic metric
+        '''
+        pass
+
+    @abc.abstractmethod
     def useFixedImageDynamics(self, originalFixedImage, transformation, direction):
         '''
         This methods provides the metric a chance to compute any useful 
