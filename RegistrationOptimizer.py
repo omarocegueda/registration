@@ -23,7 +23,9 @@ class RegistrationOptimizer(object):
         self.parameters=self.getDefaultParameters();
         self.dim=0
         self.setFixedImage(fixed)
-        self.setMovingImage(moving)
+        #self.setMovingImage(moving)
+        wmoving=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape).astype(np.int32), affineMoving))
+        self.setMovingImage(wmoving)
         self.setAffineFixed(affineFixed)
         self.setAffineMoving(affineMoving)
         self.similarityMetric=similarityMetric
@@ -36,8 +38,10 @@ class RegistrationOptimizer(object):
             maxIter=self.parameters['maxIter']
         self.fixed=fixed
         self.moving=moving
-        self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
-        self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
+#        self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
+#        self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
+        self.forwardModel=TransformationModel(None, None, None, None)
+        self.backwardModel=TransformationModel(None, None, None,  None)
         self.energyList=None
         self.reportStatus=self.parameters['reportStatus']
 
@@ -223,14 +227,39 @@ class RegistrationOptimizer(object):
         return der
 
     def __report_status(self):
-        wmoving=self.backwardModel.warpBackward(self.currentMoving)
-        wfixed=self.forwardModel.warpBackward(self.currentFixed)
-        self.similarityMetric.setMovingImage(wmoving)
-        self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.backwardModel, -1)
-        self.similarityMetric.setFixedImage(wfixed)
-        self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
-        self.similarityMetric.initializeIteration()
-        self.similarityMetric.reportStatus()
+        showCommonSpace=True
+        if showCommonSpace:
+            wmoving=self.backwardModel.warpBackward(self.currentMoving)
+            wfixed=self.forwardModel.warpBackward(self.currentFixed)
+            self.similarityMetric.setMovingImage(wmoving)
+            self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.backwardModel, -1)
+            self.similarityMetric.setFixedImage(wfixed)
+            self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
+            self.similarityMetric.initializeIteration()
+            self.similarityMetric.reportStatus()
+        else:
+            phi1=self.forwardModel.getForward()
+            phi2=self.backwardModel.getBackward()
+            phi1Inv=self.forwardModel.getBackward()
+            phi2Inv=self.backwardModel.getForward()
+            phi, md=self.updateRule.update(phi1, phi2)
+            phiInv, mdInv=self.updateRule.update(phi2Inv, phi1Inv)
+            tmp=self.forwardModel.getForward()
+            tmp2=self.forwardModel.getBackward()
+            self.forwardModel.setForward(phi)
+            self.forwardModel.setBackward(phiInv)
+            residual, stats=self.forwardModel.computeInversionError()
+            print 'Current inversion error:',stats[1],' (',stats[2],')'
+            wmoving=self.forwardModel.warpForward(self.currentMoving)
+            self.similarityMetric.setMovingImage(wmoving)
+            self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.forwardModel, 1)
+            self.similarityMetric.setFixedImage(self.currentFixed)
+            self.similarityMetric.useFixedImageDynamics(self.currentFixed, None, 1)
+            self.similarityMetric.initializeIteration()
+            self.similarityMetric.reportStatus()
+            self.forwardModel.setForward(tmp)
+            self.forwardModel.setBackward(tmp2)
+            
 
     def __optimize_symmetric(self):
         self.__initOptimizer()
