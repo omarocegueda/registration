@@ -17,7 +17,7 @@ class RegistrationOptimizer(object):
     def getDefaultParameters(self):
         return {'maxIter':[25,50,100], 'inversionIter':20,
                 'inversionTolerance':1e-3, 'tolerance':1e-6, 
-                'reportStatus':True}
+                'reportStatus':False}
 
     def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None):
         self.parameters=self.getDefaultParameters();
