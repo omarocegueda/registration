@@ -73,7 +73,7 @@ int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, dou
 int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, int *warped);
 int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats);
 int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine);
-int apendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine);
+int appendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine);
 
 void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg);
 int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal);

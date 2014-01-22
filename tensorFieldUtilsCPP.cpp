@@ -2979,7 +2979,7 @@ int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int nco
     return 0;
 }
 
-int apendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine){
+int appendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine){
     if(affine==NULL){
         return 0;
     }

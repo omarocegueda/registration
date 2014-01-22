@@ -44,8 +44,6 @@ class RegistrationOptimizer(object):
         self.inversionIter=self.parameters['inversionIter']
         if maxIter==None:
             maxIter=self.parameters['maxIter']
-        self.fixed=fixed
-        self.moving=moving
 #        self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
 #        self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
         self.forwardModel=TransformationModel(None, None, None, None)

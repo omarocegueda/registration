@@ -71,7 +71,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, int *warped)
     int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats)
     int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
-    int apendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
+    int appendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
     void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg)
     int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal)
     int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jacard, int nlabels)
@@ -820,12 +820,12 @@ def prepend_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
     cdef int ncols=d.shape[2]
     retVal=prependAffineToDisplacementField(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
     
-def apend_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
+def append_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
     cdef int retVal
     cdef int nslices=d.shape[0]
     cdef int nrows=d.shape[1]
     cdef int ncols=d.shape[2]
-    retVal=apendAffineToDisplacementField(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
+    retVal=appendAffineToDisplacementField(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
 
 def get_displacement_range(double[:,:,:,:] d, double[:,:] affine):
     cdef int retVal

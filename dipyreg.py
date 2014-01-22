@@ -74,7 +74,7 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     registrationOptimizer.optimize()
     #####################################################
     displacement=registrationOptimizer.getForward()
-    tf.prepend_affine_to_displacement_field(displacement, initAffine)
+    tf.append_affine_to_displacement_field(displacement, initAffine)
     #####Warp all requested volumes
     #---first the target using tri-linear interpolation---
     moving=nib.load(fnameMoving).get_data().squeeze().astype(np.float64)
