@@ -2590,7 +2590,7 @@ int multVectorFieldByAffine3D(double *displacement, int nslices, int nrows, int 
             }
         }
     }
-
+    return 0;
 }
 
 int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *affine, double *warped, int nsRef, int nrRef, int ncRef){
