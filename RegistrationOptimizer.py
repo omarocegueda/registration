@@ -24,10 +24,18 @@ class RegistrationOptimizer(object):
         self.dim=0
         self.setFixedImage(fixed)
         #self.setMovingImage(moving)
-        wmoving=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape).astype(np.int32), affineMoving))
+        if self.dim==3:
+            if affineMoving==None:
+                wmoving=moving
+            wmoving=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape).astype(np.int32), affineMoving))
+        else:
+            if affineMoving==None:
+                wmoving=moving
+            else:
+                wmoving=np.array(tf.warp_image_affine(moving, np.array(fixed.shape).astype(np.int32), affineMoving))
         self.setMovingImage(wmoving)
-        self.setAffineFixed(affineFixed)
-        self.setAffineMoving(affineMoving)
+#        self.setAffineFixed(None)
+#        self.setAffineMoving(None)
         self.similarityMetric=similarityMetric
         self.updateRule=updateRule
         self.setMaxIter(maxIter)
@@ -41,7 +49,7 @@ class RegistrationOptimizer(object):
 #        self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
 #        self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
         self.forwardModel=TransformationModel(None, None, None, None)
-        self.backwardModel=TransformationModel(None, None, None,  None)
+        self.backwardModel=TransformationModel(None, None, None, None)
         self.energyList=None
         self.reportStatus=self.parameters['reportStatus']
 
@@ -76,30 +84,30 @@ class RegistrationOptimizer(object):
         if self.maxIter==None:
             ready=False
             print 'Error: Maximum number of iterations per level not set.'
-        if self.affineMoving==None:
-            print 'Warning: affine transformation not set for moving image. I will use the identity.'
-        elif self.dim != self.affineMoving.shape[1]-1:
-            ready=False
-            print 'Error: inconsistent dimensions. Last dimension update: %d. Moving Affine domain: %d.'%(self.dim, self.affineMoving[1]-1)
-        if self.affineFixed==None:
-            print 'Warning: affine transformation not set for fixed image. I will use the identity.'
-        elif self.dim != self.affineFixed.shape[1]-1:
-            ready=False
-            print 'Error: inconsistent dimensions. Last dimension update: %d. Fixed Affine domain: %d.'%(self.dim, self.affineFixed[1]-1)
+#        if self.affineMoving==None:
+#            print 'Warning: affine transformation not set for moving image. I will use the identity.'
+#        elif self.dim != self.affineMoving.shape[1]-1:
+#            ready=False
+#            print 'Error: inconsistent dimensions. Last dimension update: %d. Moving Affine domain: %d.'%(self.dim, self.affineMoving[1]-1)
+#        if self.affineFixed==None:
+#            print 'Warning: affine transformation not set for fixed image. I will use the identity.'
+#        elif self.dim != self.affineFixed.shape[1]-1:
+#            ready=False
+#            print 'Error: inconsistent dimensions. Last dimension update: %d. Fixed Affine domain: %d.'%(self.dim, self.affineFixed[1]-1)
         return ready
 
     def setSimilarityMetric(self, similarityMetric):
         self.similarityMetric=similarityMetric
 
-    def setAffineFixed(self, affineFixed):
-        if affineFixed!=None:
-            self.dim=affineFixed.shape[1]-1
-        self.affineFixed=affineFixed
+#    def setAffineFixed(self, affineFixed):
+#        if affineFixed!=None:
+#            self.dim=affineFixed.shape[1]-1
+#        self.affineFixed=affineFixed
 
-    def setAffineMoving(self, affineMoving):
-        if affineMoving!=None:
-            self.dim=affineMoving.shape[1]-1
-        self.affineMoving=affineMoving
+#    def setAffineMoving(self, affineMoving):
+#        if affineMoving!=None:
+#            self.dim=affineMoving.shape[1]-1
+#        self.affineMoving=affineMoving
 
     def setUpdateRule(self, updateRule):
         self.updateRule=updateRule
@@ -122,6 +130,7 @@ class RegistrationOptimizer(object):
         ready=self.__checkReady()
         self.__connectFunctions()
         if not ready:
+            print 'Not ready'
             return False
         self.movingPyramid=[img for img in self.generatePyramid(self.moving, self.levels-1, np.ones_like(self.moving))]
         self.fixedPyramid=[img for img in self.generatePyramid(self.fixed, self.levels-1, np.ones_like(self.fixed))]
@@ -226,8 +235,8 @@ class RegistrationOptimizer(object):
         der=q(n-1.5)
         return der
 
-    def __report_status(self):
-        showCommonSpace=True
+    def __report_status(self, level):
+        showCommonSpace=False
         if showCommonSpace:
             wmoving=self.backwardModel.warpBackward(self.currentMoving)
             wfixed=self.forwardModel.warpBackward(self.currentFixed)
@@ -244,22 +253,17 @@ class RegistrationOptimizer(object):
             phi2Inv=self.backwardModel.getForward()
             phi, md=self.updateRule.update(phi1, phi2)
             phiInv, mdInv=self.updateRule.update(phi2Inv, phi1Inv)
-            tmp=self.forwardModel.getForward()
-            tmp2=self.forwardModel.getBackward()
-            self.forwardModel.setForward(phi)
-            self.forwardModel.setBackward(phiInv)
-            residual, stats=self.forwardModel.computeInversionError()
+            composition=TransformationModel(phi, phiInv, None, None)
+            composition.scaleAffines(0.5**level)
+            residual, stats=composition.computeInversionError()
             print 'Current inversion error:',stats[1],' (',stats[2],')'
-            wmoving=self.forwardModel.warpForward(self.currentMoving)
+            wmoving=composition.warpForward(self.currentMoving)
             self.similarityMetric.setMovingImage(wmoving)
-            self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.forwardModel, 1)
+            self.similarityMetric.useMovingImageDynamics(self.currentMoving, composition, 1)
             self.similarityMetric.setFixedImage(self.currentFixed)
             self.similarityMetric.useFixedImageDynamics(self.currentFixed, None, 1)
             self.similarityMetric.initializeIteration()
-            self.similarityMetric.reportStatus()
-            self.forwardModel.setForward(tmp)
-            self.forwardModel.setBackward(tmp2)
-            
+            self.similarityMetric.reportStatus()            
 
     def __optimize_symmetric(self):
         self.__initOptimizer()
@@ -281,7 +285,7 @@ class RegistrationOptimizer(object):
                 niter+=1
                 error=self.__iterate_symmetric()
             if self.reportStatus:
-                self.__report_status()
+                self.__report_status(level)
         phi1=self.forwardModel.getForward()
         phi2=self.backwardModel.getBackward()
         phi1Inv=self.forwardModel.getBackward()

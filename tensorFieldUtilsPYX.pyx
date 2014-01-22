@@ -59,15 +59,16 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *down)
     int downsampleScalarField3D(double *d1, int ns, int nr, int nc, double *down)
     int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *warped, int nrRef, int ncRef)
-    int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped)
-    int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped)
+    int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affinePre, double *affinePost, double *warped)
+    int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affinePre, double *affinePost, double *warped)
     int warpDiscreteImageNNAffine(int *img, int nrImg, int ncImg, double *affine, int *warped, int nrRef, int ncRef)
-    int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, int *warped)
+    int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affinePre, double *affinePost, int *warped)
     int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *affine, double *warped, int nsRef, int nrRef, int ncRef)
-    int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped)
-    int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped)
+    int multVectorFieldByAffine3D(double *displacement, int nslices, int nrows, int ncols, double *affine)
+    int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, double *warped)
+    int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, double *warped)
     int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, double *affine, int *warped, int nsRef, int nrRef, int ncRef)
-    int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, int *warped)
+    int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, int *warped)
     int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats)
     int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
     int apendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
@@ -605,36 +606,44 @@ def warp_image_affine(double[:,:] img, int[:]refShape, double[:,:] affine):
     warpImageAffine(&img[0,0], nrImg, ncImg, &affine[0,0], &warped[0,0], refShape[0], refShape[1])
     return warped
 
-def warp_image(double[:,:] img, double[:,:,:] displacement, double[:,:] affine=None):
+def warp_image(double[:,:] img, double[:,:,:] displacement, double[:,:] affinePre=None, double[:,:] affinePost=None):
     cdef int nrImg=img.shape[0]
     cdef int ncImg=img.shape[1]
     cdef int nrows=img.shape[0]
     cdef int ncols=img.shape[1]
     cdef double *displacementPointer=NULL
-    cdef double *affinePointer=NULL
+    cdef double *affinePrePointer=NULL
+    cdef double *affinePostPointer=NULL
+    cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
     if displacement!=None:
         displacementPointer=&displacement[0,0,0]
         nrows=displacement.shape[0]
         ncols=displacement.shape[1]
-    if affine!=None:
-        affinePointer=&affine[0,0]
-    cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
-    warpImage(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePointer, &warped[0,0]);
+    if affinePre!=None:
+        affinePrePointer=&affinePre[0,0]
+    if affinePost!=None:
+        affinePostPointer=&affinePost[0,0]
+    warpImage(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0]);
     return warped
 
-def warp_imageNN(double[:,:] img, double[:,:,:] displacement, double[:,:] affine=None):
-    cdef int nrows=displacement.shape[0]
-    cdef int ncols=displacement.shape[1]
+def warp_imageNN(double[:,:] img, double[:,:,:] displacement, double[:,:] affinePre=None, double[:,:] affinePost=None):
+    cdef int nrows=img.shape[0]
+    cdef int ncols=img.shape[1]
     cdef int nrImg=img.shape[0]
     cdef int ncImg=img.shape[1]
+    cdef double *displacementPointer=NULL
+    cdef double *affinePrePointer=NULL
+    cdef double *affinePostPointer=NULL
     cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
-    checkFortran(img)
-    checkFortran(displacement)
-    checkFortran(affine)
-    if affine==None:
-        warpImageNN(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, NULL, &warped[0,0])
-    else:
-        warpImageNN(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, &affine[0,0], &warped[0,0])
+    if displacement!=None:
+        displacementPointer=&displacement[0,0,0]
+        nrows=displacement.shape[0]
+        ncols=displacement.shape[1]
+    if affinePre!=None:
+        affinePrePointer=&affinePre[0,0]
+    if affinePost!=None:
+        affinePostPointer=&affinePost[0,0]
+    warpImageNN(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0])
     return warped
 
 def warp_discrete_imageNNAffine(int[:,:] img, int[:] refShape, double[:,:] affine=None):
@@ -646,19 +655,24 @@ def warp_discrete_imageNNAffine(int[:,:] img, int[:] refShape, double[:,:] affin
     warpDiscreteImageNNAffine(&img[0,0], nrImg, ncImg, &affine[0,0], &warped[0,0], refShape[0], refShape[1])
     return warped
 
-def warp_discrete_imageNN(int[:,:] img, double[:,:,:] displacement, double[:,:] affine=None):
-    cdef int nrows=displacement.shape[0]
-    cdef int ncols=displacement.shape[1]
+def warp_discrete_imageNN(int[:,:] img, double[:,:,:] displacement, double[:,:] affinePre=None, double[:,:] affinePost=None):
+    cdef int nrows=img.shape[0]
+    cdef int ncols=img.shape[1]
     cdef int nrImg=img.shape[0]
     cdef int ncImg=img.shape[1]
+    cdef double *displacementPointer=NULL
+    cdef double *affinePrePointer=NULL
+    cdef double *affinePostPointer=NULL
     cdef int[:,:] warped = np.ndarray((nrows, ncols), dtype=np.int32)
-    checkFortran(img)
-    checkFortran(displacement)
-    checkFortran(affine)
-    if affine==None:
-        warpDiscreteImageNN(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, NULL, &warped[0,0])
-    else:
-        warpDiscreteImageNN(&img[0,0], nrImg, ncImg, &displacement[0,0,0], nrows, ncols, &affine[0,0], &warped[0,0])
+    if displacement!=None:
+        displacementPointer=&displacement[0,0,0]
+        nrows=displacement.shape[0]
+        ncols=displacement.shape[1]
+    if affinePre!=None:
+        affinePrePointer=&affinePre[0,0]
+    if affinePost!=None:
+        affinePostPointer=&affinePost[0,0]
+    warpDiscreteImageNN(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0])
     return warped
 
 def warp_volume_affine(double[:,:,:] volume, int[:]refShape, double[:,:] affine=None):
@@ -674,38 +688,56 @@ def warp_volume_affine(double[:,:,:] volume, int[:]refShape, double[:,:] affine=
         warpVolumeAffine(&volume[0,0,0], nsVol, nrVol, ncVol, &affine[0,0], &warped[0,0,0], refShape[0], refShape[1], refShape[2])
     return warped
 
-def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affine=None):
-    cdef int nslices=displacement.shape[0]
-    cdef int nrows=displacement.shape[1]
-    cdef int ncols=displacement.shape[2]
+def mult_vector_field_by_affine3D(double[:,:,:,:] displacement, double[:,:] affine=None):
+    cdef int ns=displacement.shape[0]
+    cdef int nr=displacement.shape[1]
+    cdef int nc=displacement.shape[2]
+    multVectorFieldByAffine3D(&displacement[0,0,0,0], ns, nr, nc, &affine[0,0])
+
+def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affinePre=None, double[:,:] affinePost=None):
+    cdef int nslices=volume.shape[0]
+    cdef int nrows=volume.shape[1]
+    cdef int ncols=volume.shape[2]
     cdef int nsVol=volume.shape[0]
     cdef int nrVol=volume.shape[1]
     cdef int ncVol=volume.shape[2]
+    cdef double *displacementPointer=NULL
+    cdef double *affinePrePointer=NULL
+    cdef double *affinePostPointer=NULL
     cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
-    checkFortran(volume)
-    checkFortran(displacement)
-    checkFortran(affine)
-    if affine==None:
-        warpVolume(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, NULL, &warped[0,0,0]);
-    else:
-        warpVolume(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, &affine[0,0], &warped[0,0,0])
+    if displacement!=None:
+        displacementPointer=&displacement[0,0,0,0]
+        nslices=displacement.shape[0]
+        nrows=displacement.shape[1]
+        ncols=displacement.shape[2]
+    if affinePre!=None:
+        affinePrePointer=&affinePre[0,0]
+    if affinePost!=None:
+        affinePostPointer=&affinePost[0,0]
+    warpVolume(&volume[0,0,0], nsVol, nrVol, ncVol, displacementPointer, nslices, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0,0])
     return warped
 
-def warp_volumeNN(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affine=None):
-    cdef int nslices=displacement.shape[0]
-    cdef int nrows=displacement.shape[1]
-    cdef int ncols=displacement.shape[2]
+def warp_volumeNN(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affinePre=None, double[:,:] affinePost=None):
+    cdef int nslices=volume.shape[0]
+    cdef int nrows=volume.shape[1]
+    cdef int ncols=volume.shape[2]
     cdef int nsVol=volume.shape[0]
     cdef int nrVol=volume.shape[1]
     cdef int ncVol=volume.shape[2]
+    cdef double *displacementPointer=NULL
+    cdef double *affinePrePointer=NULL
+    cdef double *affinePostPointer=NULL
     cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
-    checkFortran(volume)
-    checkFortran(displacement)
-    checkFortran(affine)
-    if affine==None:
-        warpVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, NULL, &warped[0,0,0]);
-    else:
-        warpVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, &affine[0,0], &warped[0,0,0])
+    if displacement!=None:
+        displacementPointer=&displacement[0,0,0,0]
+        nslices=displacement.shape[0]
+        nrows=displacement.shape[1]
+        ncols=displacement.shape[2]
+    if affinePre!=None:
+        affinePrePointer=&affinePre[0,0]
+    if affinePost!=None:
+        affinePostPointer=&affinePost[0,0]
+    warpVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, displacementPointer, nslices, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0,0])
     return warped
 
 def warp_discrete_volumeNNAffine(int[:,:,:] volume, int[:] refShape, double[:,:] affine=None):
@@ -721,21 +753,27 @@ def warp_discrete_volumeNNAffine(int[:,:,:] volume, int[:] refShape, double[:,:]
         warpDiscreteVolumeNNAffine(&volume[0,0,0], nsVol, nrVol, ncVol, &affine[0,0], &warped[0,0,0], refShape[0], refShape[1], refShape[2])
     return warped
 
-def warp_discrete_volumeNN(int[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affine=None):
-    cdef int nslices=displacement.shape[0]
-    cdef int nrows=displacement.shape[1]
-    cdef int ncols=displacement.shape[2]
+def warp_discrete_volumeNN(int[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] affinePre=None, double[:,:] affinePost=None):
+    cdef int nslices=volume.shape[0]
+    cdef int nrows=volume.shape[1]
+    cdef int ncols=volume.shape[2]
     cdef int nsVol=volume.shape[0]
     cdef int nrVol=volume.shape[1]
     cdef int ncVol=volume.shape[2]
+    cdef double *displacementPointer=NULL
+    cdef double *affinePrePointer=NULL
+    cdef double *affinePostPointer=NULL
     cdef int[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.int32)
-    checkFortran(volume)
-    checkFortran(displacement)
-    checkFortran(affine)
-    if affine==None:
-        warpDiscreteVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, NULL, &warped[0,0,0])
-    else:
-        warpDiscreteVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, &displacement[0,0,0,0], nslices, nrows, ncols, &affine[0,0], &warped[0,0,0])
+    if displacement!=None:
+        displacementPointer=&displacement[0,0,0,0]
+        nslices=displacement.shape[0]
+        nrows=displacement.shape[1]
+        ncols=displacement.shape[2]
+    if affinePre!=None:
+        affinePrePointer=&affinePre[0,0]
+    if affinePost!=None:
+        affinePostPointer=&affinePost[0,0]
+    warpDiscreteVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, displacementPointer, nslices, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0,0])
     return warped
 
 def get_voting_segmentation(int[:,:,:,:] votes):

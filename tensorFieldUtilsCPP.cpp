@@ -938,7 +938,6 @@ double iterateDisplacementField3DCPP(double *deltaField, double *sigmaField, dou
     return sqrt(maxDisplacement);
 }
 
-
 double iterateResidualDisplacementFieldSSD3D(double *deltaField, double *sigmaField, double *gradientField, double *target, int *dims, double lambdaParam, double *displacementField){
     const static int numNeighbors=6;
     const static int dSlice[numNeighbors]={-1,  0, 0, 0,  0, 1};
@@ -2354,7 +2353,7 @@ int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *w
     return 0;
 }
 
-int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped){
+int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affinePre, double *affinePost, double *warped){
     double zero[2]={0.0, 0.0};
     double *dx=d1;
     int offset=2;
@@ -2367,12 +2366,17 @@ int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncol
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dii,djj;
-                if(affine!=NULL){
-                    dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
-                    djj=APPLY_AFFINE_2D_X1(i,j,affine)+dx[1];
+                if(affinePre!=NULL){
+                    dii=APPLY_AFFINE_2D_X0(i,j,affinePre)+dx[0];
+                    djj=APPLY_AFFINE_2D_X1(i,j,affinePre)+dx[1];
                 }else{
                     dii=i+dx[0];
                     djj=j+dx[1];
+                }
+                if(affinePost!=NULL){
+                    double temp=APPLY_AFFINE_2D_X0(dii,djj,affinePost);
+                    djj=APPLY_AFFINE_2D_X1(dii,djj,affinePost);
+                    dii=temp;
                 }
                 if((dii<0) || (djj<0) || (dii>nrImg-1)||(djj>ncImg-1)){//no one is affected
                     continue;
@@ -2414,7 +2418,7 @@ int warpImage(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncol
     return 0;
 }
 
-int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, double *warped){
+int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affinePre, double *affinePost, double *warped){
     double zero[2]={0.0, 0.0};
     double *dx=d1;
     int offset=2;
@@ -2427,12 +2431,17 @@ int warpImageNN(double *img, int nrImg, int ncImg, double *d1, int nrows, int nc
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dii,djj;
-                if(affine!=NULL){
-                    dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
-                    djj=APPLY_AFFINE_2D_X1(i,j,affine)+dx[1];
+                if(affinePre!=NULL){
+                    dii=APPLY_AFFINE_2D_X0(i,j,affinePre)+dx[0];
+                    djj=APPLY_AFFINE_2D_X1(i,j,affinePre)+dx[1];
                 }else{
                     dii=i+dx[0];
                     djj=j+dx[1];
+                }
+                if(affinePost!=NULL){
+                    double temp=APPLY_AFFINE_2D_X0(dii,djj,affinePost);
+                    djj=APPLY_AFFINE_2D_X1(dii,djj,affinePost);
+                    dii=temp;
                 }
                 if((dii<0) || (djj<0) || (dii>nrImg-1)||(djj>ncImg-1)){//no one is affected
                     continue;
@@ -2509,7 +2518,7 @@ int warpDiscreteImageNNAffine(int *img, int nrImg, int ncImg, double *affine, in
 /*
     Warp volume using Nearest Neighbor interpolation
 */
-int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affine, int *warped){
+int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, int ncols, double *affinePre, double *affinePost, int *warped){
     double zero[2]={0.0, 0.0};
     double *dx=d1;
     int offset=2;
@@ -2522,12 +2531,17 @@ int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, i
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dii,djj;
-                if(affine!=NULL){
-                    dii=APPLY_AFFINE_2D_X0(i,j,affine)+dx[0];
-                    djj=APPLY_AFFINE_2D_X1(i,j,affine)+dx[1];
+                if(affinePre!=NULL){
+                    dii=APPLY_AFFINE_2D_X0(i,j,affinePre)+dx[0];
+                    djj=APPLY_AFFINE_2D_X1(i,j,affinePre)+dx[1];
                 }else{
                     dii=i+dx[0];
                     djj=j+dx[1];
+                }
+                if(affinePost!=NULL){
+                    double temp=APPLY_AFFINE_2D_X0(dii,djj,affinePost);
+                    djj=APPLY_AFFINE_2D_X1(dii,djj,affinePost);
+                    dii=temp;
                 }
                 if((dii<0) || (djj<0) || (dii>nrImg-1)||(djj>ncImg-1)){//no one is affected
                     continue;
@@ -2561,6 +2575,24 @@ int warpDiscreteImageNN(int *img, int nrImg, int ncImg, double *d1, int nrows, i
 #define APPLY_AFFINE_X0(x0,x1,x2,affine) (affine[0]*(x0) + affine[1]*(x1) + affine[2]*(x2) + affine[3])
 #define APPLY_AFFINE_X1(x0,x1,x2,affine) (affine[4]*(x0) + affine[5]*(x1) + affine[6]*(x2) + affine[7])
 #define APPLY_AFFINE_X2(x0,x1,x2,affine) (affine[8]*(x0) + affine[9]*(x1) + affine[10]*(x2) + affine[11])
+
+int multVectorFieldByAffine3D(double *displacement, int nslices, int nrows, int ncols, double *affine){
+    double *d=displacement;
+    for(int s=0;s<nslices;++s){
+        for(int r=0;r<nrows;++r){
+            for(int c=0;c<ncols;++c, d+=3){
+                double d0=APPLY_AFFINE_X0(d[0], d[1], d[2], affine)-affine[3];
+                double d1=APPLY_AFFINE_X1(d[0], d[1], d[2], affine)-affine[7];
+                double d2=APPLY_AFFINE_X2(d[0], d[1], d[2], affine)-affine[11];
+                d[0]=d0;
+                d[1]=d1;
+                d[2]=d2;
+            }
+        }
+    }
+
+}
+
 int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *affine, double *warped, int nsRef, int nrRef, int ncRef){
     int sliceSizeVol=nrVol*ncVol;
     double *res=warped;
@@ -2638,7 +2670,7 @@ int warpVolumeAffine(double *volume, int nsVol, int nrVol, int ncVol, double *af
     return 0;
 }
 
-int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped){
+int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, double *warped){
     double zero[3]={0.0,0.0,0.0};
     int sliceSizeVol=nrVol*ncVol;
     double *dx=d1;
@@ -2653,14 +2685,21 @@ int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int 
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dkk,dii,djj;
-                if(affine!=NULL){
-                    dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
-                    dii=APPLY_AFFINE_X1(k,i,j,affine)+dx[1];
-                    djj=APPLY_AFFINE_X2(k,i,j,affine)+dx[2];
+                if(affinePre!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affinePre)+dx[0];
+                    dii=APPLY_AFFINE_X1(k,i,j,affinePre)+dx[1];
+                    djj=APPLY_AFFINE_X2(k,i,j,affinePre)+dx[2];
                 }else{
                     dkk=k+dx[0];
                     dii=i+dx[1];
                     djj=j+dx[2];
+                }
+                if(affinePost!=NULL){
+                    double tmp0=APPLY_AFFINE_X0(dkk,dii,djj,affinePost);
+                    double tmp1=APPLY_AFFINE_X1(dkk,dii,djj,affinePost);
+                    djj=APPLY_AFFINE_X2(dkk,dii,djj,affinePost);
+                    dii=tmp1;
+                    dkk=tmp0;
                 }
                 if((dii<0) || (djj<0) || (dkk<0) || (dii>nrVol-1)||(djj>ncVol-1)||(dkk>nsVol-1)){//no one is affected
                     continue;
@@ -2732,7 +2771,7 @@ int warpVolume(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int 
 /*
     Warp volume using Nearest Neighbor interpolation
 */
-int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, double *warped){
+int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, double *warped){
     double zero[3]={0.0,0.0,0.0};
     int sliceSizeVol=nrVol*ncVol;
     double *dx=d1;
@@ -2747,14 +2786,21 @@ int warpVolumeNN(double *volume, int nsVol, int nrVol, int ncVol, double *d1, in
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dkk,dii,djj;
-                if(affine!=NULL){
-                    dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
-                    dii=APPLY_AFFINE_X1(k,i,j,affine)+dx[1];
-                    djj=APPLY_AFFINE_X2(k,i,j,affine)+dx[2];
+                if(affinePre!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affinePre)+dx[0];
+                    dii=APPLY_AFFINE_X1(k,i,j,affinePre)+dx[1];
+                    djj=APPLY_AFFINE_X2(k,i,j,affinePre)+dx[2];
                 }else{
                     dkk=k+dx[0];
                     dii=i+dx[1];
                     djj=j+dx[2];
+                }
+                if(affinePost!=NULL){
+                    double tmp0=APPLY_AFFINE_X0(dkk,dii,djj,affinePost);
+                    double tmp1=APPLY_AFFINE_X1(dkk,dii,djj,affinePost);
+                    djj=APPLY_AFFINE_X2(dkk,dii,djj,affinePost);
+                    dii=tmp1;
+                    dkk=tmp0;
                 }
                 if((dii<0) || (djj<0) || (dkk<0) || (dii>nrVol-1)||(djj>ncVol-1)||(dkk>nsVol-1)){//no one is affected
                     continue;
@@ -2849,7 +2895,7 @@ int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, dou
 /*
     Warp volume using Nearest Neighbor interpolation
 */
-int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affine, int *warped){
+int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, int *warped){
     double zero[3]={0.0,0.0,0.0};
     int sliceSizeVol=nrVol*ncVol;
     double *dx=d1;
@@ -2864,14 +2910,21 @@ int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d
         for(int i=0;i<nrows;++i){
             for(int j=0;j<ncols;++j, dx+=offset, ++res){
                 double dkk,dii,djj;
-                if(affine!=NULL){
-                    dkk=APPLY_AFFINE_X0(k,i,j,affine)+dx[0];
-                    dii=APPLY_AFFINE_X1(k,i,j,affine)+dx[1];
-                    djj=APPLY_AFFINE_X2(k,i,j,affine)+dx[2];
+                if(affinePre!=NULL){
+                    dkk=APPLY_AFFINE_X0(k,i,j,affinePre)+dx[0];
+                    dii=APPLY_AFFINE_X1(k,i,j,affinePre)+dx[1];
+                    djj=APPLY_AFFINE_X2(k,i,j,affinePre)+dx[2];
                 }else{
                     dkk=k+dx[0];
                     dii=i+dx[1];
                     djj=j+dx[2];
+                }
+                if(affinePost!=NULL){
+                    double tmp0=APPLY_AFFINE_X0(dkk,dii,djj,affinePost);
+                    double tmp1=APPLY_AFFINE_X1(dkk,dii,djj,affinePost);
+                    djj=APPLY_AFFINE_X2(dkk,dii,djj,affinePost);
+                    dii=tmp1;
+                    dkk=tmp0;
                 }
                 if((dii<0) || (djj<0) || (dkk<0) || (dii>nrVol-1)||(djj>ncVol-1)||(dkk>nsVol-1)){//no one is affected
                     continue;
