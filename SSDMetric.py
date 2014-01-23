@@ -182,8 +182,7 @@ def vCycle3D(n, k, deltaField, sigmaField, gradientField, target, lambdaParam, d
     if n==0:
         return error
     #solve at coarcer grid
-    residual=None
-    residual=tf.compute_residual_displacement_field_SSD3D(deltaField, sigmaField, gradientField,  target, lambdaParam, displacement, residual)
+    residual=tf.compute_residual_displacement_field_SSD3D(deltaField, sigmaField, gradientField,  target, lambdaParam, displacement, None)
     subResidual=np.array(tf.downsample_displacement_field3D(residual))
     del residual
     subSigmaField=None
@@ -195,7 +194,7 @@ def vCycle3D(n, k, deltaField, sigmaField, gradientField, target, lambdaParam, d
     subDisplacement=np.zeros(shape=((sh[0]+1)//2, (sh[1]+1)//2, (sh[2]+1)//2, 3 ), dtype=np.float64)
     subLambdaParam=lambdaParam*0.25
     vCycle3D(n-1, k, subDeltaField, subSigmaField, subGradientField, subResidual, subLambdaParam, subDisplacement, depth+1)
-    displacement+=np.array(tf.upsample_displacement_field3D(subDisplacement, sh))
+    tf.accumulate_upsample_displacement_field3D(subDisplacement, displacement)
     if printEnergy and depth==0:
         energy=tf.compute_energy_SSD3D(deltaField, sigmaField, gradientField,  lambdaParam, displacement)
         print 'Energy after low-res iteration:',energy

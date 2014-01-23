@@ -13,7 +13,7 @@ def saveDeformedLattice3D(displacement, oname):
     minVal, maxVal=tf.get_displacement_range(displacement, None)
     sh=np.array([np.ceil(maxVal[0]),np.ceil(maxVal[1]),np.ceil(maxVal[2])], dtype=np.int32)
     L=np.array(rcommon.drawLattice3D(sh, 10))
-    warped=np.array(tf.warp_volume(L, displacement, np.eye(4))).astype(np.int16)
+    warped=np.array(tf.warp_volume(L, displacement)).astype(np.int16)
     img=nib.Nifti1Image(warped, np.eye(4))
     img.to_filename(oname)
 
@@ -74,6 +74,9 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     registrationOptimizer.optimize()
     #####################################################
     displacement=registrationOptimizer.getForward()
+    del registrationOptimizer
+    del similarityMetric
+    del updateRule
     tf.append_affine_to_displacement_field(displacement, initAffine)
     #####Warp all requested volumes
     #---first the target using tri-linear interpolation---

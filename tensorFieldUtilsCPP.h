@@ -53,6 +53,7 @@ int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, doubl
 
 int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc);
 int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols);
+int accumulateUpsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, double *current, int ns, int nr, int nc);
 
 int downsampleDisplacementField(double *d1, int nr, int nc, double *down);
 int downsampleScalarField(double *d1, int nr, int nc, double *down);

@@ -155,14 +155,14 @@ class EMMetric(SimilarityMetric):
         current fixed image mask from the originalFixedImage mask (warped
         by nearest neighbor interpolation)
         '''
-        fixedImageMask=(originalFixedImage>0).astype(np.int32)
+        self.fixedImageMask=(originalFixedImage>0).astype(np.int32)
         if transformation==None:
             self.fixedImageMask=fixedImageMask
             return
         if direction==1:
-            self.fixedImageMask=transformation.warpForwardNN(fixedImageMask)
+            self.fixedImageMask=transformation.warpForwardNN(self.fixedImageMask)
         else:
-            self.fixedImageMask=transformation.warpBackwardNN(fixedImageMask)
+            self.fixedImageMask=transformation.warpBackwardNN(self.fixedImageMask)
 
     def useMovingImageDynamics(self, originalMovingImage, transformation, direction):
         '''
@@ -170,14 +170,14 @@ class EMMetric(SimilarityMetric):
         current moving image mask from the originalMovingImage mask (warped
         by nearest neighbor interpolation)
         '''
-        movingImageMask=(originalMovingImage>0).astype(np.int32)
+        self.movingImageMask=(originalMovingImage>0).astype(np.int32)
         if transformation==None:
             self.movingImageMask=movingImageMask
             return
         if direction==1:
-            self.movingImageMask=transformation.warpForwardNN(movingImageMask)
+            self.movingImageMask=transformation.warpForwardNN(self.movingImageMask)
         else:
-            self.movingImageMask=transformation.warpBackwardNN(movingImageMask)
+            self.movingImageMask=transformation.warpBackwardNN(self.movingImageMask)
 
     def reportStatus(self):
         if self.dim==2:
