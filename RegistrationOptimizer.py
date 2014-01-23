@@ -19,23 +19,19 @@ class RegistrationOptimizer(object):
                 'inversionTolerance':1e-3, 'tolerance':1e-6, 
                 'reportStatus':False}
 
-    def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None):
+    def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None, useJITInterpolation=False):
         self.parameters=self.getDefaultParameters();
+        self.useJITInterpolation=useJITInterpolation
         self.dim=0
         self.setFixedImage(fixed)
-        #self.setMovingImage(moving)
-        if self.dim==3:
-            if affineMoving==None:
-                wmoving=moving
-            wmoving=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape).astype(np.int32), affineMoving))
+        self.forwardModel=TransformationModel(None, None, None, None)
+        if useJITInterpolation:
+            self.setMovingImage(moving)
+            self.backwardModel=TransformationModel(None, None, None, np.linalg.inv(affineMoving).copy(order='C'))
         else:
-            if affineMoving==None:
-                wmoving=moving
-            else:
-                wmoving=np.array(tf.warp_image_affine(moving, np.array(fixed.shape).astype(np.int32), affineMoving))
-        self.setMovingImage(wmoving)
-#        self.setAffineFixed(None)
-#        self.setAffineMoving(None)
+            wmoving=TransformationModel(None, None, affineMoving, None).warpForward(moving)
+            self.setMovingImage(wmoving)
+            self.backwardModel=TransformationModel(None, None, None, None)
         self.similarityMetric=similarityMetric
         self.updateRule=updateRule
         self.setMaxIter(maxIter)
@@ -44,10 +40,6 @@ class RegistrationOptimizer(object):
         self.inversionIter=self.parameters['inversionIter']
         if maxIter==None:
             maxIter=self.parameters['maxIter']
-#        self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
-#        self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
-        self.forwardModel=TransformationModel(None, None, None, None)
-        self.backwardModel=TransformationModel(None, None, None, None)
         self.energyList=None
         self.reportStatus=self.parameters['reportStatus']
 
@@ -211,12 +203,13 @@ class RegistrationOptimizer(object):
             self.energyList.append(fwEnergy+bwEnergy)
         except NameError:
             pass
+        self.similarityMetric.freeIteration()
         invIter=self.inversionIter
         invTol=self.inversionTolerance
         self.forwardModel.backward=np.array(self.invertVectorField(self.forwardModel.forward, invIter, invTol, None))
         self.backwardModel.backward=np.array(self.invertVectorField(self.backwardModel.forward, invIter, invTol, None))
-        self.forwardModel.forward=np.array(self.invertVectorField(self.forwardModel.backward, invIter, invTol, None))
-        self.backwardModel.forward=np.array(self.invertVectorField(self.backwardModel.backward, invIter, invTol, None))
+        self.forwardModel.forward=np.array(self.invertVectorField(self.forwardModel.backward, invIter, invTol, self.forwardModel.forward))
+        self.backwardModel.forward=np.array(self.invertVectorField(self.backwardModel.backward, invIter, invTol, self.backwardModel.forward))
         if showImages:
             self.similarityMetric.reportStatus()
         #toc=time.time()
@@ -230,7 +223,7 @@ class RegistrationOptimizer(object):
         return der
 
     def __report_status(self, level):
-        showCommonSpace=False
+        showCommonSpace=True
         if showCommonSpace:
             wmoving=self.backwardModel.warpBackward(self.currentMoving)
             wfixed=self.forwardModel.warpBackward(self.currentFixed)
@@ -280,8 +273,18 @@ class RegistrationOptimizer(object):
                 error=self.__iterate_symmetric()
             if self.reportStatus:
                 self.__report_status(level)
+        residual, stats=self.forwardModel.computeInversionError()
+        print 'Forward Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
+        residual, stats=self.backwardModel.computeInversionError()
+        print 'Backward Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
+        tf.prepend_affine_to_displacement_field(self.backwardModel.backward, self.backwardModel.affinePostInv)
+        tf.append_affine_to_displacement_field(self.backwardModel.forward, self.backwardModel.affinePost)
         self.forwardModel.forward, md=self.updateRule.update(self.forwardModel.forward, self.backwardModel.backward)
         self.forwardModel.backward, mdInv=self.updateRule.update(self.backwardModel.forward, self.forwardModel.backward)
+        self.forwardModel.affinePre=None
+        self.forwardModel.affinePreInv=None
+        self.forwardModel.affinePost=None
+        self.forwardModel.affinePostInv=None
         del self.backwardModel
         residual, stats=self.forwardModel.computeInversionError()
         print 'Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
@@ -291,6 +294,7 @@ class RegistrationOptimizer(object):
         print 'Outer iter:', self.maxIter
         print 'Metric:',self.similarityMetric.getMetricName()
         print 'Metric parameters:\n',self.similarityMetric.parameters
+        print 'JIT Interpolation:',self.useJITInterpolation
         self.__optimize_symmetric()
         #self.__optimize_asymmetric()
 

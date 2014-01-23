@@ -32,8 +32,9 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     '''
         testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt', 100)
     '''
-    applyEqualization=True
-    maxOuterIter=[25,50,100]
+    useJITInterpolation=False
+    applyEqualization=False
+    maxOuterIter=[25, 50, 100]
     print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
     sys.stdout.flush()
     moving = nib.load(fnameMoving)
@@ -70,14 +71,15 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
                       'iterationType':'vCycle'}
     similarityMetric=EMMetric(metricParameters)
     updateRule=UpdateRule.Composition()
-    registrationOptimizer=RegistrationOptimizer(fixed, moving, None, initAffine, similarityMetric, updateRule, maxOuterIter)
+    registrationOptimizer=RegistrationOptimizer(fixed, moving, None, initAffine, similarityMetric, updateRule, maxOuterIter,useJITInterpolation)
     registrationOptimizer.optimize()
     #####################################################
     displacement=registrationOptimizer.getForward()
     del registrationOptimizer
     del similarityMetric
     del updateRule
-    tf.append_affine_to_displacement_field(displacement, initAffine)
+    if not useJITInterpolation:
+        tf.append_affine_to_displacement_field(displacement, initAffine)
     #####Warp all requested volumes
     #---first the target using tri-linear interpolation---
     moving=nib.load(fnameMoving).get_data().squeeze().astype(np.float64)
