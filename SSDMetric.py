@@ -194,7 +194,12 @@ def vCycle3D(n, k, deltaField, sigmaField, gradientField, target, lambdaParam, d
     subDisplacement=np.zeros(shape=((sh[0]+1)//2, (sh[1]+1)//2, (sh[2]+1)//2, 3 ), dtype=np.float64)
     subLambdaParam=lambdaParam*0.25
     vCycle3D(n-1, k, subDeltaField, subSigmaField, subGradientField, subResidual, subLambdaParam, subDisplacement, depth+1)
+    del subDeltaField
+    del subSigmaField
+    del subGradientField
+    del subResidual
     tf.accumulate_upsample_displacement_field3D(subDisplacement, displacement)
+    del subDisplacement
     if printEnergy and depth==0:
         energy=tf.compute_energy_SSD3D(deltaField, sigmaField, gradientField,  lambdaParam, displacement)
         print 'Energy after low-res iteration:',energy

@@ -102,6 +102,17 @@ class EMMetric(SimilarityMetric):
                 self.gradientFixed[...,i]=grad
                 i+=1
 
+    def freeIteration(self):
+        del self.samplingMask
+        del self.fixedQLevels
+        del self.movingQLevels
+        del self.fixedQSigmaField
+        del self.fixedQMeansField
+        del self.movingQSigmaField
+        del self.movingQMeansField
+        del self.gradientMoving
+        del self.gradientFixed
+
     def computeForward(self):
         return self.computeStep(True)
 

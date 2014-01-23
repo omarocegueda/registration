@@ -33,7 +33,7 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
         testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt', 100)
     '''
     applyEqualization=True
-    maxOuterIter=[25,50,100]
+    maxOuterIter=[25, 50, 100]
     print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
     sys.stdout.flush()
     moving = nib.load(fnameMoving)

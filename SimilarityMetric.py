@@ -115,6 +115,15 @@ class SimilarityMetric(object):
         return NotImplemented
 
     @abc.abstractmethod
+    def freeIteration(self):
+        '''
+        This method is called by the RegistrationOptimizer after the required iterations
+        have been computed (forward and/or backward) so that the SimilarityMetric
+        can safely delete any data it computed as part of the initialization
+        '''
+        return NotImplemented
+
+    @abc.abstractmethod
     def computeForward(self):
         '''
         Must return the forward update field for a gradient-based optimization 

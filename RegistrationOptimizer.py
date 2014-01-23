@@ -203,12 +203,14 @@ class RegistrationOptimizer(object):
             self.energyList.append(fwEnergy+bwEnergy)
         except NameError:
             pass
+        self.similarityMetric.freeIteration()
         invIter=self.inversionIter
         invTol=self.inversionTolerance
         self.forwardModel.backward=np.array(self.invertVectorField(self.forwardModel.forward, invIter, invTol, None))
         self.backwardModel.backward=np.array(self.invertVectorField(self.backwardModel.forward, invIter, invTol, None))
-        self.forwardModel.forward=np.array(self.invertVectorField(self.forwardModel.backward, invIter, invTol, None))
-        self.backwardModel.forward=np.array(self.invertVectorField(self.backwardModel.backward, invIter, invTol, None))
+        self.forwardModel.forward=np.array(self.invertVectorField(self.forwardModel.backward, invIter, invTol, self.forwardModel.forward))
+        self.backwardModel.forward=np.array(self.invertVectorField(self.backwardModel.backward, invIter, invTol, self.backwardModel.forward))
+        print 'Done'
         if showImages:
             self.similarityMetric.reportStatus()
         #toc=time.time()

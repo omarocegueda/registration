@@ -174,6 +174,7 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
         showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_IBSR_08_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_08/IBSR_08_ana_strip.nii.gz', None)
         showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_08/IBSR_08_ana_strip.nii.gz', None)
         showRegistrationResultMidSlices('warpedDiff_IBSR_13_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('warpedAffine_IBSR_13_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
         showRegistrationResultMidSlices('/opt/registration/data/t1/IBSR18/IBSR_13/IBSR_13_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
         
         showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_IBSR_02_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
