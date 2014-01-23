@@ -19,14 +19,19 @@ class RegistrationOptimizer(object):
                 'inversionTolerance':1e-3, 'tolerance':1e-6, 
                 'reportStatus':False}
 
-    def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None):
+    def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None, useJITInterpolation=False):
         self.parameters=self.getDefaultParameters();
+        self.useJITInterpolation=useJITInterpolation
         self.dim=0
         self.setFixedImage(fixed)
-        self.setMovingImage(moving)
-#        moving=moving.copy()
-#        wmoving=TransformationModel(None, None, affineMoving, None).warpForward(moving)
-#        self.setMovingImage(wmoving)
+        self.forwardModel=TransformationModel(None, None, None, None)
+        if useJITInterpolation:
+            self.setMovingImage(moving)
+            self.backwardModel=TransformationModel(None, None, None, np.linalg.inv(affineMoving).copy(order='C'))
+        else:
+            wmoving=TransformationModel(None, None, affineMoving, None).warpForward(moving)
+            self.setMovingImage(wmoving)
+            self.backwardModel=TransformationModel(None, None, None, None)
         self.similarityMetric=similarityMetric
         self.updateRule=updateRule
         self.setMaxIter(maxIter)
@@ -35,9 +40,6 @@ class RegistrationOptimizer(object):
         self.inversionIter=self.parameters['inversionIter']
         if maxIter==None:
             maxIter=self.parameters['maxIter']
-        self.forwardModel=TransformationModel(None, None, None, None)
-        self.backwardModel=TransformationModel(None, None, None, np.linalg.inv(affineMoving).copy(order='C'))
-        #self.backwardModel=TransformationModel(None, None, None, None)
         self.energyList=None
         self.reportStatus=self.parameters['reportStatus']
 
@@ -292,6 +294,7 @@ class RegistrationOptimizer(object):
         print 'Outer iter:', self.maxIter
         print 'Metric:',self.similarityMetric.getMetricName()
         print 'Metric parameters:\n',self.similarityMetric.parameters
+        print 'JIT Interpolation:',self.useJITInterpolation
         self.__optimize_symmetric()
         #self.__optimize_asymmetric()
 
