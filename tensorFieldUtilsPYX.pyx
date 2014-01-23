@@ -54,6 +54,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv)
     int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc)
     int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
+    int accumulateUpsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, double *current, int ns, int nr, int nc)
     int downsampleDisplacementField(double *d1, int nr, int nc, double *down)
     int downsampleScalarField(double *d1, int nr, int nc, double *down)
     int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *down)
@@ -280,7 +281,7 @@ cpdef iterate_residual_displacement_field_SSD2D(double[:,:] deltaField, double[:
     cdef double *targetPointer=NULL
     if target!=None:
         targetPointer=&target[0,0,0]
-    retVal=iterateResidualDisplacementFieldSSD2D(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0]);
+    retVal=iterateResidualDisplacementFieldSSD2D(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0])
 
 cpdef compute_residual_displacement_field_SSD3D(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double[:,:,:,:] target, double lambdaParam, double[:,:,:,:] displacementField, double[:,:,:,:] residual):
     cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
@@ -293,7 +294,7 @@ cpdef compute_residual_displacement_field_SSD3D(double[:,:,:] deltaField, double
         targetPointer=&target[0,0,0,0]
     if residual==None:
         residual=np.empty(shape=(dims[0], dims[1], dims[2], 3), dtype=np.double)
-    retVal=computeResidualDisplacementFieldSSD3D(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0,0], &residual[0,0,0,0]);    
+    retVal=computeResidualDisplacementFieldSSD3D(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0,0], &residual[0,0,0,0])    
     return residual
 
 cpdef iterate_residual_displacement_field_SSD3D(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double[:,:,:,:] target, double lambdaParam, double[:,:,:,:] displacementField):
@@ -305,7 +306,7 @@ cpdef iterate_residual_displacement_field_SSD3D(double[:,:,:] deltaField, double
     cdef double *targetPointer=NULL
     if target!=None:
         targetPointer=&target[0,0,0,0]
-    retVal=iterateResidualDisplacementFieldSSD3D(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0,0]);
+    retVal=iterateResidualDisplacementFieldSSD3D(&deltaField[0,0,0], &sigmaField[0,0,0], &gradientField[0,0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0,0])
 
 cpdef compute_residual_displacement_field_SSD2D(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double[:,:,:] target, double lambdaParam, double[:,:,:] displacementField, double[:,:,:] residual):
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
@@ -317,7 +318,7 @@ cpdef compute_residual_displacement_field_SSD2D(double[:,:] deltaField, double[:
         targetPointer=&target[0,0,0]
     if residual==None:
         residual=np.empty(shape=(dims[0], dims[1], 2), dtype=np.double)
-    retVal=computeResidualDisplacementFieldSSD2D(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0], &residual[0,0,0]);    
+    retVal=computeResidualDisplacementFieldSSD2D(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0], &residual[0,0,0])    
     return residual
 
 cpdef compute_energy_SSD2D(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double lambdaParam, double[:,:,:] displacementField):
@@ -419,7 +420,7 @@ cpdef invert_vector_field_tv_l2(double[:,:,:] d, double lambdaParam, int maxIter
     cdef int ncols=d.shape[1]
     cdef double[:,:,:] invd=np.zeros_like(d)
     checkFortran(d)
-    retVal=invertVectorField_TV_L2(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0]);
+    retVal=invertVectorField_TV_L2(&d[0,0,0], nrows, ncols, lambdaParam, maxIter, tolerance, &invd[0,0,0])
     return invd
 
 
@@ -549,14 +550,14 @@ def downsample_scalar_field(double[:,:] field):
     cdef int nr=field.shape[0]
     cdef int nc=field.shape[1]
     cdef double[:,:] down = np.ndarray(((nr+1)//2, (nc+1)//2), dtype=np.float64)
-    downsampleScalarField(&field[0,0], nr, nc, &down[0,0]);
+    downsampleScalarField(&field[0,0], nr, nc, &down[0,0])
     return down
 
 def downsample_displacement_field(double[:,:,:] field):
     cdef int nr=field.shape[0]
     cdef int nc=field.shape[1]
     cdef double[:,:,:] down = np.ndarray(((nr+1)//2, (nc+1)//2,2), dtype=np.float64)
-    downsampleDisplacementField(&field[0,0,0], nr, nc, &down[0,0,0]);
+    downsampleDisplacementField(&field[0,0,0], nr, nc, &down[0,0,0])
     return down
 
 def downsample_scalar_field3D(double[:,:,:] field):
@@ -564,7 +565,7 @@ def downsample_scalar_field3D(double[:,:,:] field):
     cdef int nr=field.shape[1]
     cdef int nc=field.shape[2]
     cdef double[:,:,:] down = np.ndarray(((ns+1)//2, (nr+1)//2, (nc+1)//2), dtype=np.float64)
-    downsampleScalarField3D(&field[0,0,0], ns, nr, nc, &down[0,0,0]);
+    downsampleScalarField3D(&field[0,0,0], ns, nr, nc, &down[0,0,0])
     return down
 
 def downsample_displacement_field3D(double[:,:,:,:] field):
@@ -572,7 +573,7 @@ def downsample_displacement_field3D(double[:,:,:,:] field):
     cdef int nr=field.shape[1]
     cdef int nc=field.shape[2]
     cdef double[:,:,:,:] down = np.ndarray(((ns+1)//2, (nr+1)//2, (nc+1)//2,3), dtype=np.float64)
-    downsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &down[0,0,0,0]);
+    downsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &down[0,0,0,0])
     return down
 
 def upsample_displacement_field(double[:,:,:] field, int[:] targetShape):
@@ -582,7 +583,7 @@ def upsample_displacement_field(double[:,:,:] field, int[:] targetShape):
     cdef int ncols=targetShape[1]
     checkFortran(field)
     cdef double[:,:,:] up = np.ndarray((nrows, ncols,2), dtype=np.float64)
-    upsampleDisplacementField(&field[0,0,0], nr, nc, &up[0,0,0],nrows, ncols);
+    upsampleDisplacementField(&field[0,0,0], nr, nc, &up[0,0,0],nrows, ncols)
     return up
 
 def upsample_displacement_field3D(double[:,:,:,:] field, int[:] targetShape):
@@ -594,15 +595,22 @@ def upsample_displacement_field3D(double[:,:,:,:] field, int[:] targetShape):
     cdef int ncols=targetShape[2]
     checkFortran(field)
     cdef double[:,:,:,:] up = np.ndarray((nslices, nrows, ncols,3), dtype=np.float64)
-    upsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &up[0,0,0,0],nslices, nrows, ncols);
+    upsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &up[0,0,0,0],nslices, nrows, ncols)
     return up
+
+def accumulate_upsample_displacement_field3D(double[:,:,:,:] field, double[:,:,:,:] destination):
+    cdef int ns=field.shape[0]
+    cdef int nr=field.shape[1]
+    cdef int nc=field.shape[2]
+    cdef int nslices=destination.shape[0]
+    cdef int nrows=destination.shape[1]
+    cdef int ncols=destination.shape[2]    
+    accumulateUpsampleDisplacementField3D(&field[0,0,0,0], ns, nr, nc, &destination[0,0,0,0],nslices, nrows, ncols)
 
 def warp_image_affine(double[:,:] img, int[:]refShape, double[:,:] affine):
     cdef int nrImg=img.shape[0]
     cdef int ncImg=img.shape[1]
     cdef double[:,:] warped = np.ndarray((refShape[0], refShape[1]), dtype=np.float64)
-    checkFortran(img)
-    checkFortran(affine)
     warpImageAffine(&img[0,0], nrImg, ncImg, &affine[0,0], &warped[0,0], refShape[0], refShape[1])
     return warped
 
@@ -614,7 +622,6 @@ def warp_image(double[:,:] img, double[:,:,:] displacement, double[:,:] affinePr
     cdef double *displacementPointer=NULL
     cdef double *affinePrePointer=NULL
     cdef double *affinePostPointer=NULL
-    cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
     if displacement!=None:
         displacementPointer=&displacement[0,0,0]
         nrows=displacement.shape[0]
@@ -623,7 +630,8 @@ def warp_image(double[:,:] img, double[:,:,:] displacement, double[:,:] affinePr
         affinePrePointer=&affinePre[0,0]
     if affinePost!=None:
         affinePostPointer=&affinePost[0,0]
-    warpImage(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0]);
+    cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
+    warpImage(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0])
     return warped
 
 def warp_imageNN(double[:,:] img, double[:,:,:] displacement, double[:,:] affinePre=None, double[:,:] affinePost=None):
@@ -634,7 +642,6 @@ def warp_imageNN(double[:,:] img, double[:,:,:] displacement, double[:,:] affine
     cdef double *displacementPointer=NULL
     cdef double *affinePrePointer=NULL
     cdef double *affinePostPointer=NULL
-    cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
     if displacement!=None:
         displacementPointer=&displacement[0,0,0]
         nrows=displacement.shape[0]
@@ -643,6 +650,7 @@ def warp_imageNN(double[:,:] img, double[:,:,:] displacement, double[:,:] affine
         affinePrePointer=&affinePre[0,0]
     if affinePost!=None:
         affinePostPointer=&affinePost[0,0]
+    cdef double[:,:] warped = np.ndarray((nrows, ncols), dtype=np.float64)
     warpImageNN(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0])
     return warped
 
@@ -650,8 +658,6 @@ def warp_discrete_imageNNAffine(int[:,:] img, int[:] refShape, double[:,:] affin
     cdef int nrImg=img.shape[0]
     cdef int ncImg=img.shape[1]
     cdef int[:,:] warped = np.ndarray((refShape[0], refShape[1]), dtype=np.int32)
-    checkFortran(img)
-    checkFortran(affine)
     warpDiscreteImageNNAffine(&img[0,0], nrImg, ncImg, &affine[0,0], &warped[0,0], refShape[0], refShape[1])
     return warped
 
@@ -663,7 +669,6 @@ def warp_discrete_imageNN(int[:,:] img, double[:,:,:] displacement, double[:,:] 
     cdef double *displacementPointer=NULL
     cdef double *affinePrePointer=NULL
     cdef double *affinePostPointer=NULL
-    cdef int[:,:] warped = np.ndarray((nrows, ncols), dtype=np.int32)
     if displacement!=None:
         displacementPointer=&displacement[0,0,0]
         nrows=displacement.shape[0]
@@ -672,6 +677,7 @@ def warp_discrete_imageNN(int[:,:] img, double[:,:,:] displacement, double[:,:] 
         affinePrePointer=&affinePre[0,0]
     if affinePost!=None:
         affinePostPointer=&affinePost[0,0]
+    cdef int[:,:] warped = np.ndarray((nrows, ncols), dtype=np.int32)
     warpDiscreteImageNN(&img[0,0], nrImg, ncImg, displacementPointer, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0])
     return warped
 
@@ -704,7 +710,6 @@ def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] 
     cdef double *displacementPointer=NULL
     cdef double *affinePrePointer=NULL
     cdef double *affinePostPointer=NULL
-    cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
     if displacement!=None:
         displacementPointer=&displacement[0,0,0,0]
         nslices=displacement.shape[0]
@@ -714,6 +719,7 @@ def warp_volume(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:] 
         affinePrePointer=&affinePre[0,0]
     if affinePost!=None:
         affinePostPointer=&affinePost[0,0]
+    cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
     warpVolume(&volume[0,0,0], nsVol, nrVol, ncVol, displacementPointer, nslices, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0,0])
     return warped
 
@@ -727,7 +733,6 @@ def warp_volumeNN(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:
     cdef double *displacementPointer=NULL
     cdef double *affinePrePointer=NULL
     cdef double *affinePostPointer=NULL
-    cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
     if displacement!=None:
         displacementPointer=&displacement[0,0,0,0]
         nslices=displacement.shape[0]
@@ -737,6 +742,7 @@ def warp_volumeNN(double[:,:,:] volume, double[:,:,:,:] displacement, double[:,:
         affinePrePointer=&affinePre[0,0]
     if affinePost!=None:
         affinePostPointer=&affinePost[0,0]
+    cdef double[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.float64)
     warpVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, displacementPointer, nslices, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0,0])
     return warped
 
@@ -745,8 +751,6 @@ def warp_discrete_volumeNNAffine(int[:,:,:] volume, int[:] refShape, double[:,:]
     cdef int nrVol=volume.shape[1]
     cdef int ncVol=volume.shape[2]
     cdef int[:,:,:] warped = np.ndarray((refShape[0], refShape[1], refShape[2]), dtype=np.int32)
-    checkFortran(volume)
-    checkFortran(affine)
     if affine==None:
         warpDiscreteVolumeNNAffine(&volume[0,0,0], nsVol, nrVol, ncVol, NULL, &warped[0,0,0], refShape[0], refShape[1], refShape[2])
     else:
@@ -763,7 +767,6 @@ def warp_discrete_volumeNN(int[:,:,:] volume, double[:,:,:,:] displacement, doub
     cdef double *displacementPointer=NULL
     cdef double *affinePrePointer=NULL
     cdef double *affinePostPointer=NULL
-    cdef int[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.int32)
     if displacement!=None:
         displacementPointer=&displacement[0,0,0,0]
         nslices=displacement.shape[0]
@@ -773,6 +776,7 @@ def warp_discrete_volumeNN(int[:,:,:] volume, double[:,:,:,:] displacement, doub
         affinePrePointer=&affinePre[0,0]
     if affinePost!=None:
         affinePostPointer=&affinePost[0,0]
+    cdef int[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.int32)
     warpDiscreteVolumeNN(&volume[0,0,0], nsVol, nrVol, ncVol, displacementPointer, nslices, nrows, ncols, affinePrePointer, affinePostPointer, &warped[0,0,0])
     return warped
 

@@ -189,12 +189,18 @@ class RegistrationOptimizer(object):
         self.similarityMetric.setFixedImage(wfixed)
         self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
         self.similarityMetric.initializeIteration()
+        del self.forwardModel.backward
+        del self.backwardModel.backward
         fw=self.similarityMetric.computeForward()
+        self.forwardModel.forward, mdForward=self.updateRule.update(self.forwardModel.forward, fw)
+        del fw
         try:
             fwEnergy=self.similarityMetric.energy
         except NameError:
             pass
         bw=self.similarityMetric.computeBackward()
+        self.backwardModel.forward, mdBackward=self.updateRule.update(self.backwardModel.forward, bw)
+        del bw
         try:
             bwEnergy=self.similarityMetric.energy
         except NameError:
@@ -205,22 +211,12 @@ class RegistrationOptimizer(object):
             self.energyList.append(fwEnergy+bwEnergy)
         except NameError:
             pass
-#        if len(self.energyList)>=22:
-#            der=self.__getEnergyDerivative()
-#            if(der>=0):
-#                return -1
-        forward, mdForward=self.updateRule.update(self.forwardModel.getForward(), fw)
-        backward, mdBackward=self.updateRule.update(self.backwardModel.getForward(), bw)
         invIter=self.inversionIter
         invTol=self.inversionTolerance
-        invForward=np.array(self.invertVectorField(forward, invIter, invTol, self.forwardModel.getBackward()))
-        invBackward=np.array(self.invertVectorField(backward, invIter, invTol, self.backwardModel.getBackward()))
-        forward=np.array(self.invertVectorField(invForward, invIter, invTol, self.forwardModel.getForward()))
-        backward=np.array(self.invertVectorField(invBackward, invIter, invTol, self.backwardModel.getForward()))
-        self.forwardModel.setForward(forward)
-        self.forwardModel.setBackward(invForward)
-        self.backwardModel.setForward(backward)
-        self.backwardModel.setBackward(invBackward)
+        self.forwardModel.backward=np.array(self.invertVectorField(self.forwardModel.forward, invIter, invTol, None))
+        self.backwardModel.backward=np.array(self.invertVectorField(self.backwardModel.forward, invIter, invTol, None))
+        self.forwardModel.forward=np.array(self.invertVectorField(self.forwardModel.backward, invIter, invTol, None))
+        self.backwardModel.forward=np.array(self.invertVectorField(self.backwardModel.backward, invIter, invTol, None))
         if showImages:
             self.similarityMetric.reportStatus()
         #toc=time.time()
@@ -284,20 +280,11 @@ class RegistrationOptimizer(object):
                 error=self.__iterate_symmetric()
             if self.reportStatus:
                 self.__report_status(level)
-        phi1=self.forwardModel.getForward()
-        phi2=self.backwardModel.getBackward()
-        phi1Inv=self.forwardModel.getBackward()
-        phi2Inv=self.backwardModel.getForward()
-        phi, md=self.updateRule.update(phi1, phi2)
-        phiInv, mdInv=self.updateRule.update(phi2Inv, phi1Inv)
-        self.forwardModel.setForward(phi)
-        self.forwardModel.setBackward(phiInv)
+        self.forwardModel.forward, md=self.updateRule.update(self.forwardModel.forward, self.backwardModel.backward)
+        self.forwardModel.backward, mdInv=self.updateRule.update(self.backwardModel.forward, self.forwardModel.backward)
+        del self.backwardModel
         residual, stats=self.forwardModel.computeInversionError()
         print 'Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
-#        try:
-#            writeGif("evolution.gif", self.frames, duration=10.0, dither=0)
-#        except NameError:
-#            pass
         self.__endOptimizer()
 
     def optimize(self):

@@ -2304,6 +2304,97 @@ int upsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, d
     return 0;
 }
 
+
+int accumulateUpsampleDisplacementField3D(double *d1, int nslices, int nrows, int ncols, double *current, int ns, int nr, int nc){
+    int sliceSize=nrows*ncols;
+    double dx[3];
+    double *res=current;
+    for(int k=0;k<ns;++k){
+        for(int i=0;i<nr;++i){
+            for(int j=0;j<nc;++j, res+=3){
+                dx[0]=(k&1)?0.5*k:k/2;
+                dx[1]=(i&1)?0.5*i:i/2;
+                dx[2]=(j&1)?0.5*j:j/2;
+                if((dx[0]<0) || (dx[1]<0) || (dx[2]<0) || (dx[1]>nrows-1)||(dx[2]>ncols-1)||(dx[0]>nslices-1)){//no one is affected
+                    continue;
+                }
+                int kk=floor(dx[0]);
+                int ii=floor(dx[1]);
+                int jj=floor(dx[2]);
+                if((kk<0) || (ii<0) || (jj<0) || (ii>=nrows)||(jj>=ncols)||(kk>=nslices)){//no one is affected
+                    continue;
+                }
+                double cgamma=dx[0]-kk;
+                double calpha=dx[1]-ii;//by definition these factors are nonnegative
+                double cbeta=dx[2]-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                //---top-left
+                double *z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                res[0]+=alpha*beta*gamma*z[0];
+                res[1]+=alpha*beta*gamma*z[1];
+                res[2]+=alpha*beta*gamma*z[2];
+                //---top-right
+                ++jj;
+                if(jj<ncols){
+                    z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=alpha*cbeta*gamma*z[0];
+                    res[1]+=alpha*cbeta*gamma*z[1];
+                    res[2]+=alpha*cbeta*gamma*z[2];
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=calpha*cbeta*gamma*z[0];
+                    res[1]+=calpha*cbeta*gamma*z[1];
+                    res[2]+=calpha*cbeta*gamma*z[2];
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                    z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=calpha*beta*gamma*z[0];
+                    res[1]+=calpha*beta*gamma*z[1];
+                    res[2]+=calpha*beta*gamma*z[2];
+                }
+                ++kk;
+                if(kk<nslices){
+                    --ii;
+                    z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                    res[0]+=alpha*beta*cgamma*z[0];
+                    res[1]+=alpha*beta*cgamma*z[1];
+                    res[2]+=alpha*beta*cgamma*z[2];
+                    ++jj;
+                    if(jj<ncols){
+                        z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=alpha*cbeta*cgamma*z[0];
+                        res[1]+=alpha*cbeta*cgamma*z[1];
+                        res[2]+=alpha*cbeta*cgamma*z[2];
+                    }
+                    //---bottom-right
+                    ++ii;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                        z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=calpha*cbeta*cgamma*z[0];
+                        res[1]+=calpha*cbeta*cgamma*z[1];
+                        res[2]+=calpha*cbeta*cgamma*z[2];
+                    }
+                    //---bottom-left
+                    --jj;
+                    if((ii>=0)&&(jj>=0)&&(ii<nrows)&&(jj<ncols)){
+                        z=&d1[3*(kk*sliceSize+ii*ncols+jj)];
+                        res[0]+=calpha*beta*cgamma*z[0];
+                        res[1]+=calpha*beta*cgamma*z[1];
+                        res[2]+=calpha*beta*cgamma*z[2];
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
 #define APPLY_AFFINE_2D_X0(x0,x1,affine) (affine[0]*(x0) + affine[1]*(x1) + affine[2])
 #define APPLY_AFFINE_2D_X1(x0,x1,affine) (affine[3]*(x0) + affine[4]*(x1) + affine[5])
 int warpImageAffine(double *img, int nrImg, int ncImg, double *affine, double *warped, int nrRef, int ncRef){
