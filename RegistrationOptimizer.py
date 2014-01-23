@@ -23,19 +23,10 @@ class RegistrationOptimizer(object):
         self.parameters=self.getDefaultParameters();
         self.dim=0
         self.setFixedImage(fixed)
-        #self.setMovingImage(moving)
-        if self.dim==3:
-            if affineMoving==None:
-                wmoving=moving
-            wmoving=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape).astype(np.int32), affineMoving))
-        else:
-            if affineMoving==None:
-                wmoving=moving
-            else:
-                wmoving=np.array(tf.warp_image_affine(moving, np.array(fixed.shape).astype(np.int32), affineMoving))
-        self.setMovingImage(wmoving)
-#        self.setAffineFixed(None)
-#        self.setAffineMoving(None)
+        self.setMovingImage(moving)
+#        moving=moving.copy()
+#        wmoving=TransformationModel(None, None, affineMoving, None).warpForward(moving)
+#        self.setMovingImage(wmoving)
         self.similarityMetric=similarityMetric
         self.updateRule=updateRule
         self.setMaxIter(maxIter)
@@ -47,7 +38,8 @@ class RegistrationOptimizer(object):
 #        self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
 #        self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
         self.forwardModel=TransformationModel(None, None, None, None)
-        self.backwardModel=TransformationModel(None, None, None, None)
+        self.backwardModel=TransformationModel(None, None, None, np.linalg.inv(affineMoving).copy(order='C'))
+        #self.backwardModel=TransformationModel(None, None, None, None)
         self.energyList=None
         self.reportStatus=self.parameters['reportStatus']
 
@@ -230,7 +222,7 @@ class RegistrationOptimizer(object):
         return der
 
     def __report_status(self, level):
-        showCommonSpace=False
+        showCommonSpace=True
         if showCommonSpace:
             wmoving=self.backwardModel.warpBackward(self.currentMoving)
             wfixed=self.forwardModel.warpBackward(self.currentFixed)
@@ -280,6 +272,8 @@ class RegistrationOptimizer(object):
                 error=self.__iterate_symmetric()
             if self.reportStatus:
                 self.__report_status(level)
+        tf.append_affine_to_displacement_field(self.forwardModel.forward, self.backwardModel.affinePostInv)
+        tf.append_affine_to_displacement_field(self.backwardModel.forward, self.backwardModel.affinePost)
         self.forwardModel.forward, md=self.updateRule.update(self.forwardModel.forward, self.backwardModel.backward)
         self.forwardModel.backward, mdInv=self.updateRule.update(self.backwardModel.forward, self.forwardModel.backward)
         del self.backwardModel

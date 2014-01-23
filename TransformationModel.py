@@ -17,7 +17,7 @@ class TransformationModel(object):
     def setAffinePre(self, affinePre):
         if affinePre!=None:
             self.dim=affinePre.shape[1]-1
-            self.affinePreInv=np.linalg.inv(affinePre)
+            self.affinePreInv=np.linalg.inv(affinePre).copy(order='C')
         else:
             self.affinePreInv=None
         self.affinePre=affinePre
@@ -25,7 +25,7 @@ class TransformationModel(object):
     def setAffinePost(self, affinePost):
         if affinePost!=None:
             self.dim=affinePost.shape[1]-1
-            self.affinePostInv=np.linalg.inv(affinePost)
+            self.affinePostInv=np.linalg.inv(affinePost).copy(order='C')
         else:
             self.affinePostInv=None
         self.affinePost=affinePost
@@ -113,10 +113,10 @@ class TransformationModel(object):
     def scaleAffines(self, factor):
         if self.affinePre!=None:
             self.affinePre=self.__scaleAffine(self.affinePre, factor)
-            self.affinePreInv=np.linalg.inv(self.affinePre)
+            self.affinePreInv=np.linalg.inv(self.affinePre).copy(order='C')
         if self.affinePost!=None:
             self.affinePost=self.__scaleAffine(self.affinePost, factor)
-            self.affinePostInv=np.linalg.inv(self.affinePost)
+            self.affinePostInv=np.linalg.inv(self.affinePost).copy(order='C')
 
     def upsample(self, newDomainForward, newDomainBackward):
         if self.dim==2:

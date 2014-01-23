@@ -157,7 +157,7 @@ class EMMetric(SimilarityMetric):
         '''
         self.fixedImageMask=(originalFixedImage>0).astype(np.int32)
         if transformation==None:
-            self.fixedImageMask=fixedImageMask
+            self.fixedImageMask=self.fixedImageMask
             return
         if direction==1:
             self.fixedImageMask=transformation.warpForwardNN(self.fixedImageMask)
@@ -172,7 +172,7 @@ class EMMetric(SimilarityMetric):
         '''
         self.movingImageMask=(originalMovingImage>0).astype(np.int32)
         if transformation==None:
-            self.movingImageMask=movingImageMask
+            self.movingImageMask=self.movingImageMask
             return
         if direction==1:
             self.movingImageMask=transformation.warpForwardNN(self.movingImageMask)
