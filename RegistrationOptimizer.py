@@ -35,8 +35,6 @@ class RegistrationOptimizer(object):
         self.inversionIter=self.parameters['inversionIter']
         if maxIter==None:
             maxIter=self.parameters['maxIter']
-#        self.forwardModel=TransformationModel(None, None, affineFixed, affineMoving)
-#        self.backwardModel=TransformationModel(None, None, affineMoving,  affineFixed)
         self.forwardModel=TransformationModel(None, None, None, None)
         self.backwardModel=TransformationModel(None, None, None, np.linalg.inv(affineMoving).copy(order='C'))
         #self.backwardModel=TransformationModel(None, None, None, None)
@@ -210,7 +208,6 @@ class RegistrationOptimizer(object):
         self.backwardModel.backward=np.array(self.invertVectorField(self.backwardModel.forward, invIter, invTol, None))
         self.forwardModel.forward=np.array(self.invertVectorField(self.forwardModel.backward, invIter, invTol, self.forwardModel.forward))
         self.backwardModel.forward=np.array(self.invertVectorField(self.backwardModel.backward, invIter, invTol, self.backwardModel.forward))
-        print 'Done'
         if showImages:
             self.similarityMetric.reportStatus()
         #toc=time.time()
@@ -274,10 +271,18 @@ class RegistrationOptimizer(object):
                 error=self.__iterate_symmetric()
             if self.reportStatus:
                 self.__report_status(level)
-        tf.append_affine_to_displacement_field(self.forwardModel.forward, self.backwardModel.affinePostInv)
+        residual, stats=self.forwardModel.computeInversionError()
+        print 'Forward Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
+        residual, stats=self.backwardModel.computeInversionError()
+        print 'Backward Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
+        tf.prepend_affine_to_displacement_field(self.backwardModel.backward, self.backwardModel.affinePostInv)
         tf.append_affine_to_displacement_field(self.backwardModel.forward, self.backwardModel.affinePost)
         self.forwardModel.forward, md=self.updateRule.update(self.forwardModel.forward, self.backwardModel.backward)
         self.forwardModel.backward, mdInv=self.updateRule.update(self.backwardModel.forward, self.forwardModel.backward)
+        self.forwardModel.affinePre=None
+        self.forwardModel.affinePreInv=None
+        self.forwardModel.affinePost=None
+        self.forwardModel.affinePostInv=None
         del self.backwardModel
         residual, stats=self.forwardModel.computeInversionError()
         print 'Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
