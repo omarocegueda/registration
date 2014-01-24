@@ -818,6 +818,8 @@ def invert_vector_field_fixed_point3D(double[:,:,:,:] d, int maxIter, double tol
     return invd
 
 def prepend_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
+    if affine==None:
+        return
     cdef int retVal
     cdef int nslices=d.shape[0]
     cdef int nrows=d.shape[1]
@@ -825,6 +827,8 @@ def prepend_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
     retVal=prependAffineToDisplacementField(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
     
 def append_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
+    if affine==None:
+        return
     cdef int retVal
     cdef int nslices=d.shape[0]
     cdef int nrows=d.shape[1]
