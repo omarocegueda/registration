@@ -27,7 +27,7 @@ class RegistrationOptimizer(object):
         self.forwardModel=TransformationModel(None, None, None, None)
         if useJITInterpolation:
             self.setMovingImage(moving)
-            self.backwardModel=TransformationModel(None, None, None, np.linalg.inv(affineMoving).copy(order='C'))
+            self.backwardModel=TransformationModel(None, None, np.linalg.inv(affineMoving).copy(order='C'), None)
         else:
             wmoving=TransformationModel(None, None, affineMoving, None).warpForward(moving)
             self.setMovingImage(wmoving)
@@ -277,8 +277,8 @@ class RegistrationOptimizer(object):
         print 'Forward Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
         residual, stats=self.backwardModel.computeInversionError()
         print 'Backward Residual error (Symmetric diffeomorphism):',stats[1],'. (',stats[2],')'
-        tf.prepend_affine_to_displacement_field(self.backwardModel.backward, self.backwardModel.affinePostInv)
-        tf.append_affine_to_displacement_field(self.backwardModel.forward, self.backwardModel.affinePost)
+        tf.append_affine_to_displacement_field(self.backwardModel.backward, self.backwardModel.affinePreInv)
+        tf.prepend_affine_to_displacement_field(self.backwardModel.forward, self.backwardModel.affinePre)
         self.forwardModel.forward, md=self.updateRule.update(self.forwardModel.forward, self.backwardModel.backward)
         self.forwardModel.backward, mdInv=self.updateRule.update(self.backwardModel.forward, self.forwardModel.backward)
         self.forwardModel.affinePre=None
