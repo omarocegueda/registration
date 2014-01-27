@@ -4,10 +4,9 @@ import numpy as np
 import nibabel as nib
 import registrationCommon as rcommon
 import tensorFieldUtils as tf
-from RegistrationOptimizer import RegistrationOptimizer
+from SymmetricRegistrationOptimizer import SymmetricRegistrationOptimizer
 from EMMetric import EMMetric
 import UpdateRule
-from scipy import interp
 
 def saveDeformedLattice3D(displacement, oname):
     minVal, maxVal=tf.get_displacement_range(displacement, None)
@@ -21,7 +20,6 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     '''
         testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt', 100)
     '''
-    maxOuterIter=[25, 50, 100]
     print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
     sys.stdout.flush()
     moving = nib.load(fnameMoving)
@@ -41,7 +39,6 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     fixed=fixed.copy(order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
     fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
-    
     baseMoving=rcommon.getBaseFileName(fnameMoving)
     baseFixed=rcommon.getBaseFileName(fnameFixed)
     ###################Run registration##################
@@ -54,7 +51,10 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
                       'iterationType':'vCycle'}
     similarityMetric=EMMetric(metricParameters)
     updateRule=UpdateRule.Composition()
-    registrationOptimizer=RegistrationOptimizer(fixed, moving, None, initAffine, similarityMetric, updateRule, maxOuterIter)
+    optimizerParameters={'maxIter':[25,50,100], 'inversionIter':20,
+                'inversionTolerance':1e-3, 'tolerance':1e-6, 
+                'reportStatus':True}
+    registrationOptimizer=SymmetricRegistrationOptimizer(fixed, moving, None, initAffine, similarityMetric, updateRule, optimizerParameters)
     registrationOptimizer.optimize()
     #####################################################
     displacement=registrationOptimizer.getForward()
@@ -64,14 +64,12 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     #####Warp all requested volumes
     #---first the target using tri-linear interpolation---
     moving=nib.load(fnameMoving).get_data().squeeze().astype(np.float64)
-    #moving=np.copy(moving, order='C')
     moving=moving.copy(order='C')
     warped=np.array(tf.warp_volume(moving, displacement)).astype(np.int16)
     imgWarped=nib.Nifti1Image(warped, F)
     imgWarped.to_filename('warpedDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
     #---warp using affine only
     moving=nib.load(fnameMoving).get_data().squeeze().astype(np.int32)
-    #moving=np.copy(moving, order='C')
     moving=moving.copy(order='C')
     warped=np.array(tf.warp_discrete_volumeNNAffine(moving, referenceShape, initAffine)).astype(np.int16)
     imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
@@ -87,15 +85,11 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
         warped=np.array(tf.warp_discrete_volumeNN(toWarp, displacement)).astype(np.int16)
         imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
         imgWarped.to_filename('warpedDiff_'+baseWarp+'_'+baseFixed+'.nii.gz')
-        #---warp using affine only
-#        warped=np.array(tf.warp_discrete_volumeNNAffine(toWarp, referenceShape, initAffine)).astype(np.int16)
-#        imgWarped=nib.Nifti1Image(warped, F)#The affine transformation is the reference's one
-#        imgWarped.to_filename('warpedAffine_'+baseWarp+'_'+baseFixed+'.nii.gz')
     #---finally, the deformed lattice
     saveDeformedLattice3D(displacement, 'latticeDispDiff_'+baseMoving+'_'+baseFixed+'.nii.gz')
-
 '''
 import dipyreg
+dipyreg.registerMultimodalDiffeomorphic3D('target/IBSR_16_ana_strip.nii.gz', 'reference/IBSR_10_ana_strip.nii.gz', '../affine/IBSR_16_ana_strip_IBSR_10_ana_stripAffine.txt', 'warp', 25)
 dipyreg.registerMultimodalDiffeomorphic3D('target/IBSR_07_ana_strip.nii.gz', 'reference/IBSR_17_ana_strip.nii.gz', '../affine/IBSR_07_ana_strip_IBSR_17_ana_stripAffine.txt', 'warp', 50)
 dipyreg.registerMultimodalDiffeomorphic3D('target/IBSR_13_ana_strip.nii.gz', 'reference/IBSR_10_ana_strip.nii.gz', '../affine/IBSR_13_ana_strip_IBSR_10_ana_stripAffine.txt', 'warp', 50)
 '''

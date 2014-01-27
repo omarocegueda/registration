@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import registrationCommon as rcommon
 import SSDMetric
 class EMMetric(SimilarityMetric):
-    '''
+    r'''
     Similarity metric based on the Expectation-Maximization algorithm to handle
     multi-modal images. The transfer function is modeled as a set of hidden
     random variables that are estimated at each iteration of the algorithm.
@@ -66,7 +66,7 @@ class EMMetric(SimilarityMetric):
             self.computeStep=self.computeGaussSeidelStep
 
     def initializeIteration(self):
-        '''
+        r'''
         Precomputes the transfer functions (hidden random variables) and 
         variances of the estimators. Also precomputes the gradient of both
         input images. Note that once the images are transformed to the opposite
@@ -117,6 +117,9 @@ class EMMetric(SimilarityMetric):
                 i+=1
 
     def freeIteration(self):
+        r'''
+        Frees the resources allocated during initialization
+        '''
         del self.samplingMask
         del self.fixedQLevels
         del self.movingQLevels
@@ -128,12 +131,30 @@ class EMMetric(SimilarityMetric):
         del self.gradientFixed
 
     def computeForward(self):
+        r'''
+        Computes the update displacement field to be used for registration of
+        the moving image towards the fixed image
+        '''
         return self.computeStep(True)
 
     def computeBackward(self):
+        r'''
+        Computes the update displacement field to be used for registration of
+        the fixed image towards the moving image
+        '''
         return self.computeStep(False)
 
     def computeGaussSeidelStep(self, forwardStep=True):
+        r'''
+        Minimizes the linearized energy function with respect to the regularized
+        displacement field (this step does not require post-smoothing, as opposed
+        to the demons step, which does not include regularization).
+        To accelerate convergence we use the multi-grid Gauss-Seidel algorithm
+        proposed by Bruhn and Weickert et al [1]
+        [1] Andres Bruhn and Joachim Weickert, "Towards ultimate motion estimation: 
+            combining highest accuracy with real-time performance", 
+            10th IEEE International Conference on Computer Vision, 2005. ICCV 2005.         
+        '''
         maxInnerIter=self.parameters['maxInnerIter']
         lambdaParam=self.parameters['lambda']
         maxStepLength=self.parameters['maxStepLength']
@@ -161,21 +182,21 @@ class EMMetric(SimilarityMetric):
         self.symmetric=symmetric
 
     def useOriginalFixedImage(self, originalFixedImage):
-        '''
+        r'''
         EMMetric computes the object mask by thresholding the original fixed
         image
         '''
         pass
 
     def useOriginalMovingImage(self, originalMovingImage):
-        '''
+        r'''
         EMMetric computes the object mask by thresholding the original moving
         image
         '''
         pass
 
     def useFixedImageDynamics(self, originalFixedImage, transformation, direction):
-        '''
+        r'''
         EMMetric takes advantage of the image dynamics by computing the
         current fixed image mask from the originalFixedImage mask (warped
         by nearest neighbor interpolation)
@@ -190,7 +211,7 @@ class EMMetric(SimilarityMetric):
             self.fixedImageMask=transformation.warpBackwardNN(self.fixedImageMask)
 
     def useMovingImageDynamics(self, originalMovingImage, transformation, direction):
-        '''
+        r'''
         EMMetric takes advantage of the image dynamics by computing the
         current moving image mask from the originalMovingImage mask (warped
         by nearest neighbor interpolation)
@@ -205,6 +226,9 @@ class EMMetric(SimilarityMetric):
             self.movingImageMask=transformation.warpBackwardNN(self.movingImageMask)
 
     def reportStatus(self):
+        r'''
+        Shows the overlaid input images
+        '''
         if self.dim==2:
             plt.figure()
             rcommon.overlayImages(self.movingQMeansField, self.fixedQMeansField, False)
