@@ -148,16 +148,6 @@ class SimilarityMetric(object):
         return NotImplemented
 
     @abc.abstractmethod
-    def setSymmetric(self, symmetric=True):
-        '''
-        This flag indicates the similarity metric that only forward steps are 
-        going to be computed (symmetric=False) or that backward steps need to be 
-        computed too (symmetric=True). This method is abstract to force the user 
-        to specify if the derived metric supports backward steps
-        '''
-        self.symmetric=symmetric
-
-    @abc.abstractmethod
     def getDefaultParameters(self):
         return NotImplemented
 

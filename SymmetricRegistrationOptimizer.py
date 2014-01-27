@@ -20,7 +20,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
     def getDefaultParameters(self):
         return {'maxIter':[25,50,100], 'inversionIter':20,
                 'inversionTolerance':1e-3, 'tolerance':1e-6, 
-                'reportStatus':True}
+                'reportStatus':False}
 
     def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, parameters=None):
         super(SymmetricRegistrationOptimizer, self).__init__(fixed, moving, affineFixed, affineMoving, similarityMetric, updateRule, parameters)
@@ -64,6 +64,11 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         return ready
 
     def __initOptimizer(self):
+        r'''
+        Computes the Gaussian Pyramid of the input images and allocates 
+        the required memory for the transformation models at the coarcest 
+        scale.
+        '''
         ready=self.__checkReady()
         self.__connectFunctions()
         if not ready:
@@ -87,6 +92,15 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         del self.fixedPyramid
 
     def __iterate(self, showImages=False):
+        r'''
+        Performs one symmetric iteration:
+            1.Compute forward
+            2.Compute backward
+            3.Update forward
+            4.Update backward
+            5.Compute inverses
+            6.Invert the inverses to ensure the transformations are diffeomorphic
+        '''
         #tic=time.time()
         wmoving=self.backwardModel.warpBackward(self.currentMoving)
         wfixed=self.forwardModel.warpBackward(self.currentFixed)
@@ -171,6 +185,9 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             self.similarityMetric.reportStatus()            
 
     def __optimize(self):
+        r'''
+        The main multi-scale symmetric optimization algorithm
+        '''
         self.__initOptimizer()
         for level in range(self.levels-1, -1, -1):
             print 'Processing level', level

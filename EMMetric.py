@@ -19,12 +19,11 @@ class EMMetric(SimilarityMetric):
     def getDefaultParameters(self):
         return {'lambda':1.0, 'maxInnerIter':5, 'scale':1, 
                 'maxStepLength':0.25, 'sigmaDiff':3.0, 'stepType':0, 
-                'qLevels':256, 'symmetric':False,'useDoubleGradient':False,
+                'qLevels':256,'useDoubleGradient':True,
                 'iterationType':'vCycle'}
 
     def __init__(self, parameters):
         super(EMMetric, self).__init__(parameters)
-        self.setSymmetric(self.parameters['symmetric'])
         self.stepType=self.parameters['stepType']
         self.quantizationLevels=self.parameters['qLevels']
         self.useDoubleGradient=self.parameters['useDoubleGradient']
@@ -172,14 +171,8 @@ class EMMetric(SimilarityMetric):
     def computeDemonsStep(self, forwardStep=True):
         return NotImplemented
 
-    def setStepType(self, stepType):
-        self.stepType=stepType
-
     def getEnergy(self):
         return NotImplemented
-
-    def setSymmetric(self, symmetric=True):
-        self.symmetric=symmetric
 
     def useOriginalFixedImage(self, originalFixedImage):
         r'''

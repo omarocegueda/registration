@@ -19,6 +19,7 @@ class AsymmetricRegistrationOptimizer(RegistrationOptimizer):
 
     def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, parameters=None):
         super(AsymmetricRegistrationOptimizer, self).__init__(fixed, moving, affineFixed, affineMoving, similarityMetric, updateRule, parameters)
+        print 'Warning: AsymmetricRegistrationOptimizer has not been maintained in a long time, it may not work properly. Use SymmetricRegistrationOptimizer instead'
         self.setMaxIter(self.parameters['maxIter'])
         self.tolerance=self.parameters['tolerance']
         self.inversionTolerance=self.parameters['inversionTolerance']

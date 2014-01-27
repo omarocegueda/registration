@@ -3,7 +3,7 @@ from TransformationModel import TransformationModel
 import abc
 
 class RegistrationOptimizer(object):
-    '''
+    r'''
     This abstract class defines the interface to be implemented by any
     optimization algorithm for nonlinear Registration
     '''
@@ -19,6 +19,8 @@ class RegistrationOptimizer(object):
                     defaultParameters[key]=val
                 else:
                     print "Warning: parameter '",key,"' unknown. Ignored."
+        if affineFixed!=None:
+            print 'Warning: an affineFixed matrix was given as argument. This functionality has not been implemented yet.'
         self.parameters=defaultParameters
         invAffineMoving=None if affineMoving==None else np.linalg.inv(affineMoving).copy(order='C')
         self.dim=0
@@ -52,6 +54,11 @@ class RegistrationOptimizer(object):
 
     @abc.abstractmethod
     def optimize(self):
+        r'''
+        This is the main function each especialized class derived from this must
+        implement. Upon completion, the deformation field must be available from
+        the forward transformation model.
+        '''
         return NotImplemented
 
     def getForward(self):

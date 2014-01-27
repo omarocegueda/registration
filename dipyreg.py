@@ -1,3 +1,6 @@
+"""
+This script is the main launcher of the multi-modal non-linear image registration
+"""
 import sys
 import os
 import numpy as np
@@ -7,6 +10,30 @@ import tensorFieldUtils as tf
 from SymmetricRegistrationOptimizer import SymmetricRegistrationOptimizer
 from EMMetric import EMMetric
 import UpdateRule
+from dipy.fixes import argparse as arg
+
+parser = arg.ArgumentParser(description='Multi-modal, non-linear image registration')
+
+parser.add_argument('target', action='store', metavar='target',
+                    help='Nifti1 image (*.nii or *.nii.gz) or other formats supported by Nibabel')
+
+parser.add_argument('reference', action='store', metavar='reference',
+                    help='Nifti1 image (*.nii or *.nii.gz) or other formats supported by Nibabel')
+
+parser.add_argument('affine', action='store', metavar='affine',
+                    help='ANTS affine registration matrix (.txt) that registers target to reference')
+
+parser.add_argument('warp_dir', action='store', metavar='warp_dir',
+                    help='Directory (relative to ./ ) containing the images to be warped with the obtained deformation field')
+
+parser.add_argument('--smooth', action='store', metavar='smooth',
+                    help='A scalar to be used as regularization parameter (higher values produce smoother deformation fields)')
+
+parser.add_argument('--iter', action='store', metavar='max_iter',
+                    help='A x-separated list of integers indicating the maximum number of iterations at each level of the Gaussian Pyramid (similar to ANTS), e.g. 10x100x100')
+
+params = parser.parse_args()
+
 
 def saveDeformedLattice3D(displacement, oname):
     minVal, maxVal=tf.get_displacement_range(displacement, None)
@@ -97,10 +124,11 @@ if __name__=='__main__':
     '''
     python dipyreg.py "/opt/registration/data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz" "/opt/registration/data/t1/IBSR18/IBSR_02/IBSR_02_ana_strip.nii.gz" "IBSR_01_ana_strip_IBSR_02_ana_stripAffine.txt" "warp" 100.0
     '''
-    print sys.version
-    moving=sys.argv[1]
-    fixed=sys.argv[2]
-    affine=sys.argv[3]
-    warpDir=sys.argv[4]
-    lambdaParam=np.float(sys.argv[5])
-    registerMultimodalDiffeomorphic3D(moving, fixed, affine, warpDir, lambdaParam)
+#    print sys.version
+#    moving=sys.argv[1]
+#    fixed=sys.argv[2]
+#    affine=sys.argv[3]
+#    warpDir=sys.argv[4]
+#    lambdaParam=np.float(sys.argv[5])
+    print params.target, params.reference, params.affine, params.warp_dir, float(params.smooth)
+    registerMultimodalDiffeomorphic3D(params.target, params.reference, params.affine, params.warp_dir, float(params.smooth))
