@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 import registrationCommon as rcommon
 import SSDMetric
 class EMMetric(SimilarityMetric):
+    '''
+    Similarity metric based on the Expectation-Maximization algorithm to handle
+    multi-modal images. The transfer function is modeled as a set of hidden
+    random variables that are estimated at each iteration of the algorithm.
+    '''
     GAUSS_SEIDEL_STEP=0
     DEMONS_STEP=1
     SINGLECYCLE_ITER=0
@@ -61,6 +66,15 @@ class EMMetric(SimilarityMetric):
             self.computeStep=self.computeGaussSeidelStep
 
     def initializeIteration(self):
+        '''
+        Precomputes the transfer functions (hidden random variables) and 
+        variances of the estimators. Also precomputes the gradient of both
+        input images. Note that once the images are transformed to the opposite
+        modality, the gradient of the transformed images can be used with the
+        gradient of the corresponding modality in the same fasion as diff-demons
+        does for mono-modality images. If the flag self.useDoubleGradient is True
+        these garadients are averaged.
+        '''
         self.__connectFunctions()
         samplingMask=self.fixedImageMask*self.movingImageMask
         self.samplingMask=samplingMask
@@ -99,7 +113,7 @@ class EMMetric(SimilarityMetric):
                 i+=1
             i=0
             for grad in sp.gradient(self.movingQMeansField):
-                self.gradientFixed[...,i]=grad
+                self.gradientFixed[...,i]+=grad
                 i+=1
 
     def freeIteration(self):

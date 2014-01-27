@@ -3,7 +3,7 @@ class SimilarityMetric(object):
     '''
     A similarity metric is in charge of keeping track of the numerical value
     of the similarity (or distance) between the two given images. It also 
-    computes the update field ("negative gradient") for the forward and inverse 
+    computes the update field for the forward and inverse 
     displacement fields to be used in a gradient-based optimization algorithm.
     Note that this metric does not depend on any transformation (affine or 
     non-linear), so it assumes the fixed and reference images are already warped
