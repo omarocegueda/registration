@@ -17,23 +17,10 @@ def saveDeformedLattice3D(displacement, oname):
     img=nib.Nifti1Image(warped, np.eye(4))
     img.to_filename(oname)
 
-def histeq(im,nbr_bins=256):
-  """  Histogram equalization of a grayscale image. """
-  print 'Equalizing'
-  # get image histogram
-  imhist,bins = np.histogram(im.flatten(),nbr_bins,normed=True)
-  cdf = imhist.cumsum() # cumulative distribution function
-  cdf = 255 * cdf / cdf[-1] # normalize
-  # use linear interpolation of cdf to find new pixel values
-  im2 = interp(im.flatten(),bins[:-1],cdf)
-  return im2.reshape(im.shape)
-
 def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warpDir, lambdaParam):
     '''
         testEstimateMultimodalDiffeomorphicField3DMultiScale('IBSR_01_ana_strip.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt', 100)
     '''
-    useJITInterpolation=False
-    applyEqualization=False
     maxOuterIter=[25, 50, 100]
     print 'Registering', fnameMoving, 'to', fnameFixed,'with lambda=',lambdaParam  
     sys.stdout.flush()
@@ -50,10 +37,6 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
     #print initAffine
     moving=moving.get_data().squeeze().astype(np.float64)
     fixed=fixed.get_data().squeeze().astype(np.float64)
-    print 'Apply equalization', applyEqualization
-    if applyEqualization:
-        moving=histeq(moving)
-        fixed=histeq(fixed)
     moving=moving.copy(order='C')
     fixed=fixed.copy(order='C')
     moving=(moving-moving.min())/(moving.max()-moving.min())
@@ -71,15 +54,13 @@ def registerMultimodalDiffeomorphic3D(fnameMoving, fnameFixed, fnameAffine, warp
                       'iterationType':'vCycle'}
     similarityMetric=EMMetric(metricParameters)
     updateRule=UpdateRule.Composition()
-    registrationOptimizer=RegistrationOptimizer(fixed, moving, None, initAffine, similarityMetric, updateRule, maxOuterIter,useJITInterpolation)
+    registrationOptimizer=RegistrationOptimizer(fixed, moving, None, initAffine, similarityMetric, updateRule, maxOuterIter)
     registrationOptimizer.optimize()
     #####################################################
     displacement=registrationOptimizer.getForward()
     del registrationOptimizer
     del similarityMetric
     del updateRule
-    if not useJITInterpolation:
-        tf.append_affine_to_displacement_field(displacement, initAffine)
     #####Warp all requested volumes
     #---first the target using tri-linear interpolation---
     moving=nib.load(fnameMoving).get_data().squeeze().astype(np.float64)

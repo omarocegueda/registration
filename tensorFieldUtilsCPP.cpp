@@ -1193,17 +1193,17 @@ void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, in
     delete[] sums;
 }
 
-double computeInverseEnergy(double *d, double *invd, int nrows, int ncols, double lambda){
+double computeInverseEnergy_deprecated(double *d, double *invd, int nrows, int ncols, double lambda){
     double stats[3];
     double *residual=new double[2*nrows*ncols];
-    composeVectorFields(d, invd, nrows, ncols, residual, stats);
+    composeVectorFields(d, nrows, ncols,invd, nrows, ncols, residual, stats);
     double energy=0;
     for(int i=0;i<nrows-1;++i){
         for(int j=0;j<ncols-1;++j){
-            double d00=invd[2*(i*nrows+j)] - invd[2*((i+1)*nrows+j)];
-            double d01=invd[2*(i*nrows+j)+1] - invd[2*((i+1)*nrows+j)+1];
-            double d10=invd[2*(i*nrows+j)] - invd[2*(i*nrows+j+1)];
-            double d11=invd[2*(i*nrows+j)+1] - invd[2*(i*nrows+j+1)+1];
+            double d00=invd[2*(i*ncols+j)] - invd[2*((i+1)*ncols+j)];
+            double d01=invd[2*(i*ncols+j)+1] - invd[2*((i+1)*ncols+j)+1];
+            double d10=invd[2*(i*ncols+j)] - invd[2*(i*ncols+j+1)];
+            double d11=invd[2*(i*ncols+j)+1] - invd[2*(i*ncols+j+1)+1];
             energy+=d00*d00+d01*d01+d10*d10+d11*d11;
         }    
     }
@@ -1211,6 +1211,32 @@ double computeInverseEnergy(double *d, double *invd, int nrows, int ncols, doubl
     double *r=residual;
     for(int i=0;i<nrows;++i){
         for(int j=0;j<ncols;++j, r+=2){
+            energy+=r[0]+r[0]+r[1]*r[1];
+        }    
+    }
+    delete[] residual;
+    return energy;
+    
+}
+
+double computeInverseEnergy(double *d, int nr1, int nc1, double *invd, int nr2, int nc2, double lambda){
+    double stats[3];
+    double *residual=new double[2*nr1*nc1];
+    composeVectorFields(d, nr1, nc1, invd, nr2, nc2, residual, stats);
+    double energy=0;
+    for(int i=0;i<nr2-1;++i){
+        for(int j=0;j<nc2-1;++j){
+            double d00=invd[2*(i*nc2+j)] - invd[2*((i+1)*nc2+j)];
+            double d01=invd[2*(i*nc2+j)+1] - invd[2*((i+1)*nc2+j)+1];
+            double d10=invd[2*(i*nc2+j)] - invd[2*(i*nc2+j+1)];
+            double d11=invd[2*(i*nc2+j)+1] - invd[2*(i*nc2+j+1)+1];
+            energy+=d00*d00+d01*d01+d10*d10+d11*d11;
+        }    
+    }
+    energy*=lambda;
+    double *r=residual;
+    for(int i=0;i<nr1;++i){
+        for(int j=0;j<nc1;++j, r+=2){
             energy+=r[0]+r[0]+r[1]*r[1];
         }    
     }
@@ -1476,7 +1502,7 @@ int invertVectorField(double *forward, int nrows, int ncols, double lambdaParam,
         memset(temp, 0, sizeof(double)*nrows*ncols*2);
         memset(denom, 0, sizeof(double)*nrows*ncols);
         //---interpolate the current approximation and accumulate with the forward field---
-        composeVectorFields(forward, inv, nrows, ncols, residual, substats);
+        composeVectorFields(forward, nrows, ncols, inv, nrows, ncols, residual, substats);
         double *r=residual;
         double *f=forward;
         for(int i=0;i<nrows;++i){
@@ -1580,7 +1606,7 @@ int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, doub
         memset(temp, 0, sizeof(double)*nsites*3);
         memset(denom, 0, sizeof(double)*nsites);
         //---interpolate the current approximation and accumulate with the forward field---
-        composeVectorFields3D(forward, inv, nslices, nrows, ncols, residual,substats);
+        composeVectorFields3D(forward, nslices, nrows, ncols, inv, nslices, nrows, ncols, residual,substats);
         double *r=residual;
         double *f=forward;
         for(int k=0;k<nslices;++k){
@@ -1856,8 +1882,9 @@ int invertVectorFieldYan(double *forward, int nrows, int ncols, int maxloop, dou
 
 /*
     Computes comp(x)=d2(x+d1(x))+d1(x) (i.e. applies first d1, then add d2 to the result)
+    deprecated bacause it assumed both transformations were endomorphisms
 */
-int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats){
+int composeVectorFields_deprecated(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats){
     double *dx=d1;
     double *res=comp;
     double maxNorm=0;
@@ -1927,11 +1954,84 @@ int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *co
     return 0;
 }
 
+/*
+    Computes comp(x)=d2(x+d1(x))+d1(x) (i.e. applies first d1, then add d2 to the result)
+*/
+int composeVectorFields(double *d1, int nr1, int nc1, double *d2, int nr2, int nc2, double *comp, double *stats){
+    double *dx=d1;
+    double *res=comp;
+    double maxNorm=0;
+    double meanNorm=0;
+    double stdNorm=0;
+    int cnt=0;
+    memset(comp, 0, sizeof(double)*nr1*nc1*2); 
+    for(int i=0;i<nr1;++i){
+        for(int j=0;j<nc1;++j, dx+=2, res+=2){
+            double dii=i+dx[0];
+            double djj=j+dx[1];
+            if((dii<0)||(nr2-1<dii)||(djj<0)||(nc2-1<djj)){
+                continue;
+            }
+            int ii=floor(dii);
+            int jj=floor(djj);
+            if((ii<0) || (nr2<=ii)||(jj<0)||(nc2<=jj) ){
+                continue;
+            }
+            double calpha=dii-ii;//by definition these factors are nonnegative
+            double cbeta=djj-jj;
+            double alpha=1-calpha;
+            double beta=1-cbeta;
+            //---top-left
+            res[0]=dx[0];
+            res[1]=dx[1];
+            double *z=&d2[2*(ii*nc2+jj)];
+            res[0]+=alpha*beta*z[0];
+            res[1]+=alpha*beta*z[1];
+            //---top-right
+            ++jj;
+            if(jj<nc2){
+                z=&d2[2*(ii*nc2+jj)];
+                res[0]+=alpha*cbeta*z[0];
+                res[1]+=alpha*cbeta*z[1];
+            }
+            //---bottom-right
+            ++ii;
+            if((ii>=0)&&(jj>=0)&&(ii<nr2)&&(jj<nc2)){
+                z=&d2[2*(ii*nc2+jj)];
+                res[0]+=calpha*cbeta*z[0];
+                res[1]+=calpha*cbeta*z[1];
+            }
+            //---bottom-left
+            --jj;
+            if((ii>=0)&&(jj>=0)&&(ii<nr2)&&(jj<nc2)){
+                z=&d2[2*(ii*nc2+jj)];
+                res[0]+=calpha*beta*z[0];
+                res[1]+=calpha*beta*z[1];
+            }
+            //consider only displacements that land inside the image
+            if((dii>=0 && dii<=nr2-1) && (djj>=0 && djj<=nc2-1)){
+                double nn=res[0]*res[0]+res[1]*res[1];
+                if(maxNorm<nn){
+                    maxNorm=nn;
+                }
+                meanNorm+=nn;
+                stdNorm+=nn*nn;
+                ++cnt;
+            }
+        }
+    }
+    meanNorm/=cnt;
+    stats[0]=sqrt(maxNorm);
+    stats[1]=sqrt(meanNorm);
+    stats[2]=sqrt(stdNorm/cnt - meanNorm*meanNorm);
+    return 0;
+}
 
 /*
     Computes comp(x)=d2(x+d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
+    this version assumed both domains were the same
 */
-int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp, double *stats){
+int composeVectorFields3D_deprecated(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp, double *stats){
     int sliceSize=nrows*ncols;
     double *dx=d1;
     double *res=comp;
@@ -2042,6 +2142,124 @@ int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int nc
     stats[2]=sqrt(stdNorm/cnt - meanNorm*meanNorm);
     return 0;
 }
+
+
+/*
+    Computes comp(x)=d2(x+d1(x))+d1(x) (i.e. applies first d1, then d2 to the result)
+*/
+int composeVectorFields3D(double *d1, int ns1, int nr1, int nc1, double *d2, int ns2, int nr2, int nc2, double *comp, double *stats){
+    int sliceSizeD2=nr2*nc2;
+    double *dx=d1;
+    double *res=comp;
+    double maxNorm=0;
+    double meanNorm=0;
+    double stdNorm=0;
+    int cnt=0;
+    memset(comp, 0, sizeof(double)*ns1*nr1*nc1*3); 
+    for(int k=0;k<ns1;++k){
+        for(int i=0;i<nr1;++i){
+            for(int j=0;j<nc1;++j, dx+=3, res+=3){
+                double dkk=k+dx[0];
+                double dii=i+dx[1];
+                double djj=j+dx[2];
+                if((dii<0)||(djj<0)||(dkk<0)||(dii>nr2-1)||(djj>nc2-1)||(dkk>ns2-1)){
+                    continue;
+                }
+                //---top-left
+                int kk=floor(dkk);
+                int ii=floor(dii);
+                int jj=floor(djj);
+                if((ii<0)||(jj<0)||(kk<0)||(ii>=nr2)||(jj>=nc2)||(kk>=ns2)){
+                    continue;
+                }
+                double cgamma=dkk-kk;
+                double calpha=dii-ii;//by definition these factors are nonnegative
+                double cbeta=djj-jj;
+                double alpha=1-calpha;
+                double beta=1-cbeta;
+                double gamma=1-cgamma;
+                res[0]=dx[0];
+                res[1]=dx[1];
+                res[2]=dx[2];
+                double *z=&d2[3*(kk*sliceSizeD2+ii*nc2+jj)];
+                res[0]+=alpha*beta*gamma*z[0];
+                res[1]+=alpha*beta*gamma*z[1];
+                res[2]+=alpha*beta*gamma*z[2];
+                //---top-right
+                ++jj;
+                if(jj<nc2){
+                    z=&d2[3*(kk*sliceSizeD2+ii*nc2+jj)];
+                    res[0]+=alpha*cbeta*gamma*z[0];
+                    res[1]+=alpha*cbeta*gamma*z[1];
+                    res[2]+=alpha*cbeta*gamma*z[2];
+                }
+                //---bottom-right
+                ++ii;
+                if((ii>=0)&&(jj>=0)&&(ii<nr2)&&(jj<nc2)){
+                    z=&d2[3*(kk*sliceSizeD2+ii*nc2+jj)];
+                    res[0]+=calpha*cbeta*gamma*z[0];
+                    res[1]+=calpha*cbeta*gamma*z[1];
+                    res[2]+=calpha*cbeta*gamma*z[2];
+                }
+                //---bottom-left
+                --jj;
+                if((ii>=0)&&(jj>=0)&&(ii<nr2)&&(jj<nc2)){
+                    z=&d2[3*(kk*sliceSizeD2+ii*nc2+jj)];
+                    res[0]+=calpha*beta*gamma*z[0];
+                    res[1]+=calpha*beta*gamma*z[1];
+                    res[2]+=calpha*beta*gamma*z[2];
+                }
+                ++kk;
+                if(kk<ns2){
+                    --ii;
+                    z=&d2[3*(kk*sliceSizeD2+ii*nc2+jj)];
+                    res[0]+=alpha*beta*cgamma*z[0];
+                    res[1]+=alpha*beta*cgamma*z[1];
+                    res[2]+=alpha*beta*cgamma*z[2];
+                    ++jj;
+                    if(jj<nc2){
+                        z=&d2[3*(kk*sliceSizeD2+ii*nc2+jj)];
+                        res[0]+=alpha*cbeta*cgamma*z[0];
+                        res[1]+=alpha*cbeta*cgamma*z[1];
+                        res[2]+=alpha*cbeta*cgamma*z[2];
+                    }
+                    //---bottom-right
+                    ++ii;
+                    if((ii>=0)&&(jj>=0)&&(ii<nr2)&&(jj<nc2)){
+                        z=&d2[3*(kk*sliceSizeD2+ii*nc2+jj)];
+                        res[0]+=calpha*cbeta*cgamma*z[0];
+                        res[1]+=calpha*cbeta*cgamma*z[1];
+                        res[2]+=calpha*cbeta*cgamma*z[2];
+                    }
+                    //---bottom-left
+                    --jj;
+                    if((ii>=0)&&(jj>=0)&&(ii<nr2)&&(jj<nc2)){
+                        z=&d2[3*(kk*sliceSizeD2+ii*nc2+jj)];
+                        res[0]+=calpha*beta*cgamma*z[0];
+                        res[1]+=calpha*beta*cgamma*z[1];
+                        res[2]+=calpha*beta*cgamma*z[2];
+                    }
+                }
+                if((dkk>=0 && dkk<=ns2-1) && (dii>=0 && dii<=nr2-1) && (djj>=0 && djj<=nc2-1)){
+                    double nn=res[0]*res[0]+res[1]*res[1]+res[2]*res[2];
+                    if(maxNorm<nn){
+                        maxNorm=nn;
+                    }
+                    meanNorm+=nn;
+                    stdNorm+=nn*nn;
+                    ++cnt;
+                }
+            }
+        }
+    }
+    meanNorm/=cnt;
+    stats[0]=sqrt(maxNorm);
+    stats[1]=sqrt(meanNorm);
+    stats[2]=sqrt(stdNorm/cnt - meanNorm*meanNorm);
+    return 0;
+}
+
+
 
 
 int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc){
@@ -3438,7 +3656,7 @@ int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambda
 }
 
 
-int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats){
+int invertVectorFieldFixedPoint_deprecated(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats){
     double error=1+tolerance;
     double substats[3];
     double *temp[3];
@@ -3456,7 +3674,7 @@ int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, do
     int iter;
     double epsilon=0.5;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
-        composeVectorFields(temp[iter&1], d, nrows, ncols, temp[1-(iter&1)], substats);
+        composeVectorFields(temp[iter&1], nrows, ncols, d, nrows, ncols, temp[1-(iter&1)], substats);
         double difmag=0;
         error=0;
         double *p=temp[1-(iter&1)];
@@ -3485,8 +3703,51 @@ int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, do
     return 0;
 }
 
+int invertVectorFieldFixedPoint(double *d, int nr1, int nc1, int nr2, int nc2, int maxIter, double tolerance, double *invd, double *start, double *stats){
+    double error=1+tolerance;
+    double substats[3];
+    double *temp[2];
+    temp[0]=new double[nr2*nc2*2];
+    temp[1]=invd;
+    if(start!=NULL){
+        memcpy(temp[0], start, sizeof(double)*2*nr2*nc2);
+    }else{
+        memset(temp[0], 0, sizeof(double)*2*nr2*nc2);
+    }
+    
+    int nsitesInverse=2*nr2*nc2;
+    int iter;
+    double epsilon=0.5;
+    for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
+        composeVectorFields(temp[iter&1], nr1, nc1, d, nr2, nc2, temp[1-(iter&1)], substats);
+        double difmag=0;
+        error=0;
+        double *p=temp[1-(iter&1)];
+        for(int i=0;i<nsitesInverse;i+=2, p+=2){
+            double mag=sqrt(p[0]*p[0]+p[1]*p[1]);
+            error+=mag;
+            if(difmag<mag){
+                difmag=mag;
+            }
+        }
+        error/=(nr2*nc2);
+        p=temp[1-(iter&1)];
+        double *q=temp[iter&1];
+        for(int i=0;i<nsitesInverse;i+=2,p+=2,q+=2){
+            p[0]=q[0]-epsilon*p[0];
+            p[1]=q[1]-epsilon*p[1];
+        }
+    }
+    if(iter&1){//then the last computation was stored at temp[0]
+        memcpy(invd, temp[0], sizeof(double)*2*nr2*nc2);
+    }
+    delete[] temp[0];
+    stats[0]=substats[1];
+    stats[1]=iter;
+    return 0;
+}
 
-int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats){
+int invertVectorFieldFixedPoint3D_deprecated(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats){
     double error=1+tolerance;
     double *temp[2];
     double substats[3];
@@ -3501,7 +3762,7 @@ int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, 
     int iter;
     double epsilon=0.5;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
-        composeVectorFields3D(temp[iter&1], d, nslices, nrows, ncols, temp[1-(iter&1)], substats);
+        composeVectorFields3D(temp[iter&1], nslices, nrows, ncols, d, nslices, nrows, ncols, temp[1-(iter&1)], substats);
         double difmag=0;
         error=0;
         double *p=temp[1-(iter&1)];
@@ -3512,7 +3773,7 @@ int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, 
                 difmag=mag;
             }
         }
-        error/=(nrows*ncols);
+        error/=(nslices*nrows*ncols);
         p=temp[1-(iter&1)];
         double *q=temp[iter&1];
         for(int i=0;i<nsites;i+=3,p+=3,q+=3){
@@ -3523,6 +3784,50 @@ int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, 
     }
     if(iter&1){//then the last computation was stored at temp[0]
         memcpy(invd, temp[0], sizeof(double)*nsites);
+    }
+    delete[] temp[0];
+    stats[0]=error;
+    stats[1]=iter;
+    return 0;
+}
+
+int invertVectorFieldFixedPoint3D(double *d, int ns1, int nr1, int nc1, int ns2, int nr2, int nc2, int maxIter, double tolerance, double *invd, double *start, double *stats){
+    double error=1+tolerance;
+    double *temp[2];
+    double substats[3];
+    temp[0]=new double[ns2*nr2*nc2*3];
+    temp[1]=invd;
+    int nsitesInv=3*ns2*nr2*nc2;
+    if(start!=NULL){
+        memcpy(temp[0], start, sizeof(double)*nsitesInv);
+    }else{
+        memset(temp[0], 0, sizeof(double)*nsitesInv);
+    }
+    int iter;
+    double epsilon=0.5;
+    for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
+        composeVectorFields3D(temp[iter&1], ns2, nr2, nc2, d, ns1, nr1, nc1, temp[1-(iter&1)], substats);
+        double difmag=0;
+        error=0;
+        double *p=temp[1-(iter&1)];
+        for(int i=0;i<nsitesInv;i+=3, p+=3){
+            double mag=sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);
+            error+=mag;
+            if(difmag<mag){
+                difmag=mag;
+            }
+        }
+        error/=(ns2*nr2*nc2);
+        p=temp[1-(iter&1)];
+        double *q=temp[iter&1];
+        for(int i=0;i<nsitesInv;i+=3,p+=3,q+=3){
+            p[0]=q[0]-epsilon*p[0];
+            p[1]=q[1]-epsilon*p[1];
+            p[2]=q[2]-epsilon*p[2];
+        }
+    }
+    if(iter&1){//then the last computation was stored at temp[0]
+        memcpy(invd, temp[0], sizeof(double)*nsitesInv);
     }
     delete[] temp[0];
     stats[0]=error;
@@ -3569,7 +3874,7 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
         tmp[1][i]=v[i]*factor;
     }
     for(int i=1;i<=n;++i){
-        composeVectorFields(tmp[i&1], tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
+        composeVectorFields(tmp[i&1], nrows, ncols, tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
     }
     //---perform binary exponentiation: inverse---
     if(invexpv!=NULL){
@@ -3579,7 +3884,7 @@ int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double
         }
         invertVectorField(tmp[0], nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
         for(int i=1;i<=n;++i){
-            composeVectorFields(tmp[i&1], tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
+            composeVectorFields(tmp[i&1], nrows, ncols, tmp[i&1], nrows, ncols, tmp[1-(i&1)], stats);
         }
     }
     delete[] tmp[n%2];
@@ -3625,7 +3930,7 @@ int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, doubl
     }
     double substats[3];
     for(int i=1;i<=n;++i){
-        composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)], substats);
+        composeVectorFields3D(tmp[i&1], nslices, nrows, ncols, tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)], substats);
     }
     //---perform binary exponentiation: inverse---
     if(invexpv!=NULL){
@@ -3635,7 +3940,7 @@ int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, doubl
         }
         invertVectorField3D(tmp[0], nslices, nrows, ncols, 0.1, 20, 1e-4, tmp[1], stats);
         for(int i=1;i<=n;++i){
-            composeVectorFields3D(tmp[i&1], tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)],substats);
+            composeVectorFields3D(tmp[i&1], nslices, nrows, ncols, tmp[i&1], nslices, nrows, ncols, tmp[1-(i&1)],substats);
         }
     }
     delete[] tmp[n%2];

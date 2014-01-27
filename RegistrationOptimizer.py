@@ -19,19 +19,13 @@ class RegistrationOptimizer(object):
                 'inversionTolerance':1e-3, 'tolerance':1e-6, 
                 'reportStatus':False}
 
-    def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None, useJITInterpolation=False):
+    def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, maxIter=None):
         self.parameters=self.getDefaultParameters();
-        self.useJITInterpolation=useJITInterpolation
         self.dim=0
         self.setFixedImage(fixed)
         self.forwardModel=TransformationModel(None, None, None, None)
-        if useJITInterpolation:
-            self.setMovingImage(moving)
-            self.backwardModel=TransformationModel(None, None, np.linalg.inv(affineMoving).copy(order='C'), None)
-        else:
-            wmoving=TransformationModel(None, None, affineMoving, None).warpForward(moving)
-            self.setMovingImage(wmoving)
-            self.backwardModel=TransformationModel(None, None, None, None)
+        self.setMovingImage(moving)
+        self.backwardModel=TransformationModel(None, None, np.linalg.inv(affineMoving).copy(order='C'), None)
         self.similarityMetric=similarityMetric
         self.updateRule=updateRule
         self.setMaxIter(maxIter)
@@ -181,6 +175,10 @@ class RegistrationOptimizer(object):
         self.similarityMetric.setFixedImage(wfixed)
         self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
         self.similarityMetric.initializeIteration()
+        ffShape=np.array(self.forwardModel.forward.shape).astype(np.int32)
+        fbShape=np.array(self.forwardModel.backward.shape).astype(np.int32)
+        bfShape=np.array(self.backwardModel.forward.shape).astype(np.int32)
+        bbShape=np.array(self.backwardModel.backward.shape).astype(np.int32)
         del self.forwardModel.backward
         del self.backwardModel.backward
         fw=self.similarityMetric.computeForward()
@@ -206,10 +204,10 @@ class RegistrationOptimizer(object):
         self.similarityMetric.freeIteration()
         invIter=self.inversionIter
         invTol=self.inversionTolerance
-        self.forwardModel.backward=np.array(self.invertVectorField(self.forwardModel.forward, invIter, invTol, None))
-        self.backwardModel.backward=np.array(self.invertVectorField(self.backwardModel.forward, invIter, invTol, None))
-        self.forwardModel.forward=np.array(self.invertVectorField(self.forwardModel.backward, invIter, invTol, self.forwardModel.forward))
-        self.backwardModel.forward=np.array(self.invertVectorField(self.backwardModel.backward, invIter, invTol, self.backwardModel.forward))
+        self.forwardModel.backward=np.array(self.invertVectorField(self.forwardModel.forward, fbShape, invIter, invTol, None))
+        self.backwardModel.backward=np.array(self.invertVectorField(self.backwardModel.forward, bbShape, invIter, invTol, None))
+        self.forwardModel.forward=np.array(self.invertVectorField(self.forwardModel.backward, ffShape, invIter, invTol, self.forwardModel.forward))
+        self.backwardModel.forward=np.array(self.invertVectorField(self.backwardModel.backward, bfShape, invIter, invTol, self.backwardModel.forward))
         if showImages:
             self.similarityMetric.reportStatus()
         #toc=time.time()
@@ -294,7 +292,6 @@ class RegistrationOptimizer(object):
         print 'Outer iter:', self.maxIter
         print 'Metric:',self.similarityMetric.getMetricName()
         print 'Metric parameters:\n',self.similarityMetric.parameters
-        print 'JIT Interpolation:',self.useJITInterpolation
         self.__optimize_symmetric()
         #self.__optimize_asymmetric()
 

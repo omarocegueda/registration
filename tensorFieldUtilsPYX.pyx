@@ -37,9 +37,9 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, int *dims, double *diff, int nclasses, double *probs, double *weights, double *Aw, double *bw)
     double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *displacementField, double *residual)
     int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats)
-    int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats)
-    int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats)
-    int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats)
+    int invertVectorFieldFixedPoint(double *d, int nr1, int nc1, int nr2, int nc2, int maxIter, double tolerance, double *invd, double *start, double *stats)
+    int invertVectorFieldFixedPoint3D(double *d, int ns1, int nr1, int nc1, int ns2, int nr2, int nc2, int maxIter, double tolerance, double *invd, double *start, double *stats)
+    int composeVectorFields(double *d1, int nr1, int nc1, double *d2, int nr2, int nc2, double *comp, double *stats)
     int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv)
     int readDoubleBuffer(char *fname, int nDoubles, double *buffer)
     int writeDoubleBuffer(double *buffer, int nDoubles, char *fname)
@@ -50,7 +50,7 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, double *comp)
     int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv)
     void consecutiveLabelMap(int *v, int n, int *out)
-    int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp, double *stats)
+    int composeVectorFields3D(double *d1, int ns1, int nr1, int nc1, double *d2, int ns2, int nr2, int nc2, double *comp, double *stats)
     int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv)
     int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc)
     int upsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *up, int nslices, int nrows, int ncols)
@@ -433,41 +433,46 @@ cpdef invert_vector_field_Yan(double[:,:,:] d, int maxIter, double tolerance):
     retVal=invertVectorFieldYan(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0])
     return invd
 
-cpdef invert_vector_field_fixed_point(double[:,:,:] d, int maxIter, double tolerance, double[:,:,:] start=None):
+cpdef invert_vector_field_fixed_point(double[:,:,:] d, int[:] inverseShape, int maxIter, double tolerance, double[:,:,:] start=None):
     cdef int retVal
-    cdef int nrows=d.shape[0]
-    cdef int ncols=d.shape[1]
+    cdef int nr1=d.shape[0]
+    cdef int nc1=d.shape[1]
+    cdef int nr2=nr1
+    cdef int nc2=nc1
+    if inverseShape!=None:
+        nr2, nc2=inverseShape[0], inverseShape[1]
     cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
     cdef double[:,:,:] invd=np.zeros_like(d)
     cdef double *startPointer=NULL
     if start!=None:
         startPointer=&start[0,0,0]
-    retVal=invertVectorFieldFixedPoint(&d[0,0,0], nrows, ncols, maxIter, tolerance, &invd[0,0,0], startPointer, &stats[0])
+    retVal=invertVectorFieldFixedPoint(&d[0,0,0], nr1, nc1, nr2, nc2,maxIter, tolerance, &invd[0,0,0], startPointer, &stats[0])
     #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
 cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
-    cdef int nrows=d1.shape[0]
-    cdef int ncols=d1.shape[1]
+    cdef int nr1=d1.shape[0]
+    cdef int nc1=d1.shape[1]
+    cdef int nr2=d2.shape[0]
+    cdef int nc2=d2.shape[1]
     cdef double[:,:,:] comp=np.zeros_like(d1)
     cdef int retVal
     cdef double[:] stats=cvarray(shape=(3,), itemsize=sizeof(double), format='d')
-    checkFortran(d1)
-    checkFortran(d2)
-    retVal=composeVectorFields(&d1[0,0,0], &d2[0,0,0], nrows, ncols, &comp[0,0,0], &stats[0])
+    retVal=composeVectorFields(&d1[0,0,0], nr1, nc1, &d2[0,0,0], nr2, nc2, &comp[0,0,0], &stats[0])
     #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
     return comp, stats
 
 cpdef compose_vector_fields3D(double[:,:,:,:] d1, double[:,:,:,:] d2):
-    cdef int nslices=d1.shape[0]
-    cdef int nrows=d1.shape[1]
-    cdef int ncols=d1.shape[2]
+    cdef int ns1=d1.shape[0]
+    cdef int nr1=d1.shape[1]
+    cdef int nc1=d1.shape[2]
+    cdef int ns2=d2.shape[0]
+    cdef int nr2=d2.shape[1]
+    cdef int nc2=d2.shape[2]
     cdef double[:,:,:,:] comp=np.zeros_like(d1)
     cdef double[:] stats=cvarray(shape=(3,), itemsize=sizeof(double), format='d')
     cdef int retVal
-    checkFortran(d1)
-    checkFortran(d2)    
-    retVal=composeVectorFields3D(&d1[0,0,0,0], &d2[0,0,0,0], nslices, nrows, ncols, &comp[0,0,0,0], &stats[0])
+    retVal=composeVectorFields3D(&d1[0,0,0,0], ns1, nr1, nc1, &d2[0,0,0,0], ns2, nr2, nc2, &comp[0,0,0,0], &stats[0])
     #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
     return comp, stats
 
@@ -802,18 +807,22 @@ def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, do
     #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
-def invert_vector_field_fixed_point3D(double[:,:,:,:] d, int maxIter, double tolerance, double[:,:,:,:] start=None):
+def invert_vector_field_fixed_point3D(double[:,:,:,:] d, int[:] inverseShape, int maxIter, double tolerance, double[:,:,:,:] start=None):
+    cdef int ns1=d.shape[0]
+    cdef int nr1=d.shape[1]
+    cdef int nc1=d.shape[2]
+    cdef int ns2=ns1
+    cdef int nr2=nr1
+    cdef int nc2=nc1
+    if inverseShape!=None:
+        ns2, nr2, nc2=inverseShape[0], inverseShape[1], inverseShape[2]
     cdef int retVal
-    cdef int nslices=d.shape[0]
-    cdef int nrows=d.shape[1]
-    cdef int ncols=d.shape[2]
     cdef double[:] stats=cvarray(shape=(2,), itemsize=sizeof(double), format='d')
-    cdef double[:,:,:,:] invd=np.zeros_like(d)
-    checkFortran(d)
+    cdef double[:,:,:,:] invd=np.ndarray((ns2, nr2, nc2, 3), dtype=np.float64)
     cdef double *startPointer=NULL
     if start!=None:
         startPointer=&start[0,0,0,0]
-    retVal=invertVectorFieldFixedPoint3D(&d[0,0,0,0], nslices, nrows, ncols, maxIter, tolerance, &invd[0,0,0,0], startPointer, &stats[0])
+    retVal=invertVectorFieldFixedPoint3D(&d[0,0,0,0], ns1, nr1, nc1, ns2, nr2, nc2, maxIter, tolerance, &invd[0,0,0,0], startPointer, &stats[0])
     #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 

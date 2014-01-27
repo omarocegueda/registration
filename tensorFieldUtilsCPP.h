@@ -32,9 +32,9 @@ void integrateMaskedWeightedTensorFieldProductsProbsCPP(int *mask, double *q, in
 double iterateMaskedDisplacementField2DCPP(double *deltaField, double *sigmaField, double *gradientField, int *mask, int *dims, double lambdaParam, double *displacementField, double *residual);
 
 int invertVectorField(double *d, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *invd, double *stats);
-int invertVectorFieldFixedPoint(double *d, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats);
-int invertVectorFieldFixedPoint3D(double *d, int nslices, int nrows, int ncols, int maxIter, double tolerance, double *invd, double *start, double *stats);
-int composeVectorFields(double *d1, double *d2, int nrows, int ncols, double *comp, double *stats);
+int invertVectorFieldFixedPoint(double *d, int nr1, int nc1, int nr2, int nc2, int maxIter, double tolerance, double *invd, double *start, double *stats);
+int invertVectorFieldFixedPoint3D(double *d, int ns1, int nr1, int nc1, int ns2, int nr2, int nc2, int maxIter, double tolerance, double *invd, double *start, double *stats);
+int composeVectorFields(double *d1, int nr1, int nc1, double *d2, int nr2, int nc2, double *comp, double *stats);
 int vectorFieldExponential(double *v, int nrows, int ncols, double *expv, double *invexpv);
 
 int readDoubleBuffer(char *fname, int nDoubles, double *buffer);
@@ -48,7 +48,7 @@ int vectorFieldInterpolation(double *d1, double *d2, int nrows, int ncols, doubl
 int invertVectorField_TV_L2(double *forward, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv);
 
 void consecutiveLabelMap(int *v, int n, int *out);
-int composeVectorFields3D(double *d1, double *d2, int nslices, int nrows, int ncols, double *comp, double *stats);
+int composeVectorFields3D(double *d1, int ns1, int nr1, int nc1, double *d2, int ns2, int nr2, int nc2, double *comp, double *stats);
 int vectorFieldExponential3D(double *v, int nslices, int nrows, int ncols, double *expv, double *invexpv);
 
 int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int nr, int nc);
