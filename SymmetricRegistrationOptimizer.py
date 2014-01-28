@@ -226,7 +226,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         self.__endOptimizer()
 
     def optimize(self):
-        print 'Outer iter:', self.maxIter
+        print 'Optimizer parameters:\n',self.parameters
         print 'Metric:',self.similarityMetric.getMetricName()
         print 'Metric parameters:\n',self.similarityMetric.parameters
         self.__optimize()
