@@ -12,7 +12,7 @@ from EMMetric import EMMetric
 from RegistrationOptimizer import RegistrationOptimizer
 
 class AsymmetricRegistrationOptimizer(RegistrationOptimizer):
-    def getDefaultParameters(self):
+    def get_default_parameters(self):
         return {'maxIter':[25,50,100], 'inversionIter':20,
                 'inversionTolerance':1e-3, 'tolerance':1e-6, 
                 'reportStatus':True}

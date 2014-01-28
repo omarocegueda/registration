@@ -245,22 +245,22 @@ def applyRigidTransformation3D(image, beta):
                        R[2,0]*X0 + R[2,1]*X1 + R[2,2]*X2 + center[2] + beta[5])
     return ndimage.map_coordinates(image, [X0new, X1new, X2new], prefilter=const_prefilter_map_coordinates)
 
-#def pyramid_gaussian_3D(image, max_layer, mask=None):
-#    yield image.copy().astype(np.float64)
-#    for i in range(max_layer):
-#        newImage=sp.ndimage.filters.gaussian_filter(image, 1.0/6.0)[::2,::2,::2].copy()
-#        if(mask!=None):
-#            mask=mask[::2,::2,::2]
-#            newImage*=mask
-#        image=newImage.copy()
-#        yield newImage
-
 def pyramid_gaussian_3D(image, max_layer, mask=None):
     yield image.copy().astype(np.float64)
     for i in range(max_layer):
-        newImage=np.array(tf.downsample_scalar_field3D(image))
-        image=newImage
+        newImage=sp.ndimage.filters.gaussian_filter(image, 1.0/6.0)[::2,::2,::2].copy()
+        if(mask!=None):
+            mask=mask[::2,::2,::2]
+            newImage*=mask
+        image=newImage.copy()
         yield newImage
+
+#def pyramid_gaussian_3D(image, max_layer, mask=None):
+#    yield image.copy().astype(np.float64)
+#    for i in range(max_layer):
+#        newImage=np.array(tf.downsample_scalar_field3D(image))
+#        image=newImage
+#        yield newImage
 
 def pyramid_gaussian_2D(image, max_layer, mask=None):
     yield image.copy().astype(np.float64)

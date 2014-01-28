@@ -199,9 +199,9 @@ class EMMetric(SimilarityMetric):
             self.fixedImageMask=self.fixedImageMask
             return
         if direction==1:
-            self.fixedImageMask=transformation.warpForwardNN(self.fixedImageMask)
+            self.fixedImageMask=transformation.warp_forward_nn(self.fixedImageMask)
         else:
-            self.fixedImageMask=transformation.warpBackwardNN(self.fixedImageMask)
+            self.fixedImageMask=transformation.warp_backward_nn(self.fixedImageMask)
 
     def useMovingImageDynamics(self, originalMovingImage, transformation, direction):
         r'''
@@ -214,9 +214,9 @@ class EMMetric(SimilarityMetric):
             self.movingImageMask=self.movingImageMask
             return
         if direction==1:
-            self.movingImageMask=transformation.warpForwardNN(self.movingImageMask)
+            self.movingImageMask=transformation.warp_forward_nn(self.movingImageMask)
         else:
-            self.movingImageMask=transformation.warpBackwardNN(self.movingImageMask)
+            self.movingImageMask=transformation.warp_backward_nn(self.movingImageMask)
 
     def reportStatus(self):
         r'''

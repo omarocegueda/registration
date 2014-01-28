@@ -8,11 +8,11 @@ class RegistrationOptimizer(object):
     optimization algorithm for nonlinear Registration
     '''
     @abc.abstractmethod
-    def getDefaultParameters(self):
+    def get_default_parameters(self):
         return NotImplemented
 
     def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, parameters=None):
-        defaultParameters=self.getDefaultParameters()
+        defaultParameters=self.get_default_parameters()
         if parameters!=None:
             for key, val in parameters.iteritems():
                 if key in defaultParameters:
@@ -25,9 +25,9 @@ class RegistrationOptimizer(object):
         invAffineMoving=None if affineMoving==None else np.linalg.inv(affineMoving).copy(order='C')
         self.dim=0
         self.setFixedImage(fixed)
-        self.forwardModel=TransformationModel(None, None, None, None)
+        self.forward_model=TransformationModel(None, None, None, None)
         self.setMovingImage(moving)
-        self.backwardModel=TransformationModel(None, None, invAffineMoving, None)
+        self.backward_model=TransformationModel(None, None, invAffineMoving, None)
         self.similarityMetric=similarityMetric
         self.updateRule=updateRule
         self.energyList=None
@@ -61,8 +61,8 @@ class RegistrationOptimizer(object):
         '''
         return NotImplemented
 
-    def getForward(self):
-        return self.forwardModel.getForward()
+    def get_forward(self):
+        return self.forward_model.forward
 
-    def getBackward(self):
-        return self.forwardModel.getBackward()
+    def get_backward(self):
+        return self.forward_model.backward

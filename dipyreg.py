@@ -254,9 +254,9 @@ def register_3d(params):
         'maxInnerIter':int(params.inner_iter)}
     optimizer_parameters = {
         'maxIter':[int(i) for i in params.iter.split('x')],
-        'inversionIter':int(params.inversion_iter),
-        'inversionTolerance':float(params.inversion_tolerance),
-        'reportStatus':True if params.report_status else False}
+        'inversion_iter':int(params.inversion_iter),
+        'inversion_tolerance':float(params.inversion_tolerance),
+        'report_status':True if params.report_status else False}
     moving = nib.load(params.target)
     moving_affine = moving.get_affine()
     fixed = nib.load(params.reference)
@@ -280,8 +280,8 @@ def register_3d(params):
         fixed, moving, None, init_affine, similarity_metric, update_rule,
         optimizer_parameters)
     registration_optimizer.optimize()
-    displacement = registration_optimizer.getForward()
-    inverse = registration_optimizer.getBackward()
+    displacement = registration_optimizer.get_forward()
+    inverse = registration_optimizer.get_backward()
     del registration_optimizer
     del similarity_metric
     del update_rule
