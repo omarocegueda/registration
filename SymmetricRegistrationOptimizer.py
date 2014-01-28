@@ -15,27 +15,27 @@ from RegistrationOptimizer import RegistrationOptimizer
 
 class SymmetricRegistrationOptimizer(RegistrationOptimizer):
     r'''
-    Performs the multi-resolution optimization algorithm for non-linear 
+    Performs the multi-resolution optimization algorithm for non-linear
     registration using a given similarity metric and update rule (this
     scheme was inspider on the ANTS package).
     '''
     def get_default_parameters(self):
-        return {'maxIter':[25, 50, 100], 'inversion_iter':20,
-                'inversion_tolerance':1e-3, 'tolerance':1e-6, 
+        return {'max_iter':[25, 50, 100], 'inversion_iter':20,
+                'inversion_tolerance':1e-3, 'tolerance':1e-6,
                 'report_status':False}
 
-    def __init__(self, 
-                 fixed  =  None, 
-                 moving = None, 
-                 affine_fixed = None, 
-                 affine_moving = None, 
-                 similarity_metric = None, 
-                 update_rule = None, 
+    def __init__(self,
+                 fixed = None,
+                 moving = None,
+                 affine_fixed = None,
+                 affine_moving = None,
+                 similarity_metric = None,
+                 update_rule = None,
                  parameters = None):
         super(SymmetricRegistrationOptimizer, self).__init__(
-            fixed, moving, affine_fixed, affine_moving, similarity_metric, 
+            fixed, moving, affine_fixed, affine_moving, similarity_metric,
             update_rule, parameters)
-        self.setMaxIter(self.parameters['maxIter'])
+        self.set_max_iter(self.parameters['max_iter'])
         self.tolerance = self.parameters['tolerance']
         self.inversion_tolerance = self.parameters['inversion_tolerance']
         self.inversion_iter = self.parameters['inversion_iter']
@@ -55,7 +55,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
 
     def __check_ready(self):
         r'''
-        Verifies that the configuration of the optimizer and input data are 
+        Verifies that the configuration of the optimizer and input data are
         consistent and the optimizer is ready to run
         '''
         ready = True
@@ -65,7 +65,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         elif self.dim != len(self.fixed.shape):
             ready = False
             print('Error: inconsistent dimensions. Last dimension update: %d.'
-                  'Fixed image dimension: %d.'%(self.dim, 
+                  'Fixed image dimension: %d.'%(self.dim,
                                                 len(self.fixed.shape)))
         if self.moving == None:
             ready = False
@@ -73,23 +73,23 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         elif self.dim != len(self.moving.shape):
             ready = False
             print('Error: inconsistent dimensions. Last dimension update: %d.'
-                  'Moving image dimension: %d.'%(self.dim, 
+                  'Moving image dimension: %d.'%(self.dim,
                                                  len(self.moving.shape)))
-        if self.similarityMetric == None:
+        if self.similarity_metric == None:
             ready = False
             print('Error: Similarity metric not set.')
-        if self.updateRule == None:
+        if self.update_rule == None:
             ready = False
             print('Error: Update rule not set.')
-        if self.maxIter == None:
+        if self.max_iter == None:
             ready = False
             print('Error: Maximum number of iterations per level not set.')
         return ready
 
     def __init_optimizer(self):
         r'''
-        Computes the Gaussian Pyramid of the input images and allocates 
-        the required memory for the transformation models at the coarcest 
+        Computes the Gaussian Pyramid of the input images and allocates
+        the required memory for the transformation models at the coarcest
         scale.
         '''
         ready = self.__check_ready()
@@ -97,28 +97,28 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         if not ready:
             print 'Not ready'
             return False
-        self.moving_pyramid = [img for img 
-                            in self.generate_pyramid(self.moving, 
-                                                    self.levels-1, 
+        self.moving_pyramid = [img for img
+                            in self.generate_pyramid(self.moving,
+                                                    self.levels-1,
                                                     np.ones_like(self.moving))]
-        self.fixed_pyramid = [img for img 
-                           in self.generate_pyramid(self.fixed, 
-                                                   self.levels-1, 
+        self.fixed_pyramid = [img for img
+                           in self.generate_pyramid(self.fixed,
+                                                   self.levels-1,
                                                    np.ones_like(self.fixed))]
         starting_forward = np.zeros(
-            shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,), 
+            shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,),
             dtype = np.float64)
         starting_forward_inv = np.zeros(
-            shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,), 
+            shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,),
             dtype = np.float64)
         self.forward_model.scale_affines(0.5**(self.levels-1))
         self.forward_model.set_forward(starting_forward)
         self.forward_model.set_backward(starting_forward_inv)
         starting_backward = np.zeros(
-            shape = self.moving_pyramid[self.levels-1].shape+(self.dim,), 
+            shape = self.moving_pyramid[self.levels-1].shape+(self.dim,),
             dtype = np.float64)
         starting_backward_inverse = np.zeros(
-            shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,), 
+            shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,),
             dtype = np.float64)
         self.backward_model.scale_affines(0.5**(self.levels-1))
         self.backward_model.set_forward(starting_backward)
@@ -144,38 +144,38 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         #tic = time.time()
         wmoving = self.backward_model.warp_backward(self.current_moving)
         wfixed = self.forward_model.warp_backward(self.current_fixed)
-        self.similarityMetric.setMovingImage(wmoving)
-        self.similarityMetric.useMovingImageDynamics(self.current_moving, 
+        self.similarity_metric.setMovingImage(wmoving)
+        self.similarity_metric.useMovingImageDynamics(self.current_moving,
                                                      self.backward_model, -1)
-        self.similarityMetric.setFixedImage(wfixed)
-        self.similarityMetric.useFixedImageDynamics(self.current_fixed, 
+        self.similarity_metric.setFixedImage(wfixed)
+        self.similarity_metric.useFixedImageDynamics(self.current_fixed,
                                                     self.forward_model, -1)
-        self.similarityMetric.initializeIteration()
+        self.similarity_metric.initializeIteration()
         ff_shape = np.array(self.forward_model.forward.shape).astype(np.int32)
         fb_shape = np.array(self.forward_model.backward.shape).astype(np.int32)
         bf_shape = np.array(self.backward_model.forward.shape).astype(np.int32)
         bb_shape = np.array(self.backward_model.backward.shape).astype(np.int32)
         del self.forward_model.backward
         del self.backward_model.backward
-        fw_step = self.similarityMetric.computeForward()
-        self.forward_model.forward, md_forward = self.updateRule.update(
+        fw_step = self.similarity_metric.computeForward()
+        self.forward_model.forward, md_forward = self.update_rule.update(
             self.forward_model.forward, fw_step)
         del fw_step
         try:
-            fw_energy = self.similarityMetric.energy
+            fw_energy = self.similarity_metric.energy
         except NameError:
             pass
-        bw_step = self.similarityMetric.computeBackward()
-        self.backward_model.forward, md_backward = self.updateRule.update(
+        bw_step = self.similarity_metric.computeBackward()
+        self.backward_model.forward, md_backward = self.update_rule.update(
             self.backward_model.forward, bw_step)
         del bw_step
         try:
-            bw_energy = self.similarityMetric.energy
+            bw_energy = self.similarity_metric.energy
         except NameError:
             pass
         try:
             n_iter = len(self.energy_list)
-            der = '-' 
+            der = '-'
             if len(self.energy_list)>=3:
                 der = self.__get_energy_derivative()
             print('%d:\t%0.6f\t%0.6f\t%0.6f\t%s'%(n_iter , fw_energy, bw_energy,
@@ -183,7 +183,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             self.energy_list.append(fw_energy+bw_energy)
         except NameError:
             pass
-        self.similarityMetric.freeIteration()
+        self.similarity_metric.freeIteration()
         inv_iter = self.inversion_iter
         inv_tol = self.inversion_tolerance
         self.forward_model.backward = np.array(
@@ -194,14 +194,14 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
                 self.backward_model.forward, bb_shape, inv_iter, inv_tol, None))
         self.forward_model.forward = np.array(
             self.invert_vector_field(
-                self.forward_model.backward, ff_shape, inv_iter, inv_tol, 
+                self.forward_model.backward, ff_shape, inv_iter, inv_tol,
                 self.forward_model.forward))
         self.backward_model.forward = np.array(
             self.invert_vector_field(
-                self.backward_model.backward, bf_shape, inv_iter, inv_tol, 
+                self.backward_model.backward, bf_shape, inv_iter, inv_tol,
                 self.backward_model.forward))
         if show_images:
-            self.similarityMetric.report_status()
+            self.similarity_metric.report_status()
         #toc = time.time()
         #print('Iter time: %f sec' % (toc - tic))
         return md_forward+md_backward
@@ -226,36 +226,36 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         if show_common_space:
             wmoving = self.backward_model.warp_backward(self.current_moving)
             wfixed = self.forward_model.warp_backward(self.current_fixed)
-            self.similarityMetric.setMovingImage(wmoving)
-            self.similarityMetric.useMovingImageDynamics(self.current_moving, 
-                                                         self.backward_model, 
+            self.similarity_metric.setMovingImage(wmoving)
+            self.similarity_metric.useMovingImageDynamics(self.current_moving,
+                                                         self.backward_model,
                                                          -1)
-            self.similarityMetric.setFixedImage(wfixed)
-            self.similarityMetric.useFixedImageDynamics(self.current_fixed, 
-                                                        self.forward_model, 
+            self.similarity_metric.setFixedImage(wfixed)
+            self.similarity_metric.useFixedImageDynamics(self.current_fixed,
+                                                        self.forward_model,
                                                         -1)
-            self.similarityMetric.initializeIteration()
-            self.similarityMetric.report_status()
+            self.similarity_metric.initializeIteration()
+            self.similarity_metric.report_status()
         else:
             phi1 = self.forward_model.forward
             phi2 = self.backward_model.backward
             phi1_inv = self.forward_model.backward
             phi2_inv = self.backward_model.forward
-            phi, mean_disp = self.updateRule.update(phi1, phi2)
-            phi_inv, mean_disp = self.updateRule.update(phi2_inv, phi1_inv)
+            phi, mean_disp = self.update_rule.update(phi1, phi2)
+            phi_inv, mean_disp = self.update_rule.update(phi2_inv, phi1_inv)
             composition = TransformationModel(phi, phi_inv, None, None)
             composition.scale_affines(0.5**level)
             residual, stats = composition.compute_inversion_error()
             print('Current inversion error: %0.6f (%0.6f)'%(stats[1], stats[2]))
             wmoving = composition.warp_forward(self.current_moving)
-            self.similarityMetric.setMovingImage(wmoving)
-            self.similarityMetric.useMovingImageDynamics(self.current_moving, 
+            self.similarity_metric.setMovingImage(wmoving)
+            self.similarity_metric.useMovingImageDynamics(self.current_moving,
                                                          composition, 1)
-            self.similarityMetric.setFixedImage(self.current_fixed)
-            self.similarityMetric.useFixedImageDynamics(self.current_fixed, 
+            self.similarity_metric.setFixedImage(self.current_fixed)
+            self.similarity_metric.useFixedImageDynamics(self.current_fixed,
                                                         None, 1)
-            self.similarityMetric.initializeIteration()
-            self.similarityMetric.report_status()            
+            self.similarity_metric.initializeIteration()
+            self.similarity_metric.report_status()
 
     def __optimize(self):
         r'''
@@ -266,21 +266,21 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             print 'Processing level', level
             self.current_fixed = self.fixed_pyramid[level]
             self.current_moving = self.moving_pyramid[level]
-            self.similarityMetric.useOriginalFixedImage(
+            self.similarity_metric.useOriginalFixedImage(
                 self.fixed_pyramid[level])
-            self.similarityMetric.useOriginalMovingImage(
+            self.similarity_metric.useOriginalMovingImage(
                 self.moving_pyramid[level])
-            self.similarityMetric.setLevelsBelow(self.levels-level)
-            self.similarityMetric.setLevelsAbove(level)
+            self.similarity_metric.setLevelsBelow(self.levels-level)
+            self.similarity_metric.setLevelsAbove(level)
             if level < self.levels - 1:
-                self.forward_model.upsample(self.current_fixed.shape, 
+                self.forward_model.upsample(self.current_fixed.shape,
                                            self.current_moving.shape)
-                self.backward_model.upsample(self.current_moving.shape, 
+                self.backward_model.upsample(self.current_moving.shape,
                                             self.current_fixed.shape)
             error = 1+self.tolerance
             niter = 0
             self.energy_list = []
-            while (niter<self.maxIter[level]) and (self.tolerance<error):
+            while (niter<self.max_iter[level]) and (self.tolerance<error):
                 niter += 1
                 error = self.__iterate()
             if self.report_status:
@@ -295,9 +295,9 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             self.backward_model.backward, self.backward_model.affine_pre_inv)
         tf.prepend_affine_to_displacement_field(
             self.backward_model.forward, self.backward_model.affine_pre)
-        self.forward_model.forward, mean_disp = self.updateRule.update(
+        self.forward_model.forward, mean_disp = self.update_rule.update(
             self.forward_model.forward, self.backward_model.backward)
-        self.forward_model.backward, mean_disp_inv = self.updateRule.update(
+        self.forward_model.backward, mean_disp_inv = self.update_rule.update(
             self.backward_model.forward, self.forward_model.backward)
         self.forward_model.affine_pre = None
         self.forward_model.affine_pre_inv = None
@@ -311,8 +311,8 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
 
     def optimize(self):
         print 'Optimizer parameters:\n', self.parameters
-        print 'Metric:', self.similarityMetric.getMetricName()
-        print 'Metric parameters:\n', self.similarityMetric.parameters
+        print 'Metric:', self.similarity_metric.getMetricName()
+        print 'Metric parameters:\n', self.similarity_metric.parameters
         self.__optimize()
 
 def test_optimizer_monomodal_2d():
@@ -331,13 +331,13 @@ def test_optimizer_monomodal_2d():
     fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
     ################Configure and run the Optimizer#####################
     max_iter = [i for i in [25, 50, 100]]
-    similarity_metric = SSDMetric({'symmetric':True, 
-                                'lambda':5.0, 
+    similarity_metric = SSDMetric({'symmetric':True,
+                                'lambda':5.0,
                                 'stepType':SSDMetric.GAUSS_SEIDEL_STEP})
     update_rule = UpdateRule.Composition()
-    registration_optimizer = SymmetricRegistrationOptimizer(fixed, moving, 
-                                                         None, None, 
-                                                         similarity_metric, 
+    registration_optimizer = SymmetricRegistrationOptimizer(fixed, moving,
+                                                         None, None,
+                                                         similarity_metric,
                                                          update_rule, max_iter)
     registration_optimizer.optimize()
     #######################show results#################################
@@ -347,15 +347,15 @@ def test_optimizer_monomodal_2d():
     fixed_to_moving = np.array(tf.warp_image(fixed, direct_inverse))
     rcommon.overlayImages(moving_to_fixed, fixed, True)
     rcommon.overlayImages(fixed_to_moving, moving, True)
-    direct_residual, stats = tf.compose_vector_fields(displacement, 
+    direct_residual, stats = tf.compose_vector_fields(displacement,
                                                      direct_inverse)
     direct_residual = np.array(direct_residual)
-    rcommon.plotDiffeomorphism(displacement, direct_inverse, direct_residual, 
+    rcommon.plotDiffeomorphism(displacement, direct_inverse, direct_residual,
                                'inv-direct', 7)
 
 def test_optimizer_multimodal_2d(lambda_param):
     r'''
-    Registers one of the mid-slices (axial, coronal or sagital) of each input 
+    Registers one of the mid-slices (axial, coronal or sagital) of each input
     volume (the volumes are expected to be from diferent modalities and
     should already be affine-registered, for example Brainweb t1 vs t2)
     '''
@@ -365,14 +365,14 @@ def test_optimizer_multimodal_2d(lambda_param):
 #    fnameFixed = 'data/C.png'
     nifti = True
     if nifti:
-        nib_moving  =  nib.load(fname_moving)
-        nib_fixed  =  nib.load(fname_fixed)
+        nib_moving = nib.load(fname_moving)
+        nib_fixed = nib.load(fname_fixed)
         moving = nib_moving.get_data().squeeze().astype(np.float64)
         fixed = nib_fixed.get_data().squeeze().astype(np.float64)
         moving = np.copy(moving, order = 'C')
         fixed = np.copy(fixed, order = 'C')
         shape_moving = moving.shape
-        shape_fixed = fixed.shape    
+        shape_fixed = fixed.shape
         moving = moving[:, shape_moving[1]//2, :].copy()
         fixed = fixed[:, shape_fixed[1]//2, :].copy()
         moving = (moving-moving.min())/(moving.max()-moving.min())
@@ -387,27 +387,27 @@ def test_optimizer_multimodal_2d(lambda_param):
         moving = (moving-moving.min())/(moving.max() - moving.min())
         fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
     max_iter = [i for i in [25, 50, 100]]
-    similarity_metric = EMMetric({'symmetric':True, 
-                               'lambda':lambda_param, 
-                               'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 
-                               'qLevels':256, 
+    similarity_metric = EMMetric({'symmetric':True,
+                               'lambda':lambda_param,
+                               'stepType':SSDMetric.GAUSS_SEIDEL_STEP,
+                               'qLevels':256,
                                'maxInnerIter':20,
                                'useDoubleGradient':True,
-                               'maxStepLength':0.25})    
+                               'maxStepLength':0.25})
     update_rule = UpdateRule.Composition()
     print('Generating synthetic field...')
     #----apply synthetic deformation field to fixed image
-    ground_truth = rcommon.createDeformationField2D_type2(fixed.shape[0], 
+    ground_truth = rcommon.createDeformationField2D_type2(fixed.shape[0],
                                               fixed.shape[1], 8)
     warped_fixed = rcommon.warpImage(fixed, ground_truth)
     print('Registering T2 (template) to deformed T1 (template)...')
     plt.figure()
     rcommon.overlayImages(warped_fixed, moving, False)
-    registration_optimizer = SymmetricRegistrationOptimizer(warped_fixed, 
+    registration_optimizer = SymmetricRegistrationOptimizer(warped_fixed,
                                                             moving,
-                                                            None, None, 
-                                                            similarity_metric, 
-                                                            update_rule, 
+                                                            None, None,
+                                                            similarity_metric,
+                                                            update_rule,
                                                             max_iter)
     registration_optimizer.optimize()
     #######################show results#################################
@@ -416,12 +416,12 @@ def test_optimizer_multimodal_2d(lambda_param):
     moving_to_fixed = np.array(tf.warp_image(moving, displacement))
     fixed_to_moving = np.array(tf.warp_image(warped_fixed, direct_inverse))
     rcommon.overlayImages(moving_to_fixed, fixed_to_moving, True)
-    direct_residual, stats = tf.compose_vector_fields(displacement, 
+    direct_residual, stats = tf.compose_vector_fields(displacement,
                                                      direct_inverse)
     direct_residual = np.array(direct_residual)
-    rcommon.plotDiffeomorphism(displacement, direct_inverse, direct_residual, 
+    rcommon.plotDiffeomorphism(displacement, direct_inverse, direct_residual,
                                'inv-direct', 7)
-    
+
     residual = ((displacement-ground_truth))**2
     mean_displacement_error = np.sqrt(residual.sum(2)*(warped_fixed>0)).mean()
     stdev_displacement_error = np.sqrt(residual.sum(2)*(warped_fixed>0)).std()
@@ -434,7 +434,7 @@ if __name__ == '__main__':
     end_time = time.time()
     print('Registration time: %f sec' % (end_time - start_time))
     #testRegistrationOptimizerMonomodal2D()
-    
+
 #    import nibabel as nib
 #    result = nib.load('data/circleToC.nii.gz')
 #    result = result.get_data().astype(np.double)

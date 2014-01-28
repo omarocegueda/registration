@@ -253,7 +253,7 @@ def register_3d(params):
         'useDoubleGradient':False if params.single_gradient else True,
         'maxInnerIter':int(params.inner_iter)}
     optimizer_parameters = {
-        'maxIter':[int(i) for i in params.iter.split('x')],
+        'max_iter':[int(i) for i in params.iter.split('x')],
         'inversion_iter':int(params.inversion_iter),
         'inversion_tolerance':float(params.inversion_tolerance),
         'report_status':True if params.report_status else False}
