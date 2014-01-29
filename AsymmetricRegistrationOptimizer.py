@@ -153,7 +153,7 @@ class AsymmetricRegistrationOptimizer(RegistrationOptimizer):
         print 'Outer iter:', self.maxIter
         print 'Metric:',self.similarityMetric.getMetricName()
         print 'Metric parameters:\n',self.similarityMetric.parameters
-        self.__optimize_asymmetric()
+        self.__optimize()
 
 def testRegistrationOptimizerMonomodal2D():
     fnameMoving='data/circle.png'

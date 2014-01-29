@@ -394,14 +394,19 @@ def test_optimizer_multimodal_2d(lambda_param):
         fixed = np.copy(fixed, order = 'C')
         moving = (moving-moving.min())/(moving.max() - moving.min())
         fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
-    max_iter = [i for i in [25, 50, 100]]
+    max_iter = [i for i in [25, 25, 100]]
     similarity_metric = EMMetric({'symmetric':True,
                                'lambda':lambda_param,
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP,
-                               'qLevels':256,
-                               'maxInnerIter':20,
-                               'useDoubleGradient':True,
-                               'maxStepLength':0.25})
+                               'q_levels':256,
+                               'max_inner_iter':20,
+                               'use_double_gradient':True,
+                               'max_step_length':0.25})
+    optimizer_parameters = {
+        'max_iter':max_iter,
+        'inversion_iter':20,
+        'inversion_tolerance':1e-3,
+        'report_status':True}
     update_rule = UpdateRule.Composition()
     print('Generating synthetic field...')
     #----apply synthetic deformation field to fixed image
@@ -416,7 +421,7 @@ def test_optimizer_multimodal_2d(lambda_param):
                                                             None, None,
                                                             similarity_metric,
                                                             update_rule,
-                                                            max_iter)
+                                                            optimizer_parameters)
     registration_optimizer.optimize()
     #######################show results#################################
     displacement = registration_optimizer.get_forward()
