@@ -43,7 +43,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
 
     def __connect_functions(self):
         r'''
-        Assigns the appropriate functions to be called displacement field
+        Assigns the appropriate functions to be called for displacement field
         inversion according to the dimension of the input images
         '''
         if self.dim == 2:
@@ -144,20 +144,20 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         #tic = time.time()
         wmoving = self.backward_model.warp_backward(self.current_moving)
         wfixed = self.forward_model.warp_backward(self.current_fixed)
-        self.similarity_metric.setMovingImage(wmoving)
-        self.similarity_metric.useMovingImageDynamics(self.current_moving,
+        self.similarity_metric.set_moving_image(wmoving)
+        self.similarity_metric.use_moving_image_dynamics(self.current_moving,
                                                      self.backward_model, -1)
-        self.similarity_metric.setFixedImage(wfixed)
-        self.similarity_metric.useFixedImageDynamics(self.current_fixed,
+        self.similarity_metric.set_fixed_image(wfixed)
+        self.similarity_metric.use_fixed_image_dynamics(self.current_fixed,
                                                     self.forward_model, -1)
-        self.similarity_metric.initializeIteration()
+        self.similarity_metric.initialize_iteration()
         ff_shape = np.array(self.forward_model.forward.shape).astype(np.int32)
         fb_shape = np.array(self.forward_model.backward.shape).astype(np.int32)
         bf_shape = np.array(self.backward_model.forward.shape).astype(np.int32)
         bb_shape = np.array(self.backward_model.backward.shape).astype(np.int32)
         del self.forward_model.backward
         del self.backward_model.backward
-        fw_step = self.similarity_metric.computeForward()
+        fw_step = self.similarity_metric.compute_forward()
         self.forward_model.forward, md_forward = self.update_rule.update(
             self.forward_model.forward, fw_step)
         del fw_step
@@ -165,7 +165,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             fw_energy = self.similarity_metric.energy
         except NameError:
             pass
-        bw_step = self.similarity_metric.computeBackward()
+        bw_step = self.similarity_metric.compute_backward()
         self.backward_model.forward, md_backward = self.update_rule.update(
             self.backward_model.forward, bw_step)
         del bw_step
@@ -183,7 +183,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             self.energy_list.append(fw_energy+bw_energy)
         except NameError:
             pass
-        self.similarity_metric.freeIteration()
+        self.similarity_metric.free_iteration()
         inv_iter = self.inversion_iter
         inv_tol = self.inversion_tolerance
         self.forward_model.backward = np.array(
@@ -226,15 +226,14 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         if show_common_space:
             wmoving = self.backward_model.warp_backward(self.current_moving)
             wfixed = self.forward_model.warp_backward(self.current_fixed)
-            self.similarity_metric.setMovingImage(wmoving)
-            self.similarity_metric.useMovingImageDynamics(self.current_moving,
-                                                         self.backward_model,
-                                                         -1)
-            self.similarity_metric.setFixedImage(wfixed)
-            self.similarity_metric.useFixedImageDynamics(self.current_fixed,
+            self.similarity_metric.set_moving_image(wmoving)
+            self.similarity_metric.use_moving_image_dynamics(
+                self.current_moving, self.backward_model, -1)
+            self.similarity_metric.set_fixed_image(wfixed)
+            self.similarity_metric.use_moving_image_dynamics(self.current_fixed,
                                                         self.forward_model,
                                                         -1)
-            self.similarity_metric.initializeIteration()
+            self.similarity_metric.initialize_iteration()
             self.similarity_metric.report_status()
         else:
             phi1 = self.forward_model.forward
@@ -248,13 +247,13 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             residual, stats = composition.compute_inversion_error()
             print('Current inversion error: %0.6f (%0.6f)'%(stats[1], stats[2]))
             wmoving = composition.warp_forward(self.current_moving)
-            self.similarity_metric.setMovingImage(wmoving)
-            self.similarity_metric.useMovingImageDynamics(self.current_moving,
-                                                         composition, 1)
-            self.similarity_metric.setFixedImage(self.current_fixed)
+            self.similarity_metric.set_moving_image(wmoving)
+            self.similarity_metric.use_moving_image_dynamics(
+                self.current_moving, composition, 1)
+            self.similarity_metric.set_fixed_image(self.current_fixed)
             self.similarity_metric.useFixedImageDynamics(self.current_fixed,
                                                         None, 1)
-            self.similarity_metric.initializeIteration()
+            self.similarity_metric.initialize_iteration()
             self.similarity_metric.report_status()
 
     def __optimize(self):
@@ -266,12 +265,12 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             print 'Processing level', level
             self.current_fixed = self.fixed_pyramid[level]
             self.current_moving = self.moving_pyramid[level]
-            self.similarity_metric.useOriginalFixedImage(
+            self.similarity_metric.use_original_fixed_image(
                 self.fixed_pyramid[level])
-            self.similarity_metric.useOriginalMovingImage(
+            self.similarity_metric.use_original_fixed_image(
                 self.moving_pyramid[level])
-            self.similarity_metric.setLevelsBelow(self.levels-level)
-            self.similarity_metric.setLevelsAbove(level)
+            self.similarity_metric.set_levels_below(self.levels-level)
+            self.similarity_metric.set_levels_above(level)
             if level < self.levels - 1:
                 self.forward_model.upsample(self.current_fixed.shape,
                                            self.current_moving.shape)
@@ -311,7 +310,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
 
     def optimize(self):
         print 'Optimizer parameters:\n', self.parameters
-        print 'Metric:', self.similarity_metric.getMetricName()
+        print 'Metric:', self.similarity_metric.get_metric_name()
         print 'Metric parameters:\n', self.similarity_metric.parameters
         self.__optimize()
 

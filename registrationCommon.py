@@ -248,7 +248,7 @@ def applyRigidTransformation3D(image, beta):
 def pyramid_gaussian_3D(image, max_layer, mask=None):
     yield image.copy().astype(np.float64)
     for i in range(max_layer):
-        newImage=sp.ndimage.filters.gaussian_filter(image, 1.0/6.0)[::2,::2,::2].copy()
+        newImage=sp.ndimage.filters.gaussian_filter(image, 2.0/3.0)[::2,::2,::2].copy()
         if(mask!=None):
             mask=mask[::2,::2,::2]
             newImage*=mask

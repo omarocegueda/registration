@@ -221,8 +221,7 @@ def save_registration_results(init_affine, displacement, inverse, params):
         to_warp = to_warp.copy(order='C')
         base_warp = rcommon.getBaseFileName(name)
         warped = np.array(
-            tf.warp_discrete_volumeNN(to_warp, displacement)
-            ).astype(np.int16)
+            tf.warp_discrete_volumeNN(to_warp, displacement)).astype(np.int16)
         img_warped = nib.Nifti1Image(warped, fixed_affine)
         img_warped.to_filename('warpedDiff_'+base_warp+'_'+base_fixed+'.nii.gz')
     #---finally, the optional output
@@ -249,9 +248,9 @@ def register_3d(params):
     ####Initialize parameter dictionaries####
     metric_parameters = {
         'lambda':float(params.smooth),
-        'qLevels':int(params.quantization_levels),
-        'useDoubleGradient':False if params.single_gradient else True,
-        'maxInnerIter':int(params.inner_iter)}
+        'q_levels':int(params.quantization_levels),
+        'use_double_gradient':False if params.single_gradient else True,
+        'max_inner_iter':int(params.inner_iter)}
     optimizer_parameters = {
         'max_iter':[int(i) for i in params.iter.split('x')],
         'inversion_iter':int(params.inversion_iter),

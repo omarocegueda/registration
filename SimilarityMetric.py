@@ -1,3 +1,7 @@
+'''
+Defines the contract that must be fulfilled by the especialized similarity 
+metrics to be used with a RegistrationOptimizer
+'''
 import abc
 class SimilarityMetric(object):
     '''
@@ -10,43 +14,55 @@ class SimilarityMetric(object):
     '''
     __metaclass__ = abc.ABCMeta
     def __init__(self, parameters):
-        defaultParameters = self.getDefaultParameters()
+        default_parameters = self.get_default_parameters()
         for key, val in parameters.iteritems():
-            if key in defaultParameters:
-                defaultParameters[key] = val
+            if key in default_parameters:
+                default_parameters[key] = val
             else:
-                print "Warning: parameter '",key,"' unknown. Ignored."
-        self.parameters = defaultParameters
-        self.setFixedImage(None)
-        self.setMovingImage(None)
+                print "Warning: parameter '", key, "' unknown. Ignored."
+        self.parameters = default_parameters
+        self.set_fixed_image(None)
+        self.set_moving_image(None)
+        self.levels_above = 0
+        self.levels_below = 0
         self.symmetric = False
         self.dim = None
 
-    def setLevelsBelow(self, levels):
-        self.levelsBelow = levels
+    def set_levels_below(self, levels):
+        r'''
+        Informs this metric the number of pyramid levels below the current one.
+        The metric may change its behavior (e.g. number of inner iterations)
+        accordingly
+        '''
+        self.levels_below = levels
 
-    def setLevelsAbove(self, levels):
-        self.levelsAbove = levels
+    def set_levels_above(self, levels):
+        r'''
+        Informs this metric the number of pyramid levels above the current one.
+        The metric may change its behavior (e.g. number of inner iterations)
+        accordingly
+        '''
+        self.levels_above = levels
 
-    def setFixedImage(self, fixedImage):
+    def set_fixed_image(self, fixed_image):
         '''
         Sets the fixed image. The dimension the similarity metric operates on
         is defined as the dimension of the last image (fixed or moving) passed
         to it
         '''
-        self.dim = len(fixedImage.shape) if fixedImage != None else 0
-        self.fixedImage = fixedImage
+        self.dim = len(fixed_image.shape) if fixed_image != None else 0
+        self.fixed_image = fixed_image
 
     @abc.abstractmethod
-    def getMetricName(self):
+    def get_metric_name(self):
         '''
         Must return the name of the metric that specializes this generic metric
         '''
         pass
 
     @abc.abstractmethod
-    def useFixedImageDynamics(self,
-                              originalFixedImage,
+    def use_fixed_image_dynamics(self,
+                              original_fixed_image,
                               transformation,
                               direction):
         '''
@@ -55,13 +71,12 @@ class SimilarityMetric(object):
         (as the transformation of an original fixed image). This method is
         called by the optimizer just after it sets the fixed image.
         Transformation will be an instance of TransformationModel or None if
-        the originalMovingImage equals self.movingImage. Direction is either 1
+        the originalMovingImage equals self.moving_image. Direction is either 1
         (warp forward) or -1(warp backward)
         '''
-        pass
 
     @abc.abstractmethod
-    def useOriginalFixedImage(self, originalFixedImage):
+    def use_original_fixed_image(self, original_fixed_image):
         '''
         This methods provides the metric a chance to compute any useful
         information from the original moving image (to be used along with the
@@ -70,19 +85,18 @@ class SimilarityMetric(object):
         image only and then warp this binary mask instead of thresholding
         at each iteration, which might cause artifacts due to interpolation)
         '''
-        pass
 
-    def setMovingImage(self, movingImage):
+    def set_moving_image(self, moving_image):
         '''
         Sets the moving image. The dimension the similarity metric operates on
         is defined as the dimension of the last image (fixed or moving) passed
         to it
         '''
-        self.dim = len(movingImage.shape) if movingImage != None else 0
-        self.movingImage = movingImage
+        self.dim = len(moving_image.shape) if moving_image != None else 0
+        self.moving_image = moving_image
 
     @abc.abstractmethod
-    def useOriginalMovingImage(self, originalMovingImage):
+    def use_original_moving_image(self, original_moving_image):
         '''
         This methods provides the metric a chance to compute any useful
         information from the original moving image (to be used along with the
@@ -91,11 +105,10 @@ class SimilarityMetric(object):
         image only and then warp this binary mask instead of thresholding
         at each iteration, which might cause artifacts due to interpolation)
         '''
-        pass
 
     @abc.abstractmethod
-    def useMovingImageDynamics(self,
-                               originalMovingImage,
+    def use_moving_image_dynamics(self,
+                               original_moving_image,
                                transformation,
                                direction):
         '''
@@ -104,13 +117,12 @@ class SimilarityMetric(object):
         (as the transformation of an original fixed image). This method is
         called by the optimizer just after it sets the fixed image.
         Transformation will be an instance of TransformationModel or None if
-        the originalMovingImage equals self.movingImage. Direction is either 1
+        the originalMovingImage equals self.moving_image. Direction is either 1
         (warp forward) or -1(warp backward)
         '''
-        pass
 
     @abc.abstractmethod
-    def initializeIteration(self):
+    def initialize_iteration(self):
         '''
         This method will be called before any computeUpdate or computeInverse
         call, this gives the chance to the Metric to precompute any useful
@@ -118,50 +130,47 @@ class SimilarityMetric(object):
         was needed in ANTS because the updates are called once per voxel. In
         Python this is unpractical, though.
         '''
-        return NotImplemented
 
     @abc.abstractmethod
-    def freeIteration(self):
+    def free_iteration(self):
         '''
         This method is called by the RegistrationOptimizer after the required
         iterations have been computed (forward and/or backward) so that the
         SimilarityMetric can safely delete any data it computed as part of the
         initialization
         '''
-        return NotImplemented
 
     @abc.abstractmethod
-    def computeForward(self):
+    def compute_forward(self):
         '''
         Must return the forward update field for a gradient-based optimization
         algorithm
         '''
-        return NotImplemented
 
     @abc.abstractmethod
-    def computeBackward(self):
+    def compute_backward(self):
         '''
         Must return the inverse update field for a gradient-based optimization
         algorithm
         '''
-        return NotImplemented
 
     @abc.abstractmethod
-    def getEnergy(self):
+    def get_energy(self):
         '''
         Must return the numeric value of the similarity between the given fixed
         and moving images
         '''
-        return NotImplemented
 
     @abc.abstractmethod
-    def getDefaultParameters(self):
-        return NotImplemented
+    def get_default_parameters(self):
+        r'''
+        Derived classes must return a dictionary containing its parameter names
+        and default values
+        '''
 
     @abc.abstractmethod
-    def reportStatus(self):
+    def report_status(self):
         '''
         This function is called mostly for debugging purposes. The metric
         can for example show the overlaid images or print some statistics
         '''
-        return NotImplemented
