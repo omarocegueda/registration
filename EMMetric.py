@@ -55,20 +55,20 @@ class EMMetric(SimilarityMetric):
             self.quantize = tf.quantizePositiveImageCYTHON
             self.compute_stats = tf.computeMaskedImageClassStatsCYTHON
             if self.iteration_type == EMMetric.SINGLECYCLE_ITER:
-                self.multi_resolution_iteration = SSDMetric.singleCycle2D
+                self.multi_resolution_iteration = SSDMetric.single_cycle_2d
             elif self.iteration_type == EMMetric.VCYCLE_ITER:
-                self.multi_resolution_iteration = SSDMetric.vCycle2D
+                self.multi_resolution_iteration = SSDMetric.v_cycle_2d
             else:
-                self.multi_resolution_iteration = SSDMetric.wCycle2D
+                self.multi_resolution_iteration = SSDMetric.w_cycle_2d
         else:
             self.quantize = tf.quantizePositiveVolumeCYTHON
             self.compute_stats = tf.computeMaskedVolumeClassStatsCYTHON
             if self.iteration_type == EMMetric.SINGLECYCLE_ITER:
-                self.multi_resolution_iteration = SSDMetric.singleCycle3D
+                self.multi_resolution_iteration = SSDMetric.single_cycle_3d
             elif self.iteration_type == EMMetric.VCYCLE_ITER:
-                self.multi_resolution_iteration = SSDMetric.vCycle3D
+                self.multi_resolution_iteration = SSDMetric.v_cycle_3d
             else:
-                self.multi_resolution_iteration = SSDMetric.wCycle3D
+                self.multi_resolution_iteration = SSDMetric.w_cycle_3d
         if self.step_type == EMMetric.DEMONS_STEP:
             self.compute_step = self.compute_demons_step
         else:
