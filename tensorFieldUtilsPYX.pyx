@@ -71,8 +71,10 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int warpDiscreteVolumeNNAffine(int *volume, int nsVol, int nrVol, int ncVol, double *affine, int *warped, int nsRef, int nrRef, int ncRef)
     int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d1, int nslices, int nrows, int ncols, double *affinePre, double *affinePost, int *warped)
     int invertVectorField3D(double *forward, int nslices, int nrows, int ncols, double lambdaParam, int maxIter, double tolerance, double *inv, double *stats)
-    int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
-    int appendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine)
+    int prependAffineToDisplacementField2D(double *d1, int nrows, int ncols, double *affine)
+    int prependAffineToDisplacementField3D(double *d1, int nslices, int nrows, int ncols, double *affine)
+    int appendAffineToDisplacementField2D(double *d1, int nrows, int ncols, double *affine)
+    int appendAffineToDisplacementField3D(double *d1, int nslices, int nrows, int ncols, double *affine)
     void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg)
     int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal)
     int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jacard, int nlabels)
@@ -279,9 +281,12 @@ cpdef iterate_residual_displacement_field_SSD2D(double[:,:] deltaField, double[:
     dims[1]=deltaField.shape[1]
     cdef double retVal
     cdef double *targetPointer=NULL
+    cdef double *sigmaFieldPointer=NULL
+    if sigmaField!=None:
+        sigmaFieldPointer=&sigmaField[0,0]
     if target!=None:
         targetPointer=&target[0,0,0]
-    retVal=iterateResidualDisplacementFieldSSD2D(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0])
+    retVal=iterateResidualDisplacementFieldSSD2D(&deltaField[0,0], sigmaFieldPointer, &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0])
 
 cpdef compute_residual_displacement_field_SSD3D(double[:,:,:] deltaField, double[:,:,:] sigmaField, double[:,:,:,:] gradientField,  double[:,:,:,:] target, double lambdaParam, double[:,:,:,:] displacementField, double[:,:,:,:] residual):
     cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
@@ -314,11 +319,14 @@ cpdef compute_residual_displacement_field_SSD2D(double[:,:] deltaField, double[:
     dims[1]=deltaField.shape[1]
     cdef int retVal
     cdef double *targetPointer=NULL
+    cdef double *sigmaFieldPointer=NULL
+    if sigmaField!=None:
+        sigmaFieldPointer=&sigmaField[0,0]
     if target!=None:
         targetPointer=&target[0,0,0]
     if residual==None:
         residual=np.empty(shape=(dims[0], dims[1], 2), dtype=np.double)
-    retVal=computeResidualDisplacementFieldSSD2D(&deltaField[0,0], &sigmaField[0,0], &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0], &residual[0,0,0])    
+    retVal=computeResidualDisplacementFieldSSD2D(&deltaField[0,0], sigmaFieldPointer, &gradientField[0,0,0], targetPointer, &dims[0], lambdaParam, &displacementField[0,0,0], &residual[0,0,0])    
     return residual
 
 cpdef compute_energy_SSD2D(double[:,:] deltaField, double[:,:] sigmaField, double[:,:,:] gradientField,  double lambdaParam, double[:,:,:] displacementField):
@@ -826,23 +834,39 @@ def invert_vector_field_fixed_point3D(double[:,:,:,:] d, int[:] inverseShape, in
     #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
-def prepend_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
+def prepend_affine_to_displacement_field_2d(double[:,:,:] d, double[:,:] affine):
+    if affine==None:
+        return
+    cdef int retVal
+    cdef int nrows=d.shape[0]
+    cdef int ncols=d.shape[1]
+    retVal=prependAffineToDisplacementField2D(&d[0,0,0], nrows, ncols, &affine[0,0])
+
+def prepend_affine_to_displacement_field_3d(double[:,:,:,:] d, double[:,:] affine):
     if affine==None:
         return
     cdef int retVal
     cdef int nslices=d.shape[0]
     cdef int nrows=d.shape[1]
     cdef int ncols=d.shape[2]
-    retVal=prependAffineToDisplacementField(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
+    retVal=prependAffineToDisplacementField3D(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
     
-def append_affine_to_displacement_field(double[:,:,:,:] d, double[:,:] affine):
+def append_affine_to_displacement_field_3d(double[:,:,:,:] d, double[:,:] affine):
     if affine==None:
         return
     cdef int retVal
     cdef int nslices=d.shape[0]
     cdef int nrows=d.shape[1]
     cdef int ncols=d.shape[2]
-    retVal=appendAffineToDisplacementField(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
+    retVal=appendAffineToDisplacementField3D(&d[0,0,0,0], nslices, nrows, ncols, &affine[0,0])
+
+def append_affine_to_displacement_field_2d(double[:,:,:] d, double[:,:] affine):
+    if affine==None:
+        return
+    cdef int retVal
+    cdef int nrows=d.shape[0]
+    cdef int ncols=d.shape[1]
+    retVal=appendAffineToDisplacementField2D(&d[0,0,0], nrows, ncols, &affine[0,0])
 
 def get_displacement_range(double[:,:,:,:] d, double[:,:] affine):
     cdef int retVal

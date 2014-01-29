@@ -54,7 +54,7 @@ def estimateNewMonomodalSyNField2D(moving, fixed, fWarp, fInv, mWarp, mInv, lamb
         maxInnerIter=1000
         while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
-            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, movingGradient,  lambdaParam, totalF, fw, None)
+            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, movingGradient,  lambdaParam, fw, None)
         #fw*=0.5
         totalF, stats=tf.compose_vector_fields(fw, totalF)
         totalF=np.array(totalF);
@@ -70,19 +70,19 @@ def estimateNewMonomodalSyNField2D(moving, fixed, fWarp, fInv, mWarp, mInv, lamb
         maxInnerIter=1000
         while((maxVariation>innerTolerance)and(innerIter<maxInnerIter)):
             innerIter+=1
-            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, fixedGradient,  lambdaParam, totalM, mw, None)
+            maxVariation=tf.iterateDisplacementField2DCYTHON(deltaField, sigmaField, fixedGradient,  lambdaParam, mw, None)
         #mw*=0.5
         totalM, stats=tf.compose_vector_fields(mw, totalM)
         totalM=np.array(totalM);
         meanDispM=np.mean(np.abs(mw))
-        #totalFInv=np.array(tf.invert_vector_field_fixed_point(totalF, 20, 1e-6))
-        #totalMInv=np.array(tf.invert_vector_field_fixed_point(totalM, 20, 1e-6))
-        #totalF=np.array(tf.invert_vector_field_fixed_point(totalFInv, 20, 1e-6))
-        #totalM=np.array(tf.invert_vector_field_fixed_point(totalMInv, 20, 1e-6))
-        totalFInv=np.array(tf.invert_vector_field(totalF, 0.75, 100, 1e-6))
-        totalMInv=np.array(tf.invert_vector_field(totalM, 0.75, 100, 1e-6))
-        totalF=np.array(tf.invert_vector_field(totalFInv, 0.75, 100, 1e-6))
-        totalM=np.array(tf.invert_vector_field(totalMInv, 0.75, 100, 1e-6))
+        totalFInv=np.array(tf.invert_vector_field_fixed_point(totalF, None, 20, 1e-3, None))
+        totalMInv=np.array(tf.invert_vector_field_fixed_point(totalM, None, 20, 1e-3, None))
+        totalF=np.array(tf.invert_vector_field_fixed_point(totalFInv, None, 20, 1e-3, None))
+        totalM=np.array(tf.invert_vector_field_fixed_point(totalMInv, None, 20, 1e-3, None))
+#        totalFInv=np.array(tf.invert_vector_field(totalF, 0.75, 100, 1e-6))
+#        totalMInv=np.array(tf.invert_vector_field(totalM, 0.75, 100, 1e-6))
+#        totalF=np.array(tf.invert_vector_field(totalFInv, 0.75, 100, 1e-6))
+#        totalM=np.array(tf.invert_vector_field(totalMInv, 0.75, 100, 1e-6))
         if(meanDispM+meanDispF<2*outerTolerance):
             break
     print "Iter: ",innerIter, "Mean lateral displacement:", 0.5*(meanDispM+meanDispF), "Max variation:",maxVariation

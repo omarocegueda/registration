@@ -84,11 +84,11 @@ class SSDMetric(SimilarityMetric):
         gradient = self.gradient_moving+self.gradient_fixed
         displacement = np.zeros(shape = (shape)+(self.dim,), dtype = np.float64)
         if self.dim == 2:
-            displacement = w_cycle_2d(self.levels_below, max_inner_iter, 
+            self.energy = v_cycle_2d(self.levels_below, max_inner_iter, 
                                     delta_field, None, gradient, None, 
                                     lambda_param, displacement)
         else:
-            displacement = v_cycle_3d(self.levels_below, max_inner_iter,
+            self.energy = v_cycle_3d(self.levels_below, max_inner_iter,
                                     delta_field, None, gradient, None, 
                                     lambda_param, displacement)
         max_norm = np.sqrt(np.sum(displacement**2, -1)).max()
@@ -165,6 +165,9 @@ class SSDMetric(SimilarityMetric):
 
     def get_metric_name(self):
         return "SSDMetric"
+
+    def free_iteration(self):
+        pass
 #######################Multigrid algorithms for SSD-like metrics#############
 
 printEnergy = False

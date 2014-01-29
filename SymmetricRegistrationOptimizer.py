@@ -49,9 +49,13 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         if self.dim == 2:
             self.invert_vector_field = tf.invert_vector_field_fixed_point
             self.generate_pyramid = rcommon.pyramid_gaussian_2D
+            self.append_affine = tf.append_affine_to_displacement_field_2d
+            self.prepend_affine = tf.prepend_affine_to_displacement_field_2d
         else:
             self.invert_vector_field = tf.invert_vector_field_fixed_point3D
             self.generate_pyramid = rcommon.pyramid_gaussian_3D
+            self.append_affine = tf.append_affine_to_displacement_field_3d
+            self.prepend_affine = tf.prepend_affine_to_displacement_field_3d
 
     def __check_ready(self):
         r'''
@@ -157,7 +161,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         bb_shape = np.array(self.backward_model.backward.shape).astype(np.int32)
         del self.forward_model.backward
         del self.backward_model.backward
-        fw_step = self.similarity_metric.compute_forward()
+        fw_step = np.array(self.similarity_metric.compute_forward())
         self.forward_model.forward, md_forward = self.update_rule.update(
             self.forward_model.forward, fw_step)
         del fw_step
@@ -165,7 +169,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             fw_energy = self.similarity_metric.energy
         except NameError:
             pass
-        bw_step = self.similarity_metric.compute_backward()
+        bw_step = np.array(self.similarity_metric.compute_backward())
         self.backward_model.forward, md_backward = self.update_rule.update(
             self.backward_model.forward, bw_step)
         del bw_step
@@ -290,10 +294,10 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         residual, stats = self.backward_model.compute_inversion_error()
         print('Backward Residual error (Symmetric diffeomorphism):%0.6f (%0.6f)'
               %(stats[1], stats[2]))
-        tf.append_affine_to_displacement_field(
-            self.backward_model.backward, self.backward_model.affine_pre_inv)
-        tf.prepend_affine_to_displacement_field(
-            self.backward_model.forward, self.backward_model.affine_pre)
+        self.append_affine(self.backward_model.backward, 
+                         self.backward_model.affine_pre_inv)
+        self.prepend_affine(self.backward_model.forward, 
+                            self.backward_model.affine_pre)
         self.forward_model.forward, mean_disp = self.update_rule.update(
             self.forward_model.forward, self.backward_model.backward)
         self.forward_model.backward, mean_disp_inv = self.update_rule.update(
@@ -323,21 +327,26 @@ def test_optimizer_monomodal_2d():
     moving = plt.imread(fname_moving)
     fixed = plt.imread(fname_fixed)
     moving = moving[:, :, 0].astype(np.float64)
-    fixed = fixed[:, :, 1].astype(np.float64)
+    fixed = fixed[:, :, 0].astype(np.float64)
     moving = np.copy(moving, order = 'C')
     fixed = np.copy(fixed, order = 'C')
     moving = (moving-moving.min())/(moving.max() - moving.min())
     fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
     ################Configure and run the Optimizer#####################
-    max_iter = [i for i in [25, 50, 100]]
+    max_iter = [i for i in [20, 100, 100, 100]]
     similarity_metric = SSDMetric({'symmetric':True,
                                 'lambda':5.0,
                                 'stepType':SSDMetric.GAUSS_SEIDEL_STEP})
+    optimizer_parameters = {
+        'max_iter':max_iter,
+        'inversion_iter':40,
+        'inversion_tolerance':1e-3,
+        'report_status':True}
     update_rule = UpdateRule.Composition()
     registration_optimizer = SymmetricRegistrationOptimizer(fixed, moving,
                                                          None, None,
                                                          similarity_metric,
-                                                         update_rule, max_iter)
+                                                         update_rule, optimizer_parameters)
     registration_optimizer.optimize()
     #######################show results#################################
     displacement = registration_optimizer.get_forward()

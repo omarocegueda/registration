@@ -3271,7 +3271,21 @@ int warpDiscreteVolumeNN(int *volume, int nsVol, int nrVol, int ncVol, double *d
     return 0;
 }
 
-int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine){
+int prependAffineToDisplacementField2D(double *d1, int nrows, int ncols, double *affine){
+    if(affine==NULL){
+        return 0;
+    }
+    double *dx=d1;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, dx+=2){
+            dx[0]+=APPLY_AFFINE_2D_X0(i,j,affine)-i;
+            dx[1]+=APPLY_AFFINE_2D_X1(i,j,affine)-j;
+        }
+    }
+    return 0;
+}
+
+int prependAffineToDisplacementField3D(double *d1, int nslices, int nrows, int ncols, double *affine){
     if(affine==NULL){
         return 0;
     }
@@ -3288,7 +3302,7 @@ int prependAffineToDisplacementField(double *d1, int nslices, int nrows, int nco
     return 0;
 }
 
-int appendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncols, double *affine){
+int appendAffineToDisplacementField3D(double *d1, int nslices, int nrows, int ncols, double *affine){
     if(affine==NULL){
         return 0;
     }
@@ -3301,6 +3315,21 @@ int appendAffineToDisplacementField(double *d1, int nslices, int nrows, int ncol
                 dx[1]=APPLY_AFFINE_X1(dkk,dii,djj,affine)-i;
                 dx[2]=APPLY_AFFINE_X2(dkk,dii,djj,affine)-j;
             }
+        }
+    }
+    return 0;
+}
+
+int appendAffineToDisplacementField2D(double *d1, int nrows, int ncols, double *affine){
+    if(affine==NULL){
+        return 0;
+    }
+    double *dx=d1;
+    for(int i=0;i<nrows;++i){
+        for(int j=0;j<ncols;++j, dx+=2){
+            double dii=dx[0]+i,djj=dx[1]+j;
+            dx[0]=APPLY_AFFINE_2D_X0(dii,djj,affine)-i;
+            dx[1]=APPLY_AFFINE_2D_X1(dii,djj,affine)-j;
         }
     }
     return 0;
@@ -3717,7 +3746,7 @@ int invertVectorFieldFixedPoint(double *d, int nr1, int nc1, int nr2, int nc2, i
     
     int nsitesInverse=2*nr2*nc2;
     int iter;
-    double epsilon=0.5;
+    double epsilon=0.25;
     for(iter=0;(iter<maxIter) && (tolerance<error);++iter){
         composeVectorFields(temp[iter&1], nr1, nc1, d, nr2, nc2, temp[1-(iter&1)], substats);
         double difmag=0;
