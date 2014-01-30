@@ -81,7 +81,8 @@ class SSDMetric(SimilarityMetric):
             delta_field = self.fixed_image-self.moving_image
         else:
             delta_field = self.moving_image - self.fixed_image
-        gradient = self.gradient_moving+self.gradient_fixed
+        #gradient = self.gradient_moving+self.gradient_fixed
+        gradient = self.gradient_moving
         displacement = np.zeros(shape = (shape)+(self.dim,), dtype = np.float64)
         if self.dim == 2:
             self.energy = v_cycle_2d(self.levels_below, max_inner_iter, 
@@ -252,7 +253,7 @@ def v_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
     '''
     #presmoothing
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD2D(delta_field,
+        tf.iterate_residual_displacement_field_SSD2D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
@@ -266,7 +267,13 @@ def v_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
                                              displacement)
             print 'Energy after top-level iter', i+1, ' [unique]:', energy
     if n == 0:
-        return error
+        try:
+            energy
+        except NameError:
+            energy = tf.compute_energy_SSD2D(delta_field, sigma_field, 
+                                         gradient_field, lambda_param, 
+                                         displacement)
+        return energy
     #solve at coarcer grid
     residual = None
     residual = tf.compute_residual_displacement_field_SSD2D(delta_field,
@@ -300,7 +307,7 @@ def v_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
         print 'Energy after low-res iteration:', energy
     #post-smoothing
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD2D(delta_field,
+        tf.iterate_residual_displacement_field_SSD2D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
@@ -519,7 +526,7 @@ def v_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
     '''
     #presmoothing
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD3D(delta_field,
+        tf.iterate_residual_displacement_field_SSD3D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
@@ -533,7 +540,13 @@ def v_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
                                              displacement)
             print 'Energy after top-level iter', i+1, ' [unique]:', energy
     if n == 0:
-        return error
+        try:
+            energy
+        except NameError:
+            energy = tf.compute_energy_SSD3D(delta_field, sigma_field,
+                                         gradient_field, lambda_param,
+                                         displacement)
+        return energy
     #solve at coarcer grid
     residual = tf.compute_residual_displacement_field_SSD3D(delta_field,
                                                             sigma_field,
@@ -570,7 +583,7 @@ def v_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
         print 'Energy after low-res iteration:', energy
     #post-smoothing
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD3D(delta_field,
+        tf.iterate_residual_displacement_field_SSD3D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,

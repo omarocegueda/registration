@@ -55,7 +55,7 @@ class Composition(UpdateRule):
         else:
             updated, stats = tf.compose_vector_fields3D(new_displacement, 
                                                         current_displacement)
-        return updated, mse
+        return np.array(updated), np.array(mse)
 
 class ProjectedComposition(UpdateRule):
     r'''

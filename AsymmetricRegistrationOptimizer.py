@@ -1,321 +1,346 @@
+'''
+Especialization of the registration optimizer to perform asymmetric
+(unidirectional) registration
+'''
 import time
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import nibabel as nib
 import registrationCommon as rcommon
 import tensorFieldUtils as tf
 import UpdateRule
-from TransformationModel import TransformationModel
 from SSDMetric import SSDMetric
 from EMMetric import EMMetric
 from RegistrationOptimizer import RegistrationOptimizer
 
 class AsymmetricRegistrationOptimizer(RegistrationOptimizer):
+    r'''
+    Performs the multi-resolution optimization algorithm for non-linear
+    registration using a given similarity metric and update rule (this
+    scheme was inspider on the ANTS package).
+    '''
     def get_default_parameters(self):
-        return {'maxIter':[25,50,100], 'inversionIter':20,
-                'inversionTolerance':1e-3, 'tolerance':1e-6, 
-                'reportStatus':True}
+        return {'max_iter':[25, 50, 100], 'inversion_iter':20,
+                'inversion_tolerance':1e-3, 'tolerance':1e-6,
+                'report_status':True}
 
-    def __init__(self, fixed=None, moving=None, affineFixed=None, affineMoving=None, similarityMetric=None, updateRule=None, parameters=None):
-        super(AsymmetricRegistrationOptimizer, self).__init__(fixed, moving, affineFixed, affineMoving, similarityMetric, updateRule, parameters)
-        print 'Warning: AsymmetricRegistrationOptimizer has not been maintained in a long time, it may not work properly. Use SymmetricRegistrationOptimizer instead'
-        self.setMaxIter(self.parameters['maxIter'])
-        self.tolerance=self.parameters['tolerance']
-        self.inversionTolerance=self.parameters['inversionTolerance']
-        self.inversionIter=self.parameters['inversionIter']
-        self.reportStatus=self.parameters['reportStatus']
+    def __init__(self,
+                 fixed = None,
+                 moving = None, affine_fixed = None,
+                 affine_moving = None,
+                 similarity_metric = None,
+                 update_rule = None,
+                 parameters = None):
+        super(AsymmetricRegistrationOptimizer, self).__init__(
+            fixed, moving, affine_fixed, affine_moving, similarity_metric,
+            update_rule, parameters)
+        print('Warning: AsymmetricRegistrationOptimizer has not been'
+              'maintained in a long time, it may not work properly.'
+              'Use SymmetricRegistrationOptimizer instead')
+        self.set_max_iter(self.parameters['max_iter'])
+        self.tolerance = self.parameters['tolerance']
+        self.inversion_tolerance = self.parameters['inversion_tolerance']
+        self.inversion_iter = self.parameters['inversion_iter']
+        self.report_status = self.parameters['report_status']
+        self.energy_list = []
 
-    def __connectFunctions(self):
-        if self.dim==2:
-            self.invertVectorField=tf.invert_vector_field_fixed_point
-            self.generatePyramid=rcommon.pyramid_gaussian_2D
+    def __connect_functions(self):
+        r'''
+        Assigns the appropriate functions to be called for displacement field
+        inversion and Gaussian pyramid according to the dimension of the
+        input images
+        '''
+        if self.dim == 2:
+            self.invert_vector_field = tf.invert_vector_field_fixed_point
+            self.generate_pyramid = rcommon.pyramid_gaussian_2D
         else:
-            self.invertVectorField=tf.invert_vector_field_fixed_point3D
-            self.generatePyramid=rcommon.pyramid_gaussian_3D
+            self.invert_vector_field = tf.invert_vector_field_fixed_point3D
+            self.generate_pyramid = rcommon.pyramid_gaussian_3D
 
-    def __checkReady(self):
-        ready=True
-        if self.fixed==None:
-            ready=False
-            print 'Error: Fixed image not set.'
-        elif self.dim!=len(self.fixed.shape):
-            ready=False
-            print 'Error: inconsistent dimensions. Last dimension update: %d. Fixed image dimension: %d.'%(self.dim, len(self.fixed.shape))
-        if self.moving==None:
-            ready=False
-            print 'Error: Moving image not set.'
-        elif self.dim!=len(self.moving.shape):
-            ready=False
-            print 'Error: inconsistent dimensions. Last dimension update: %d. Moving image dimension: %d.'%(self.dim, len(self.moving.shape))
-        if self.similarityMetric==None:
-            ready=False
-            print 'Error: Similarity metric not set.'
-        if self.updateRule==None:
-            ready=False
-            print 'Error: Update rule not set.'
-        if self.maxIter==None:
-            ready=False
-            print 'Error: Maximum number of iterations per level not set.'
+    def __check_ready(self):
+        r'''
+        Verifies that the configuration of the optimizer and input data are
+        consistent and the optimizer is ready to run
+        '''
+        ready  =  True
+        if self.fixed  ==  None:
+            ready  =  False
+            print('Error: Fixed image not set.')
+        elif self.dim !=  len(self.fixed.shape):
+            ready  =  False
+            print('Error: inconsistent dimensions. Last dimension update: %d.'
+                  'Fixed image dimension: %d.'%(self.dim,
+                                                len(self.fixed.shape)))
+        if self.moving  ==  None:
+            ready  =  False
+            print('Error: Moving image not set.')
+        elif self.dim !=  len(self.moving.shape):
+            ready  =  False
+            print('Error: inconsistent dimensions. Last dimension update: %d.'
+                  'Moving image dimension: %d.'%(self.dim,
+                                                 len(self.moving.shape)))
+        if self.similarity_metric  ==  None:
+            ready  =  False
+            print('Error: Similarity metric not set.')
+        if self.update_rule  ==  None:
+            ready  =  False
+            print('Error: Update rule not set.')
+        if self.max_iter  ==  None:
+            ready  =  False
+            print('Error: Maximum number of iterations per level not set.')
         return ready
 
-    def __initOptimizer(self):
-        ready=self.__checkReady()
-        self.__connectFunctions()
+    def __init_optimizer(self):
+        r'''
+        Computes the Gaussian Pyramid of the input images and allocates
+        the required memory for the transformation models at the coarcest
+        scale.
+        '''
+        ready = self.__check_ready()
+        self.__connect_functions()
         if not ready:
             print 'Not ready'
             return False
-        self.movingPyramid=[img for img in self.generatePyramid(self.moving, self.levels-1, np.ones_like(self.moving))]
-        self.fixedPyramid=[img for img in self.generatePyramid(self.fixed, self.levels-1, np.ones_like(self.fixed))]
-        startingForward=np.zeros(shape=self.fixedPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
-        startingForwardInv=np.zeros(shape=self.fixedPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
-        self.forwardModel.scaleAffines(0.5**(self.levels-1))
-        self.forwardModel.setForward(startingForward)
-        self.forwardModel.setBackward(startingForwardInv)
-        startingBackward=np.zeros(shape=self.movingPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
-        startingBackwardInverse=np.zeros(shape=self.fixedPyramid[self.levels-1].shape+(self.dim,), dtype=np.float64)
-        self.backwardModel.scaleAffines(0.5**(self.levels-1))
-        self.backwardModel.setForward(startingBackward)
-        self.backwardModel.setBackward(startingBackwardInverse)
+        self.moving_pyramid  =  [img for img
+                               in self.generate_pyramid(self.moving,
+                                                       self.levels-1)]
+        self.fixed_pyramid  =  [img for img
+                              in self.generate_pyramid(self.fixed,
+                                                      self.levels-1)]
+        starting_forward = np.zeros(
+            shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,),
+            dtype = np.float64)
+        starting_forward_inv = np.zeros(
+            shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,),
+            dtype = np.float64)
+        self.forward_model.scale_affines(0.5**(self.levels-1))
+        self.forward_model.set_forward(starting_forward)
+        self.forward_model.set_backward(starting_forward_inv)
 
-    def __endOptimizer(self):
-        del self.movingPyramid
-        del self.fixedPyramid
+    def __end_optimizer(self):
+        r'''
+        Frees the resources allocated during initialization
+        '''
+        del self.moving_pyramid
+        del self.fixed_pyramid
 
-    def __iterate(self, showImages=False):
-        wmoving=self.forwardModel.warpForward(self.currentMoving)
-        self.similarityMetric.setMovingImage(wmoving)
-        self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.forwardModel, 1)
-        self.similarityMetric.setFixedImage(self.currentFixed)
-        self.similarityMetric.useFixedImageDynamics(self.currentFixed, None, 1)
-        self.similarityMetric.initializeIteration()
-        fw=self.similarityMetric.computeForward()
-        forward, meanDifference=self.updateRule.update(fw, self.forwardModel.getForward())
-        self.forwardModel.setForward(forward)
-        if showImages:
-            self.similarityMetric.reportStatus()
-        return meanDifference
+    def __iterate(self, show_images = False):
+        r'''
+        Performs one unidirectional iteration
+        '''
+        wmoving = self.forward_model.warp_forward(self.current_moving)
+        self.similarity_metric.set_moving_image(wmoving)
+        self.similarity_metric.use_moving_image_dynamics(self.current_moving,
+                                                         self.forward_model, 1)
+        self.similarity_metric.set_fixed_image(self.current_fixed)
+        self.similarity_metric.use_fixed_image_dynamics(
+            self.current_fixed, None, 1)
+        self.similarity_metric.initialize_iteration()
+        fw_step = np.array(self.similarity_metric.compute_forward())
+        self.forward_model.forward, mean_diff = self.update_rule.update(
+            fw_step, self.forward_model.forward)
+        try:
+            fw_energy = self.similarity_metric.energy
+        except NameError:
+            pass
+        try:
+            n_iter = len(self.energy_list)
+            der = '-'
+            if len(self.energy_list)>=3:
+                der = self.__get_energy_derivative()
+            print('%d:\t%0.6f\t%s'%(n_iter , fw_energy, der))
+            self.energy_list.append(fw_energy)
+        except NameError:
+            pass
+        if show_images:
+            self.similarity_metric.report_status()
+        return mean_diff
 
     def __optimize(self):
-        self.__initOptimizer()
+        r'''
+        The main multi-scale optimization algorithm for unidirectional
+        registration
+        '''
+        self.__init_optimizer()
         for level in range(self.levels-1, -1, -1):
             print 'Processing level', level
-            self.currentFixed=self.fixedPyramid[level]
-            self.currentMoving=self.movingPyramid[level]
-            self.similarityMetric.useOriginalFixedImage(self.fixedPyramid[level])
-            self.similarityMetric.useOriginalMovingImage(self.movingPyramid[level])
-            if level<self.levels-1:
-                self.forwardModel.upsample(self.currentFixed.shape, self.currentMoving.shape)
-            error=1+self.tolerance
-            niter=0
-            while (niter<self.maxIter[level]) and (self.tolerance<error):
-                niter+=1
-                error=self.__iterate()
-        self.__endOptimizer()
+            self.current_fixed = self.fixed_pyramid[level]
+            self.current_moving = self.moving_pyramid[level]
+            self.similarity_metric.use_original_fixed_image(
+                self.fixed_pyramid[level])
+            self.similarity_metric.use_original_moving_image(
+                self.moving_pyramid[level])
+            if level < self.levels-1:
+                self.forward_model.upsample(self.current_fixed.shape,
+                                            self.current_moving.shape)
+            niter = 0
+            self.energy_list = []
+            while (niter<self.max_iter[level]):
+                niter += 1
+                self.__iterate()
+            if self.report_status:
+                self.__report_status(level)
+        self.forward_model.backward = self.invert_vector_field(
+                self.forward_model.forward, None, self.inversion_iter, 
+                self.inversion_tolerance, None)
+        self.__end_optimizer()
 
-    def __getEnergyDerivative(self):
-        n=len(self.energyList)
-        q = np.poly1d(np.polyfit(range(n), self.energyList,2)).deriv()
-        der=q(n-1.5)
+    def __get_energy_derivative(self):
+        r'''
+        Returns the derivative of the estimated energy as a function of "time"
+        (iterations) at the last iteration
+        '''
+        n_iter = len(self.energy_list)
+        poly_der = np.poly1d(
+            np.polyfit(range(n_iter), self.energy_list, 2)).deriv()
+        der = poly_der(n_iter-1.5)
         return der
 
     def __report_status(self, level):
-        showCommonSpace=True
-        if showCommonSpace:
-            wmoving=self.backwardModel.warpBackward(self.currentMoving)
-            wfixed=self.forwardModel.warpBackward(self.currentFixed)
-            self.similarityMetric.setMovingImage(wmoving)
-            self.similarityMetric.useMovingImageDynamics(self.currentMoving, self.backwardModel, -1)
-            self.similarityMetric.setFixedImage(wfixed)
-            self.similarityMetric.useFixedImageDynamics(self.currentFixed, self.forwardModel, -1)
-            self.similarityMetric.initializeIteration()
-            self.similarityMetric.reportStatus()
-        else:
-            phi1=self.forwardModel.getForward()
-            phi2=self.backwardModel.getBackward()
-            phi1Inv=self.forwardModel.getBackward()
-            phi2Inv=self.backwardModel.getForward()
-            phi, md=self.updateRule.update(phi1, phi2)
-            phiInv, mdInv=self.updateRule.update(phi2Inv, phi1Inv)
-            composition=TransformationModel(phi, phiInv, None, None)
-            composition.scaleAffines(0.5**level)
-            residual, stats=composition.computeInversionError()
-            print 'Current inversion error:',stats[1],' (',stats[2],')'
-            wmoving=composition.warpForward(self.currentMoving)
-            self.similarityMetric.setMovingImage(wmoving)
-            self.similarityMetric.useMovingImageDynamics(self.currentMoving, composition, 1)
-            self.similarityMetric.setFixedImage(self.currentFixed)
-            self.similarityMetric.useFixedImageDynamics(self.currentFixed, None, 1)
-            self.similarityMetric.initializeIteration()
-            self.similarityMetric.reportStatus()            
+        r'''
+        Shows the current overlaid images on the reference space
+        '''
+        wmoving = self.forward_model.warp_forward(self.current_moving)
+        self.similarity_metric.set_moving_image(wmoving)
+        self.similarity_metric.use_moving_image_dynamics(self.current_moving,
+                                                         self.forward_model,
+                                                         1)
+        self.similarity_metric.set_fixed_image(self.current_fixed)
+        self.similarity_metric.use_fixed_image_dynamics(self.current_fixed,
+                                                     None,
+                                                     -1)
+        self.similarity_metric.initialize_iteration()
+        self.similarity_metric.report_status()
 
     def optimize(self):
-        print 'Outer iter:', self.maxIter
-        print 'Metric:',self.similarityMetric.getMetricName()
-        print 'Metric parameters:\n',self.similarityMetric.parameters
+        print 'Outer iter:', self.max_iter
+        print 'Metric:', self.similarity_metric.get_metric_name()
+        print 'Metric parameters:\n', self.similarity_metric.parameters
         self.__optimize()
 
-def testRegistrationOptimizerMonomodal2D():
-    fnameMoving='data/circle.png'
-    fnameFixed='data/C.png'
-    nib_moving=plt.imread(fnameMoving)
-    nib_fixed=plt.imread(fnameFixed)
-    moving=nib_moving[:,:,0].astype(np.float64)
-    fixed=nib_fixed[:,:,1].astype(np.float64)
-    moving=np.copy(moving, order='C')
-    fixed=np.copy(fixed, order='C')
-    moving=(moving-moving.min())/(moving.max() - moving.min())
-    fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
+def test_optimizer_monomodal_2d():
+    r'''
+    Classical Circle-To-C experiment for 2D Monomodal registration
+    '''
+    fname_moving = 'data/circle.png'
+    fname_fixed = 'data/C.png'
+    nib_moving = plt.imread(fname_moving)
+    nib_fixed = plt.imread(fname_fixed)
+    moving = nib_moving[:, :, 0].astype(np.float64)
+    fixed = nib_fixed[:, :, 1].astype(np.float64)
+    moving = np.copy(moving, order = 'C')
+    fixed = np.copy(fixed, order = 'C')
+    moving = (moving-moving.min())/(moving.max() - moving.min())
+    fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
     ################Configure and run the Optimizer#####################
-    maxIter=[i for i in [25,50,100]]
-    similarityMetric=SSDMetric({'symmetric':True, 'lambda':5.0, 'stepType':SSDMetric.GAUSS_SEIDEL_STEP})
-    updateRule=UpdateRule.Composition()
-    #updateRule=UpdateRule.ProjectedComposition()
-    registrationOptimizer=AsymmetricRegistrationOptimizer(fixed, moving, None, None, similarityMetric, updateRule, maxIter)
-    registrationOptimizer.optimize()
+    max_iter = [i for i in [25, 100, 100, 100]]
+    similarity_metric = SSDMetric({'lambda':5.0,
+                                   'max_inner_iter':50,
+                                   'step_type':SSDMetric.GAUSS_SEIDEL_STEP})
+    update_rule = UpdateRule.Composition()
+    optimizer_parameters = {
+        'max_iter':max_iter,
+        'inversion_iter':40,
+        'inversion_tolerance':1e-3,
+        'report_status':True}
+    registration_optimizer = AsymmetricRegistrationOptimizer(
+        fixed, moving, None, None,
+        similarity_metric, update_rule, optimizer_parameters)
+    registration_optimizer.optimize()
     #######################show results#################################
-    displacement=registrationOptimizer.getForward()
-    directInverse=registrationOptimizer.getBackward()
-    movingToFixed=np.array(tf.warp_image(moving, displacement))
-    fixedToMoving=np.array(tf.warp_image(fixed, directInverse))
-    rcommon.overlayImages(movingToFixed, fixed, True)
-    rcommon.overlayImages(fixedToMoving, moving, True)
-#    X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
-#    detJacobian=rcommon.computeJacobianField(displacement)
-#    plt.figure()
-#    plt.imshow(detJacobian)
-#    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
-#    plt.clabel(CS, inline=1, fontsize=10)
-#    plt.title('det(J(displacement))')
-#    print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
-    #directInverse=np.array(tf.invert_vector_field(displacement, 2.0, 500, 1e-7))
-#    detJacobianInverse=rcommon.computeJacobianField(directInverse)
-#    plt.figure()
-#    plt.imshow(detJacobianInverse)
-#    CS=plt.contour(X0,X1,detJacobianInverse, levels=[0.0],colors='w')
-#    plt.clabel(CS, inline=1, fontsize=10)
-#    plt.title('det(J(displacement^-1))')
-#    print 'J^-1 range:', '[', detJacobianInverse.min(), detJacobianInverse.max(),']'
-    directResidual,stats=tf.compose_vector_fields(displacement, directInverse)
-    directResidual=np.array(directResidual)
-    rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 'inv-direct', 7)
+    displacement = registration_optimizer.get_forward()
+    direct_inverse = registration_optimizer.get_backward()
+    moving_to_fixed = np.array(tf.warp_image(moving, displacement))
+    fixed_to_moving = np.array(tf.warp_image(fixed, direct_inverse))
+    rcommon.overlayImages(moving_to_fixed, fixed, True)
+    rcommon.overlayImages(fixed_to_moving, moving, True)
+    direct_residual, stats = tf.compose_vector_fields(displacement,
+                                                      direct_inverse)
+    direct_residual = np.array(direct_residual)
+    rcommon.plotDiffeomorphism(displacement, direct_inverse, direct_residual,
+                               'inv-direct', 7)
 
-def testRegistrationOptimizerMultimodal2D(lambdaParam, synthetic):
-    displacementGTName='templateToIBSR01_GT.npy'
-    fnameMoving='data/t2/IBSR_t2template_to_01.nii.gz'
-    fnameFixed='data/t1/IBSR_template_to_01.nii.gz'
-#    fnameMoving='data/circle.png'
-#    fnameFixed='data/C.png'
-    nifti=True
+def test_optimizer_multimodal_2d(lambda_param):
+    r'''
+    Registers one of the mid-slices (axial, coronal or sagital) of each input
+    volume (the volumes are expected to be from diferent modalities and
+    should already be affine-registered, for example Brainweb t1 vs t2)
+    '''
+    fname_moving = 'data/t2/IBSR_t2template_to_01.nii.gz'
+    fname_fixed = 'data/t1/IBSR_template_to_01.nii.gz'
+#    fname_moving = 'data/circle.png'
+#    fname_fixed = 'data/C.png'
+    nifti = True
     if nifti:
-        nib_moving = nib.load(fnameMoving)
-        nib_fixed = nib.load(fnameFixed)
-        moving=nib_moving.get_data().squeeze().astype(np.float64)
-        fixed=nib_fixed.get_data().squeeze().astype(np.float64)
-        moving=np.copy(moving, order='C')
-        fixed=np.copy(fixed, order='C')
-        sl=moving.shape
-        sr=fixed.shape    
-        moving=moving[:,sl[1]//2,:].copy()
-        fixed=fixed[:,sr[1]//2,:].copy()
-#        moving=histeq(moving)
-#        fixed=histeq(fixed)
-        moving=(moving-moving.min())/(moving.max()-moving.min())
-        fixed=(fixed-fixed.min())/(fixed.max()-fixed.min())
+        nib_moving  =  nib.load(fname_moving)
+        nib_fixed  =  nib.load(fname_fixed)
+        moving = nib_moving.get_data().squeeze().astype(np.float64)
+        fixed = nib_fixed.get_data().squeeze().astype(np.float64)
+        moving = np.copy(moving, order = 'C')
+        fixed = np.copy(fixed, order = 'C')
+        moving_shape = moving.shape
+        fixed_shape = fixed.shape
+        moving = moving[:, moving_shape[1]//2, :].copy()
+        fixed = fixed[:, fixed_shape[1]//2, :].copy()
+#        moving = histeq(moving)
+#        fixed = histeq(fixed)
+        moving = (moving-moving.min())/(moving.max()-moving.min())
+        fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
     else:
-        nib_moving=plt.imread(fnameMoving)
-        nib_fixed=plt.imread(fnameFixed)
-        moving=nib_moving[:,:,0].astype(np.float64)
-        fixed=nib_fixed[:,:,1].astype(np.float64)
-        moving=np.copy(moving, order='C')
-        fixed=np.copy(fixed, order='C')
-        moving=(moving-moving.min())/(moving.max() - moving.min())
-        fixed=(fixed-fixed.min())/(fixed.max() - fixed.min())
-    #maxIter=[i for i in [25,50,100,100]]
-    maxIter=[i for i in [25,50,100]]
-    similarityMetric=EMMetric({'symmetric':True, 
-                               'lambda':lambdaParam, 
-                               'stepType':SSDMetric.GAUSS_SEIDEL_STEP, 
-                               'qLevels':256, 
-                               'maxInnerIter':20,
-                               'useDoubleGradient':True,
-                               'maxStepLength':0.25})    
-    updateRule=UpdateRule.Composition()
-    if(synthetic):
-        print 'Generating synthetic field...'
-        #----apply synthetic deformation field to fixed image
-        GT=rcommon.createDeformationField2D_type2(fixed.shape[0], fixed.shape[1], 8)
-        warpedFixed=rcommon.warpImage(fixed,GT)
-    else:
-        templateT1=nib.load('data/t1/IBSR_template_to_01.nii.gz')
-        templateT1=templateT1.get_data().squeeze().astype(np.float64)
-        templateT1=np.copy(templateT1, order='C')
-        sh=templateT1.shape
-        templateT1=templateT1[:,sh[1]//2,:]
-        templateT1=(templateT1-templateT1.min())/(templateT1.max()-templateT1.min())
-        if(os.path.exists(displacementGTName)):
-            print 'Loading precomputed realistic field...'
-            GT=np.load(displacementGTName)
-        else:
-            print 'Generating realistic field...'
-            #load two T1 images: the template and an IBSR sample
-            ibsrT1=nib.load('data/t1/IBSR18/IBSR_01/IBSR_01_ana_strip.nii.gz')
-            ibsrT1=ibsrT1.get_data().squeeze().astype(np.float64)
-            ibsrT1=np.copy(ibsrT1, order='C')
-            ibsrT1=ibsrT1[:,sh[1]//2,:]
-            ibsrT1=(ibsrT1-ibsrT1.min())/(ibsrT1.max()-ibsrT1.min())
-            #register the template(moving) to the ibsr sample(fixed)
-            #updateRule=UpdateRule.ProjectedComposition()
-            registrationOptimizer=AsymmetricRegistrationOptimizer(ibsrT1, templateT1, None, None, similarityMetric, updateRule, maxIter)
-            registrationOptimizer.optimize()
-            #----apply 'realistic' deformation field to fixed image
-            GT=registrationOptimizer.getForward()
-            np.save(displacementGTName, GT)
-        warpedFixed=rcommon.warpImage(templateT1, GT)
+        nib_moving = plt.imread(fname_moving)
+        nib_fixed = plt.imread(fname_fixed)
+        moving = nib_moving[:, :, 0].astype(np.float64)
+        fixed = nib_fixed[:, :, 1].astype(np.float64)
+        moving = np.copy(moving, order = 'C')
+        fixed = np.copy(fixed, order = 'C')
+        moving = (moving-moving.min())/(moving.max() - moving.min())
+        fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
+    #max_iter = [i for i in [25,50,100,100]]
+    max_iter = [i for i in [25, 50, 100]]
+    similarity_metric = EMMetric({'symmetric':True,
+                               'lambda':lambda_param,
+                               'step_type':SSDMetric.GAUSS_SEIDEL_STEP,
+                               'q_levels':256,
+                               'max_inner_iter':40,
+                               'use_double_gradient':True,
+                               'max_step_length':0.25})
+    optimizer_parameters = {
+        'max_iter':max_iter,
+        'inversion_iter':40,
+        'inversion_tolerance':1e-3,
+        'report_status':True}
+    update_rule = UpdateRule.Composition()
+    print 'Generating synthetic field...'
+    #----apply synthetic deformation field to fixed image
+    ground_truth = rcommon.createDeformationField2D_type2(fixed.shape[0],
+                                                          fixed.shape[1], 8)
+    warped_fixed = rcommon.warpImage(fixed, ground_truth)
     print 'Registering T2 (template) to deformed T1 (template)...'
     plt.figure()
-    rcommon.overlayImages(warpedFixed, moving, False)
-    registrationOptimizer=AsymmetricRegistrationOptimizer(warpedFixed, moving, None, None, similarityMetric, updateRule, maxIter)
-    registrationOptimizer.optimize()
+    rcommon.overlayImages(warped_fixed, moving, False)
+    registration_optimizer = AsymmetricRegistrationOptimizer(
+        warped_fixed, moving, None, None, similarity_metric,
+        update_rule, optimizer_parameters)
+    registration_optimizer.optimize()
     #######################show results#################################
-    displacement=registrationOptimizer.getForward()
-    directInverse=registrationOptimizer.getBackward()
-    movingToFixed=np.array(tf.warp_image(moving, displacement))
-    fixedToMoving=np.array(tf.warp_image(warpedFixed, directInverse))
-    rcommon.overlayImages(movingToFixed, fixedToMoving, True)
-#    X1,X0=np.mgrid[0:displacement.shape[0], 0:displacement.shape[1]]
-#    detJacobian=rcommon.computeJacobianField(displacement)
-#    plt.figure()
-#    plt.imshow(detJacobian)
-#    CS=plt.contour(X0,X1,detJacobian,levels=[0.0], colors='b')
-#    plt.clabel(CS, inline=1, fontsize=10)
-#    plt.title('det(J(displacement))')
-#    print 'J range:', '[', detJacobian.min(), detJacobian.max(),']'
-    #directInverse=np.array(tf.invert_vector_field(displacement, 2.0, 500, 1e-7))
-#    detJacobianInverse=rcommon.computeJacobianField(directInverse)
-#    plt.figure()
-#    plt.imshow(detJacobianInverse)
-#    CS=plt.contour(X0,X1,detJacobianInverse, levels=[0.0],colors='w')
-#    plt.clabel(CS, inline=1, fontsize=10)
-#    plt.title('det(J(displacement^-1))')
-#    print 'J^-1 range:', '[', detJacobianInverse.min(), detJacobianInverse.max(),']'
-    directResidual,stats=tf.compose_vector_fields(displacement, directInverse)
-    directResidual=np.array(directResidual)
-    rcommon.plotDiffeomorphism(displacement, directInverse, directResidual, 'inv-direct', 7)
-    
-    residual=((displacement-GT))**2
-    meanDisplacementError=np.sqrt(residual.sum(2)*(warpedFixed>0)).mean()
-    stdevDisplacementError=np.sqrt(residual.sum(2)*(warpedFixed>0)).std()
-    print 'Mean displacement error: ', meanDisplacementError,'(',stdevDisplacementError,')'
+    displacement = registration_optimizer.get_forward()
+    direct_inverse = registration_optimizer.get_backward()
+    moving_to_fixed = np.array(tf.warp_image(moving, displacement))
+    fixed_to_moving = np.array(tf.warp_image(warped_fixed, direct_inverse))
+    rcommon.overlayImages(moving_to_fixed, fixed_to_moving, True)
+    direct_residual, stats = tf.compose_vector_fields(displacement,
+                                                      direct_inverse)
+    direct_residual = np.array(direct_residual)
+    rcommon.plotDiffeomorphism(displacement, direct_inverse, direct_residual,
+                               'inv-direct', 7)
 
-if __name__=='__main__':
-    tic=time.time()
-    testRegistrationOptimizerMultimodal2D(50, True)
-    toc=time.time()
-    print('Registration time: %f sec' % (toc - tic))
-    #testRegistrationOptimizerMonomodal2D()
-    
-#    import nibabel as nib
-#    result=nib.load('data/circleToC.nii.gz')
-#    result=result.get_data().astype(np.double)
-#    plt.imshow(result)
+    residual = ((displacement-ground_truth))**2
+    mean_error = np.sqrt(residual.sum(2)*(warped_fixed>0)).mean()
+    stdev_error = np.sqrt(residual.sum(2)*(warped_fixed>0)).std()
+    print 'Mean displacement error: ', mean_error, '(', stdev_error, ')'
+
+if __name__ == '__main__':
+    TIC = time.time()
+    test_optimizer_multimodal_2d(50)
+    TOC = time.time()
+    print('Registration time: %f sec' % (TOC - TIC))

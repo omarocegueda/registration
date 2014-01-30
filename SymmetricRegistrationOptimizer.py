@@ -44,7 +44,8 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
     def __connect_functions(self):
         r'''
         Assigns the appropriate functions to be called for displacement field
-        inversion according to the dimension of the input images
+        inversion, Gaussian pyramid, and affine/dense deformation composition 
+        according to the dimension of the input images
         '''
         if self.dim == 2:
             self.invert_vector_field = tf.invert_vector_field_fixed_point
@@ -102,13 +103,11 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             print 'Not ready'
             return False
         self.moving_pyramid = [img for img
-                            in self.generate_pyramid(self.moving,
-                                                    self.levels-1,
-                                                    np.ones_like(self.moving))]
+                               in self.generate_pyramid(self.moving,
+                                                        self.levels-1)]
         self.fixed_pyramid = [img for img
-                           in self.generate_pyramid(self.fixed,
-                                                   self.levels-1,
-                                                   np.ones_like(self.fixed))]
+                              in self.generate_pyramid(self.fixed,
+                                                       self.levels-1)]
         starting_forward = np.zeros(
             shape = self.fixed_pyramid[self.levels-1].shape+(self.dim,),
             dtype = np.float64)
@@ -394,7 +393,7 @@ def test_optimizer_multimodal_2d(lambda_param):
         fixed = np.copy(fixed, order = 'C')
         moving = (moving-moving.min())/(moving.max() - moving.min())
         fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
-    max_iter = [i for i in [25, 25, 100]]
+    max_iter = [i for i in [25, 50, 100]]
     similarity_metric = EMMetric({'symmetric':True,
                                'lambda':lambda_param,
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP,
