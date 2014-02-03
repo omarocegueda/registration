@@ -100,6 +100,46 @@ if __name__=='__main__':
                 for w in target[1:]:
                     subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
         sys.exit(0)
+    if sys.argv[1]=='s2':#provide two file lists: moving and fixed
+        if argc<4:
+            print 'Please specify two text files containing the names of the moving and fixed images to register'
+            sys.exit(0)
+        try:
+            with open(sys.argv[2]) as f:
+                linesMoving=f.readlines()
+        except IOError:
+            print 'Could not open file:', sys.argv[2]
+            sys.exit(0)
+        try:
+            with open(sys.argv[3]) as f:
+                linesFixed=f.readlines()
+        except IOError:
+            print 'Could not open file:', sys.argv[3]
+            sys.exit(0)
+        namesMoving=[line.strip().split() for line in linesMoving]
+        namesFixed=[line.strip().split() for line in linesFixed]
+        nlinesMoving=len(namesMoving)
+        nlinesFixed=len(namesFixed)
+        if nlinesFixed!=nlinesMoving:
+            print 'Error: the number of files in the moving (%d) list is not the same as in the fixed list(%d)'%(nlinesMoving, nlinesFixed)
+            sys.exit(0)
+        for i in range(nlinesMoving):
+            target=namesMoving[i][0]
+            reference=namesFixed[i][0]
+            if (not target) or (not reference):
+                continue
+            print 'Generating registration folder:', target, reference
+            dirName='0'+str(i+1) if i+1<10 else str(i+1)
+            mkdir_p(os.path.join(dirName,'target'))
+            mkdir_p(os.path.join(dirName,'reference'))
+            mkdir_p(os.path.join(dirName,'warp'))
+            subprocess.call('ln '+target+' '+dirName+'/target', shell=True)
+            subprocess.call('ln '+reference+' '+dirName+'/reference', shell=True)
+            subprocess.call('ln jobFullSyNEM.sh '+dirName, shell=True)
+            subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
+            for w in namesMoving[1:]:
+                subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
+        sys.exit(0)
     ############################Submit###################################
     if sys.argv[1]=='u':
         dirNames=[name for name in os.listdir(".") if os.path.isdir(name) and fnmatch.fnmatch(name, '[0-9]*')]
