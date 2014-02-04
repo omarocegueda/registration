@@ -191,17 +191,37 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
         showRegistrationResultMidSlices('warpedDiff_IBSR_07_ana_strip_IBSR_12_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_12/IBSR_12_ana_strip.nii.gz', None)
         
         showRegistrationResultMidSlices('warpedDiff_IBSR_15_ana_strip_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 't1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_01_segTRI_fill_ana_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/phantom_1.0mm_normal_crisp.rawb.nii.gz', None)
+        
+        showRegistrationResultMidSlices('data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/phantom_1.0mm_normal_crisp_peeled.nii.gz', None)
+        showRegistrationResultMidSlices('data/t2/t2_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/phantom_1.0mm_normal_crisp_peeled.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_16_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+        showRegistrationResultMidSlices('warpedAffine_IBSR_16_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+        showRegistrationResultMidSlices('test16.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+        
+        showRegistrationResultMidSlices('data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb_peeled.nii.gz', None)
+        showRegistrationResultMidSlices('warpedAffine_IBSR_15_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_15_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+        
+        showRegistrationResultMidSlices('warpedAffine_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+        showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+        
+        
     '''
     
     if(fnameAffine==None):
         T=np.eye(4)
     else:
         T=rcommon.readAntsAffine(fnameAffine)
+    print 'T:',T
     fixed=nib.load(fnameFixed)
     F=fixed.get_affine()
+    print 'F:',F
     fixed=fixed.get_data().squeeze().astype(np.float64)
     moving=nib.load(fnameMoving)
     M=moving.get_affine()
+    print 'M:',M
     moving=moving.get_data().squeeze().astype(np.float64)
     initAffine=np.linalg.inv(M).dot(T.dot(F))
     
@@ -209,9 +229,26 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
     moving=np.copy(moving, order='C')
     warped=np.array(tf.warp_volume_affine(moving, np.array(fixed.shape).astype(np.int32), initAffine))
     sh=warped.shape
-    rcommon.overlayImages(warped[:,sh[1]//2,:], fixed[:,sh[1]//2,:])
     rcommon.overlayImages(warped[sh[0]//2,:,:], fixed[sh[0]//2,:,:])
-    rcommon.overlayImages(warped[:,:,sh[2]//2], fixed[:,:,sh[2]//2])    
+    rcommon.overlayImages(warped[:,sh[1]//2,:], fixed[:,sh[1]//2,:])
+    rcommon.overlayImages(warped[:,:,sh[2]//2], fixed[:,:,sh[2]//2])
+
+def rawToNifti(fname, ns, nr, nc, maskname=None):
+    '''
+    rawToNifti('data/phantom_1.0mm_normal_crisp.rawb', 181, 217, 181, 'data/phantom_1.0mm_normal_crisp.rawb')
+    rawToNifti('data/t1/t1_icbm_normal_1mm_pn0_rf0.rawb', 181, 217, 181, 'data/phantom_1.0mm_normal_crisp.rawb')
+    rawToNifti('data/t2/t2_icbm_normal_1mm_pn0_rf0.rawb', 181, 217, 181, 'data/phantom_1.0mm_normal_crisp.rawb')
+    '''
+    discrete=np.fromfile(fname, dtype=np.ubyte).reshape(ns,nr,nc)
+    if maskname!=None:
+        mask=np.fromfile(maskname, dtype=np.ubyte).reshape(ns,nr,nc)
+        mask=(mask>0).astype(np.int8)*(mask<4).astype(np.int8)
+        discrete*=mask
+    discrete=discrete.transpose([2,1,0])
+    nifti_discrete = nib.Nifti1Image(discrete, np.eye(4))
+    #baseName=rcommon.getBaseFileName(fname)
+    oname=fname+'.nii.gz' if maskname==None else fname+'_peeled.nii.gz'
+    nifti_discrete.to_filename(oname)
 
 def computeJacard(aname, bname):
     '''
@@ -219,7 +256,7 @@ def computeJacard(aname, bname):
     computeJacard('warpedDiff_IBSR_13_segTRI_fill_ana_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_segTRI_fill_ana.nii.gz' )
     computeJacard('warpedAffine_IBSR_16_segTRI_fill_ana_IBSR_10_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_segTRI_fill_ana.nii.gz')
     computeJacard('warpedAffine_IBSR_10_segTRI_fill_ana_IBSR_01_ana_strip.nii.gz', '/opt/registration/data/t1/IBSR18/IBSR_10/IBSR_10_seg_ana.nii.gz',None)
-    
+    computeJacard('warpedDiff_IBSR_01_segTRI_fill_ana_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/phantom_1.0mm_normal_crisp.rawb.nii.gz')
     '''
     baseA=rcommon.getBaseFileName(aname)
     baseB=rcommon.getBaseFileName(bname)
@@ -245,7 +282,7 @@ def computeJacard(aname, bname):
     np.savetxt(oname,jacard)
     return jacard
 
-def fullJacard(names, segIndex, warpedPreffix):
+def fullJacardAllPairs(names, segIndex, warpedPreffix):
     nlines=len(names)
     sumJacard=None
     sumJacard2=None
@@ -294,6 +331,44 @@ def fullJacard(names, segIndex, warpedPreffix):
     variance=sumJacard2/nsamples-meanJacard**2#E[X^2] - E[X]^2
     std=np.sqrt(variance)
     return meanJacard, std, worstPair, minScore
+
+def fullJacard(namesTarget, namesReference, segIndex, warpedPreffix):
+    nlines=len(namesTarget)
+    sumJacard=None
+    sumJacard2=None
+    nsamples=0.0
+    for i in range(nlines):
+        if not namesTarget[i]:
+            continue
+        if not namesReference[i]:
+            continue
+        registrationReference=namesReference[i][0]
+        reference=namesReference[i][segIndex]
+        target=namesTarget[i][segIndex]
+        baseReference=rcommon.getBaseFileName(registrationReference)
+        baseTarget=rcommon.getBaseFileName(target)
+        warpedName=warpedPreffix+baseTarget+'_'+baseReference+'.nii.gz'
+        jacard=computeJacard(reference, warpedName)
+        nsamples+=1
+        if sumJacard==None:
+            sumJacard=jacard
+            sumJacard2=jacard**2
+        else:
+            lenOld=len(sumJacard)
+            lenNew=len(jacard)
+            extendedShape=(np.max([lenOld, lenNew]),)
+            newSum=np.zeros(shape=extendedShape, dtype=np.float64)
+            newSum2=np.zeros(shape=extendedShape, dtype=np.float64)
+            newSum[:lenOld]=sumJacard[...]
+            newSum[:lenNew]+=jacard[...]
+            newSum2[:lenOld]=sumJacard2[...]
+            newSum2[:lenNew]+=jacard[...]**2
+            sumJacard=newSum
+            sumJacard2=newSum2
+    meanJacard=sumJacard/nsamples
+    variance=sumJacard2/nsamples-meanJacard**2#E[X^2] - E[X]^2
+    std=np.sqrt(variance)
+    return meanJacard, std
 
 def getRohlfingResults(meanName, sdName):
     '''
@@ -445,7 +520,7 @@ if __name__=="__main__":
         bname=sys.argv[3]
         computeJacard(aname, bname)
         sys.exit(0)
-    elif(sys.argv[1]=='fulljacard'):#compute the mean and std dev of jacard index among all pairs of the given volumes
+    elif(sys.argv[1]=='fulljacardpairs'):#compute the mean and std dev of jacard index among all pairs of the given volumes
         if argc<3:
             print "A text file containing the segmentation names must be provided."
         try:
@@ -459,8 +534,35 @@ if __name__=="__main__":
             warpedPreffix=sys.argv[3]#e.g.: 'warpedAffine_'
         filesPerSample=len(names[0])
         for segIndex in range(1,filesPerSample):
-            meanJacard, stdJacard, worstPair, minScore=fullJacard(names, segIndex, warpedPreffix)
+            meanJacard, stdJacard, worstPair, minScore=fullJacardAllPairs(names, segIndex, warpedPreffix)
             print '[', segIndex,'] Min trace:',minScore,'. Worst pair:',worstPair,'[',names[worstPair[0]][segIndex],', ',names[worstPair[1]][segIndex],']'
+            np.savetxt("jacard_mean_"+warpedPreffix+str(segIndex)+'.txt',meanJacard)
+            np.savetxt("jacard_std_"+warpedPreffix+str(segIndex)+'.txt',stdJacard)
+        sys.exit(0)
+    elif(sys.argv[1]=='fulljacard'):#compute the mean and std dev of jacard index among two lists of segmented images
+        if argc<4:
+            print "Two text files (target, reference) containing the corresponding segmentation names must be provided."
+        try:
+            with open(sys.argv[2]) as f:
+                namesTarget=[line.strip().split() for line in f.readlines()]
+        except IOError:
+            print 'Cannot open file:',sys.argv[2]
+            sys.exit(0)
+        try:
+            with open(sys.argv[3]) as f:
+                namesReference=[line.strip().split() for line in f.readlines()]
+        except IOError:
+            print 'Cannot open file:',sys.argv[3]
+            sys.exit(0)
+        if len(namesTarget)!=len(namesReference):
+            print "Error: both lists must have the same number of elements"
+            sys.exit(0)
+        warpedPreffix="warpedDiff_"
+        if(argc>4):
+            warpedPreffix=sys.argv[4]#e.g.: 'warpedAffine_'
+        filesPerSample=len(namesTarget[0])
+        for segIndex in range(1,filesPerSample):
+            meanJacard, stdJacard=fullJacard(namesTarget, namesReference, segIndex, warpedPreffix)
             np.savetxt("jacard_mean_"+warpedPreffix+str(segIndex)+'.txt',meanJacard)
             np.savetxt("jacard_std_"+warpedPreffix+str(segIndex)+'.txt',stdJacard)
         sys.exit(0)
