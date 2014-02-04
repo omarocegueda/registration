@@ -276,7 +276,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             self.similarity_metric.set_levels_above(level)
             if level < self.levels - 1:
                 self.forward_model.upsample(self.current_fixed.shape,
-                                           self.current_moving.shape)
+                                           self.current_fixed.shape)
                 self.backward_model.upsample(self.current_moving.shape,
                                             self.current_fixed.shape)
             error = 1+self.tolerance

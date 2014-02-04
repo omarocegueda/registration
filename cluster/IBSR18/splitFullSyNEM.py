@@ -137,7 +137,7 @@ if __name__=='__main__':
             subprocess.call('ln '+reference+' '+dirName+'/reference', shell=True)
             subprocess.call('ln jobFullSyNEM.sh '+dirName, shell=True)
             subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
-            for w in namesMoving[1:]:
+            for w in namesMoving[i][1:]:
                 subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
         sys.exit(0)
     ############################Submit###################################
