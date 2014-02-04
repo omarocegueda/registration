@@ -554,8 +554,8 @@ if __name__=="__main__":
             print "Error: both lists must have the same number of elements"
             sys.exit(0)
         meanJacard, stdJacard=fullJacard(namesTarget, namesReference)
-        np.savetxt("jacard_mean_"+warpedPreffix+str(segIndex)+'.txt',meanJacard)
-        np.savetxt("jacard_std_"+warpedPreffix+str(segIndex)+'.txt',stdJacard)
+        np.savetxt("jacard_mean.txt",meanJacard)
+        np.savetxt("jacard_std.txt",stdJacard)
         sys.exit(0)
     elif(sys.argv[1]=='ptt'):
         if argc<3:
