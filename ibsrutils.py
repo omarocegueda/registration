@@ -332,7 +332,7 @@ def fullJacardAllPairs(names, segIndex, warpedPreffix):
     std=np.sqrt(variance)
     return meanJacard, std, worstPair, minScore
 
-def fullJacard(namesTarget, namesReference, segIndex, warpedPreffix):
+def fullJacard(namesTarget, namesReference):
     nlines=len(namesTarget)
     sumJacard=None
     sumJacard2=None
@@ -342,13 +342,9 @@ def fullJacard(namesTarget, namesReference, segIndex, warpedPreffix):
             continue
         if not namesReference[i]:
             continue
-        registrationReference=namesReference[i][0]
-        reference=namesReference[i][segIndex]
-        target=namesTarget[i][segIndex]
-        baseReference=rcommon.getBaseFileName(registrationReference)
-        baseTarget=rcommon.getBaseFileName(target)
-        warpedName=warpedPreffix+baseTarget+'_'+baseReference+'.nii.gz'
-        jacard=computeJacard(reference, warpedName)
+        reference=namesReference[i][0]
+        target=namesTarget[i][0]
+        jacard=computeJacard(reference, target)
         nsamples+=1
         if sumJacard==None:
             sumJacard=jacard
@@ -557,14 +553,9 @@ if __name__=="__main__":
         if len(namesTarget)!=len(namesReference):
             print "Error: both lists must have the same number of elements"
             sys.exit(0)
-        warpedPreffix="warpedDiff_"
-        if(argc>4):
-            warpedPreffix=sys.argv[4]#e.g.: 'warpedAffine_'
-        filesPerSample=len(namesTarget[0])
-        for segIndex in range(1,filesPerSample):
-            meanJacard, stdJacard=fullJacard(namesTarget, namesReference, segIndex, warpedPreffix)
-            np.savetxt("jacard_mean_"+warpedPreffix+str(segIndex)+'.txt',meanJacard)
-            np.savetxt("jacard_std_"+warpedPreffix+str(segIndex)+'.txt',stdJacard)
+        meanJacard, stdJacard=fullJacard(namesTarget, namesReference)
+        np.savetxt("jacard_mean_"+warpedPreffix+str(segIndex)+'.txt',meanJacard)
+        np.savetxt("jacard_std_"+warpedPreffix+str(segIndex)+'.txt',stdJacard)
         sys.exit(0)
     elif(sys.argv[1]=='ptt'):
         if argc<3:
