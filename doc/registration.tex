@@ -477,6 +477,59 @@ where
     \caption{An input (warped) point $x+d_{x}$ located at regions 1(a),2(b),3(c) and 4(d), with respect to z. The interpolation coefficients can easily be computed as $(\alpha_{x}, \beta_{x})=(1,1)-\lfloor x+d_{x}\rfloor$. }
     \label{fig:dayIndex}
 \end{figure}
+
+
+\section{Symmetric Diffeomorphic Multimodal Non-Linear Registration}
+Let $I_1$, $I_2$ be two images (whose modalities are not necessarily the same) defined over the domains $\Omega_{1}$, $\Omega_{2}$, respectively. Let $G$ be the set of possible values $I_1$ and $I_2$ may take (e.g. $G=\left\lbrace 0,1,...,255\right\rbrace$). Our objective is to find two diffeomorphisms $\psi_{1}:\Omega_{1}\rightarrow \Omega_{R}$, $\psi_{2}:\Omega_{2}\rightarrow \Omega_{R}$ such that the observed images $I_{1}, I_{2}$ may be modeled as
+\begin{equation}
+	F_{1}[I_{1}(x)] = I_{2}(\psi_{2}^{-1}(\psi_{1}(x))) + \eta_{1}(x), x\in\Omega_{1}
+\end{equation}
+\begin{equation}
+	F_{2}[I_{2}(x)] = I_{1}(\psi_{1}^{-1}(\psi_{2}(x))) + \eta_{2}(x), x\in\Omega_{2}
+\end{equation}
+where $F_{1}, F_{2}:G \rightarrow G$ are (unknown) transfer functions between the two modalities and $\eta_{1}, \eta_{2}$ are random fields of independent random variables.\\
+
+By introducing the (unknown) hidden variables $Y(x)=F_{1}[I_{1}(x)], x\in \Omega_{1}$, $Z(x)=F_{2}[I_{2}(x)], x\in \Omega_{2}$ we may apply the EM algorithm to maximize the posterior distribution $P(\Psi | I_{1}, I_{2}) = \frac{P(I_{1}, I_{2} | \Psi)P(\Psi)}{P(I_{1}, I_{2})}$ with respect to $\Psi$:
+\begin{equation}
+	Q(\Psi, \Psi^{t-1}) = E_{Y,Z}\left[\log \left( \frac{P(I_{1}, I_{2}, Y, Z|\Psi)P(\Psi)}{P(I_{1}, I_{2}, Y, Z)}\right) | I_{1}, I_{2}, \Psi^{t-1}\right]
+\end{equation}
+\begin{equation}
+=\int_{y,z} -(K_1 + U(\Psi, y, z))dP(y,z| I_{1}, I_{2}, \Psi^{t-1}) 
+\end{equation}
+where $\Psi = (\psi_{1}, \psi_{2})$, $\Psi^{t-1} = (\psi_{1}^{t-1}, \psi_{2}^{t-1})$, $K_{1} =\log P(I_{1}, I_{2}, Y, Z)$  and 
+\begin{equation}
+	U(\Psi, y, z) = \log \left(P(I_{1}, I_{2}, Y, Z|\Psi)P(\Psi)\right)=
+\end{equation}
+\begin{equation}
+	\sum_{g\in G} \sum_{x : I_{1}(x) = g} \frac{\left(y(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{1}(g)^{2}} + \lambda R(\psi_{1})
+\end{equation}
+\begin{equation}
+	+\sum_{g\in G} \sum_{x : I_{2}(x) = g} \frac{\left(z(g) - \tilde{I_{1}}(\psi_{2}(x))\right)^{2}}{\sigma_{2}(g)^{2}} + \lambda R(\psi_{2})
+\end{equation}
+where $\tilde{I_{2}}(v) := I_{2}(\psi_{2}^{-1}(v))$ and $\tilde{I_{1}}(v) := I_{1}(\psi_{1}^{-1}(v)), v\in \Omega_{R}$ are the warped input images under the corresponing inverse transformations and are both defined on the reference domain $\Omega_{R}$.\\
+
+If we assume $Y, Z$ are independent, and their components $Y(g), g\in G$, $Z(g), g\in G$ are independent to each other, the density function $P(y,z| I_{1}, I_{2}, \Psi^{t-1})$ can be written as $P(y,z| I_{1}, I_{2}, \Psi^{t-1}) = h_{Y}(y)h_{Z}(z) = 
+\prod_{g\in G}h_{Y(g)}(y(g)) \prod_{g\in G}h_{Z(g)}(z(g))$, and the expected value can be written as 
+\begin{equation}
+-K_{1}-\int_{G^{|G|}}\sum_{g\in G} \sum_{x : I_{1}(x) = g} \frac{\left(y(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{1}(g)^{2}}d h_{Y}(y) 
+\end{equation}
+\begin{equation}
+-\int_{G^{|G|}}\sum_{g\in G} \sum_{x : I_{2}(x) = g} \frac{\left(z(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{2}(g)^{2}}d h_{Z}(z) 
+\end{equation}
+which can be further simplified as
+\begin{equation}
+-K_{1}-\sum_{g\in G} \sum_{x : I_{1}(x) = g} \int_{G}\frac{\left(r - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{1}(g)^{2}}d h_{Y(g)}(r) 
+\end{equation}
+\begin{equation}
+-\sum_{g\in G} \sum_{x : I_{2}(x) = g} \int_{G}\frac{\left(s - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{2}(g)^{2}}d h_{Z(g)}(s) 
+\end{equation}
+now let $\bar{r}(g)$ and $\bar{s}(g)$ be the expected value of $Y(g)$ and $Z(g)$ given $I_{1}, I_{2}, \Psi^{t-1}$, then 
+\begin{equation}
+\int_{G}\left(r - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}d h_{Y(g)}(r) = \int_{G}\left(r - \bar{r}(g) + \bar{r}(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}d h_{Y(g)}(r)
+\end{equation}
+\begin{equation}
+=\sigma^{2}_{1}(g) + \int_{G}\left(\bar{r}(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}d h_{Y(g)}(r)
+\end{equation}
 \bibliographystyle{plain}
 \bibliography{references}
 
