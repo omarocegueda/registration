@@ -2,7 +2,7 @@
 ####################################################
 # Author: Omar Ocegueda (omar@cimat.mx)
 #PBS -l mem=4gb
-#PBS -l nodes=1:ppn=1
+#PBS -l nodes=1:ppn=4
 #PBS -l walltime=03:00:00
 #PBS -N FullANTS
 #PBS -M omar@cimat.com
@@ -10,6 +10,7 @@ export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
 export PATH=$HOME/opt:$PATH
 export PYTHONPATH=$HOME/opt/lib/python2.7/site-packages:$PYTHONPATH
+export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=4
 ###################################
 date
 reference=$(ls reference)
