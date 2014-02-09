@@ -146,15 +146,13 @@ class SSDMetric(SimilarityMetric):
         '''
         pass
 
-    def use_fixed_image_dynamics(self, originalfixed_image, transformation,
-                                 direction):
+    def use_fixed_image_dynamics(self, originalfixed_image, transformation):
         r'''
         SSDMetric does not take advantage of the image dynamics, just pass
         '''
         pass
 
-    def use_moving_image_dynamics(self, original_moving_image, transformation,
-                                  direction):
+    def use_moving_image_dynamics(self, original_moving_image, transformation):
         r'''
         SSDMetric does not take advantage of the image dynamics, just pass
         '''

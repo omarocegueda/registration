@@ -63,16 +63,14 @@ class SimilarityMetric(object):
     @abc.abstractmethod
     def use_fixed_image_dynamics(self,
                               original_fixed_image,
-                              transformation,
-                              direction):
+                              transformation):
         '''
         This methods provides the metric a chance to compute any useful
         information from knowing how the current fixed image was generated
         (as the transformation of an original fixed image). This method is
         called by the optimizer just after it sets the fixed image.
         Transformation will be an instance of TransformationModel or None if
-        the originalMovingImage equals self.moving_image. Direction is either 1
-        (warp forward) or -1(warp backward)
+        the originalMovingImage equals self.moving_image.
         '''
 
     @abc.abstractmethod
@@ -109,16 +107,14 @@ class SimilarityMetric(object):
     @abc.abstractmethod
     def use_moving_image_dynamics(self,
                                original_moving_image,
-                               transformation,
-                               direction):
+                               transformation):
         '''
         This methods provides the metric a chance to compute any useful
         information from knowing how the current fixed image was generated
         (as the transformation of an original fixed image). This method is
         called by the optimizer just after it sets the fixed image.
         Transformation will be an instance of TransformationModel or None if
-        the originalMovingImage equals self.moving_image. Direction is either 1
-        (warp forward) or -1(warp backward)
+        the originalMovingImage equals self.moving_image.
         '''
 
     @abc.abstractmethod
