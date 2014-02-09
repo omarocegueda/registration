@@ -22,7 +22,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
     def get_default_parameters(self):
         return {'max_iter':[25, 50, 100], 'inversion_iter':20,
                 'inversion_tolerance':1e-3, 'tolerance':1e-6,
-                'report_status':False}
+                'report_status':True}
 
     def __init__(self,
                  fixed = None,
@@ -233,7 +233,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             self.similarity_metric.use_moving_image_dynamics(
                 self.current_moving, self.backward_model.inverse())
             self.similarity_metric.set_fixed_image(wfixed)
-            self.similarity_metric.use_moving_image_dynamics(
+            self.similarity_metric.use_fixed_image_dynamics(
                 self.current_fixed, self.forward_model.inverse())
             self.similarity_metric.initialize_iteration()
             self.similarity_metric.report_status()
@@ -323,7 +323,7 @@ def test_optimizer_monomodal_2d():
     fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
     ################Configure and run the Optimizer#####################
     max_iter = [i for i in [20, 100, 100, 100]]
-    similarity_metric = SSDMetric({'symmetric':True,
+    similarity_metric = SSDMetric(2, {'symmetric':True,
                                 'lambda':5.0,
                                 'stepType':SSDMetric.GAUSS_SEIDEL_STEP})
     optimizer_parameters = {
@@ -384,7 +384,7 @@ def test_optimizer_multimodal_2d(lambda_param):
         moving = (moving-moving.min())/(moving.max() - moving.min())
         fixed = (fixed-fixed.min())/(fixed.max() - fixed.min())
     max_iter = [i for i in [25, 50, 100]]
-    similarity_metric = EMMetric({'symmetric':True,
+    similarity_metric = EMMetric(2, {'symmetric':True,
                                'lambda':lambda_param,
                                'stepType':SSDMetric.GAUSS_SEIDEL_STEP,
                                'q_levels':256,

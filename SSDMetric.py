@@ -19,8 +19,8 @@ class SSDMetric(SimilarityMetric):
         return {'lambda':1.0, 'max_inner_iter':5, 'scale':1,
                 'max_step_length':0.25, 'sigma_diff':3.0, 'step_type':0}
 
-    def __init__(self, parameters):
-        super(SSDMetric, self).__init__(parameters)
+    def __init__(self, dim, parameters):
+        super(SSDMetric, self).__init__(dim, parameters)
         self.step_type = self.parameters['step_type']
         self.levels_below = 0
 

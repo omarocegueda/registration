@@ -273,7 +273,7 @@ def register_3d(params):
     moving = (moving-moving.min())/(moving.max()-moving.min())
     fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
     ###################Run registration##################
-    similarity_metric = EMMetric(metric_parameters)
+    similarity_metric = EMMetric(3, metric_parameters)
     update_rule = UpdateRule.Composition()
     registration_optimizer = SymmetricRegistrationOptimizer(
         fixed, moving, None, init_affine, similarity_metric, update_rule,

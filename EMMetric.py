@@ -27,8 +27,8 @@ class EMMetric(SimilarityMetric):
                 'q_levels':256,'use_double_gradient':True,
                 'iteration_type':'v_cycle'}
 
-    def __init__(self, parameters):
-        super(EMMetric, self).__init__(parameters)
+    def __init__(self, dim, parameters):
+        super(EMMetric, self).__init__(dim, parameters)
         self.step_type = self.parameters['step_type']
         self.q_levels = self.parameters['q_levels']
         self.use_double_gradient = self.parameters['use_double_gradient']
@@ -44,6 +44,11 @@ class EMMetric(SimilarityMetric):
             self.iteration_type = EMMetric.WCYCLE_ITER
         else:
             self.iteration_type = EMMetric.VCYCLE_ITER
+        self.fixed_image_transformation=None
+        self.moving_image_transformation=None
+        self.fixed_original=None
+        self.moving_original=None
+        self.__connect_functions()
 
     def __connect_functions(self):
         r'''
@@ -84,22 +89,32 @@ class EMMetric(SimilarityMetric):
         diff-demons does for mono-modality images. If the flag
         self.use_double_gradient is True these garadients are averaged.
         '''
-        self.__connect_functions()
-        sampling_mask = self.fixed_image_mask*self.moving_image_mask
-        self.sampling_mask = sampling_mask
-        fixedq, self.fixedq_levels, hist = self.quantize(self.fixed_image,
-                                                      self.q_levels)
-        fixedq = np.array(fixedq, dtype = np.int32)
-        self.fixedq_levels = np.array(self.fixedq_levels)
-        fixedq_means, fixedq_variances = self.compute_stats(sampling_mask,
-                                                       self.moving_image,
+        composition=self.moving_image_transformation.compose(self.fixed_image_transformation.inverse())
+        self.sampling_fixed = composition.warp_forward_nn(self.moving_image_mask)
+        self.sampling_moving = composition.warp_backward_nn(self.fixed_image_mask)
+        self.sampling_fixed *= self.fixed_image_mask
+        self.sampling_moving *= self.moving_image_mask
+        warped_moving = composition.warp_forward(self.moving_original)
+        warped_fixed = composition.warp_backward(self.fixed_original)
+        del composition
+        fixedq_means, fixedq_variances = self.compute_stats(self.sampling_fixed,
+                                                       warped_moving,
                                                        self.q_levels,
-                                                       fixedq)
+                                                       self.fixedq)
         fixedq_means[0] = 0
         fixedq_means = np.array(fixedq_means)
         fixedq_variances = np.array(fixedq_variances)
-        self.fixedq_sigma_field = fixedq_variances[fixedq]
-        self.fixedq_means_field = fixedq_means[fixedq]
+        ######################
+        warped_fixedq = self.fixed_image_transformation.warp_forward_nn(self.fixedq)
+        self.fixedq_sigma_field = fixedq_variances[warped_fixedq]
+        self.fixedq_means_field = fixedq_means[warped_fixedq]
+#        warped_fixedq = self.fixed_image_transformation.warp_forward_nn(self.fixedq)
+#        self.fixedq_sigma_field = fixedq_variances[self.fixedq]
+#        self.fixedq_means_field = fixedq_means[self.fixedq]
+#        self.fixedq_sigma_field = self.fixed_image_transformation.warp_forward_nn(self.fixedq_sigma_field)
+#        self.fixedq_means_field = self.fixed_image_transformation.warp_forward(self.fixedq_means_field)
+        ######################
+        del warped_fixedq
         self.gradient_moving = np.empty(
             shape = (self.moving_image.shape)+(self.dim,), dtype = np.float64)
         i = 0
@@ -112,17 +127,23 @@ class EMMetric(SimilarityMetric):
         for grad in sp.gradient(self.fixed_image):
             self.gradient_fixed[..., i] = grad
             i += 1
-        movingq, self.movingq_levels, hist = self.quantize(self.moving_image,
-                                                        self.q_levels)
-        movingq = np.array(movingq, dtype = np.int32)
-        self.movingq_levels = np.array(self.movingq_levels)
-        movingq_means, movingq_variances = self.compute_stats(
-            sampling_mask, self.fixed_image, self.q_levels, movingq)
+        movingq_means, movingq_variances = self.compute_stats(self.sampling_moving,
+                                                       warped_fixed,
+                                                       self.q_levels,
+                                                       self.movingq)
         movingq_means[0] = 0
         movingq_means = np.array(movingq_means)
         movingq_variances = np.array(movingq_variances)
-        self.movingq_sigma_field = movingq_variances[movingq]
-        self.movingq_means_field = movingq_means[movingq]
+        ######################
+        warped_movingq = self.moving_image_transformation.warp_forward_nn(self.movingq)
+        self.movingq_sigma_field = movingq_variances[warped_movingq]
+        self.movingq_means_field = movingq_means[warped_movingq]
+#        warped_movingq = self.moving_image_transformation.warp_forward_nn(self.movingq)
+#        self.movingq_sigma_field = movingq_variances[self.movingq]
+#        self.movingq_means_field = movingq_means[self.movingq]
+#        self.movingq_sigma_field = self.moving_image_transformation.warp_forward_nn(self.movingq_sigma_field)
+#        self.movingq_means_field = self.moving_image_transformation.warp_forward(self.movingq_means_field)
+        ######################
         if self.use_double_gradient:
             i = 0
             for grad in sp.gradient(self.fixedq_means_field):
@@ -137,15 +158,14 @@ class EMMetric(SimilarityMetric):
         r'''
         Frees the resources allocated during initialization
         '''
-        del self.sampling_mask
-        del self.fixedq_levels
-        del self.movingq_levels
         del self.fixedq_sigma_field
         del self.fixedq_means_field
         del self.movingq_sigma_field
         del self.movingq_means_field
         del self.gradient_moving
         del self.gradient_fixed
+        self.fixed_original=None
+        self.moving_original=None
 
     def compute_forward(self):
         r'''
@@ -231,10 +251,16 @@ class EMMetric(SimilarityMetric):
         current fixed image mask from the originalFixedImage mask (warped
         by nearest neighbor interpolation)
         '''
-        self.fixed_image_mask = (original_fixed_image>0).astype(np.int32)
-        if transformation == None:
+        self.fixed_image_transformation = transformation
+        if original_fixed_image == None:
+            self.fixed_original = None
             return
-        self.fixed_image_mask = transformation.warp_forward_nn(self.fixed_image_mask)
+        if self.fixed_original==None or self.fixed_original.shape != original_fixed_image.shape:
+            self.fixed_original=original_fixed_image
+            self.fixedq, self.fixedq_levels, hist = self.quantize(original_fixed_image, self.q_levels)
+            self.fixedq=np.array(self.fixedq, dtype = np.int32)
+            self.fixedq_levels=np.array(self.fixedq_levels)
+            self.fixed_image_mask = (original_fixed_image>0).astype(np.int32)
 
     def use_moving_image_dynamics(self, original_moving_image, transformation):
         r'''
@@ -242,19 +268,29 @@ class EMMetric(SimilarityMetric):
         current moving image mask from the originalMovingImage mask (warped
         by nearest neighbor interpolation)
         '''
-        self.moving_image_mask = (original_moving_image>0).astype(np.int32)
-        if transformation == None:
+        self.moving_image_transformation = transformation
+        if original_moving_image == None:
+            self.moving_original = None
             return
-        self.moving_image_mask = transformation.warp_forward_nn(self.moving_image_mask)
+        if self.moving_original == None or self.moving_original.shape != original_moving_image.shape:
+            self.moving_original = original_moving_image
+            self.movingq, self.movingq_levels, hist = self.quantize(self.moving_image, self.q_levels)
+            self.movingq = np.array(self.movingq, dtype = np.int32)
+            self.movingq_levels = np.array(self.movingq_levels)
+            self.moving_image_mask = (original_moving_image>0).astype(np.int32)
 
     def report_status(self):
         r'''
         Shows the overlaid input images
         '''
         if self.dim == 2:
+            fixed = self.fixedq_means_field
+            moving = self.movingq_means_field
+#            fixed = self.fixedq_means_field * self.sampling_fixed
+#            moving = self.movingq_means_field * self.sampling_moving
             plt.figure()
-            rcommon.overlayImages(self.movingq_means_field,
-                                  self.fixedq_means_field, False)
+            rcommon.overlayImages(moving,
+                                  fixed, False)
         else:
             fixed = self.fixed_image
             moving = self.moving_image
