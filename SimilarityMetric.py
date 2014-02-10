@@ -13,7 +13,8 @@ class SimilarityMetric(object):
     non-linear), so it assumes the fixed and reference images are already warped
     '''
     __metaclass__ = abc.ABCMeta
-    def __init__(self, parameters):
+    def __init__(self, dim, parameters):
+        self.dim = dim
         default_parameters = self.get_default_parameters()
         for key, val in parameters.iteritems():
             if key in default_parameters:
@@ -26,7 +27,6 @@ class SimilarityMetric(object):
         self.levels_above = 0
         self.levels_below = 0
         self.symmetric = False
-        self.dim = None
 
     def set_levels_below(self, levels):
         r'''
@@ -46,11 +46,12 @@ class SimilarityMetric(object):
 
     def set_fixed_image(self, fixed_image):
         '''
-        Sets the fixed image. The dimension the similarity metric operates on
-        is defined as the dimension of the last image (fixed or moving) passed
-        to it
+        Sets the fixed image. Verifies that the image dimension is consistent
+        with this metric.
         '''
-        self.dim = len(fixed_image.shape) if fixed_image != None else 0
+        new_dim = len(fixed_image.shape) if fixed_image != None else self.dim
+        if new_dim!=self.dim:
+            raise AttributeError('Unexpected fixed_image dimension: '+str(new_dim))
         self.fixed_image = fixed_image
 
     @abc.abstractmethod
@@ -63,16 +64,14 @@ class SimilarityMetric(object):
     @abc.abstractmethod
     def use_fixed_image_dynamics(self,
                               original_fixed_image,
-                              transformation,
-                              direction):
+                              transformation):
         '''
         This methods provides the metric a chance to compute any useful
         information from knowing how the current fixed image was generated
         (as the transformation of an original fixed image). This method is
         called by the optimizer just after it sets the fixed image.
         Transformation will be an instance of TransformationModel or None if
-        the originalMovingImage equals self.moving_image. Direction is either 1
-        (warp forward) or -1(warp backward)
+        the originalMovingImage equals self.moving_image.
         '''
 
     @abc.abstractmethod
@@ -88,11 +87,12 @@ class SimilarityMetric(object):
 
     def set_moving_image(self, moving_image):
         '''
-        Sets the moving image. The dimension the similarity metric operates on
-        is defined as the dimension of the last image (fixed or moving) passed
-        to it
+        Sets the moving image. Verifies that the image dimension is consistent
+        with this metric.
         '''
-        self.dim = len(moving_image.shape) if moving_image != None else 0
+        new_dim = len(moving_image.shape) if moving_image != None else self.dim
+        if new_dim!=self.dim:
+            raise AttributeError('Unexpected fixed_image dimension: '+str(new_dim))
         self.moving_image = moving_image
 
     @abc.abstractmethod
@@ -109,16 +109,14 @@ class SimilarityMetric(object):
     @abc.abstractmethod
     def use_moving_image_dynamics(self,
                                original_moving_image,
-                               transformation,
-                               direction):
+                               transformation):
         '''
         This methods provides the metric a chance to compute any useful
         information from knowing how the current fixed image was generated
         (as the transformation of an original fixed image). This method is
         called by the optimizer just after it sets the fixed image.
         Transformation will be an instance of TransformationModel or None if
-        the originalMovingImage equals self.moving_image. Direction is either 1
-        (warp forward) or -1(warp backward)
+        the originalMovingImage equals self.moving_image.
         '''
 
     @abc.abstractmethod

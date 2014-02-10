@@ -27,8 +27,8 @@ class EMMetric(SimilarityMetric):
                 'q_levels':256,'use_double_gradient':True,
                 'iteration_type':'v_cycle'}
 
-    def __init__(self, parameters):
-        super(EMMetric, self).__init__(parameters)
+    def __init__(self, dim, parameters):
+        super(EMMetric, self).__init__(dim, parameters)
         self.step_type = self.parameters['step_type']
         self.q_levels = self.parameters['q_levels']
         self.use_double_gradient = self.parameters['use_double_gradient']
@@ -225,8 +225,7 @@ class EMMetric(SimilarityMetric):
         '''
         pass
 
-    def use_fixed_image_dynamics(self, original_fixed_image, transformation,
-                              direction):
+    def use_fixed_image_dynamics(self, original_fixed_image, transformation):
         r'''
         EMMetric takes advantage of the image dynamics by computing the
         current fixed image mask from the originalFixedImage mask (warped
@@ -235,15 +234,9 @@ class EMMetric(SimilarityMetric):
         self.fixed_image_mask = (original_fixed_image>0).astype(np.int32)
         if transformation == None:
             return
-        if direction == 1:
-            self.fixed_image_mask = transformation.warp_forward_nn(
-                self.fixed_image_mask)
-        else:
-            self.fixed_image_mask = transformation.warp_backward_nn(
-                self.fixed_image_mask)
+        self.fixed_image_mask = transformation.warp_forward_nn(self.fixed_image_mask)
 
-    def use_moving_image_dynamics(self, original_moving_image, transformation,
-                               direction):
+    def use_moving_image_dynamics(self, original_moving_image, transformation):
         r'''
         EMMetric takes advantage of the image dynamics by computing the
         current moving image mask from the originalMovingImage mask (warped
@@ -252,12 +245,7 @@ class EMMetric(SimilarityMetric):
         self.moving_image_mask = (original_moving_image>0).astype(np.int32)
         if transformation == None:
             return
-        if direction == 1:
-            self.moving_image_mask = transformation.warp_forward_nn(
-                self.moving_image_mask)
-        else:
-            self.moving_image_mask = transformation.warp_backward_nn(
-                self.moving_image_mask)
+        self.moving_image_mask = transformation.warp_forward_nn(self.moving_image_mask)
 
     def report_status(self):
         r'''

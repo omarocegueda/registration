@@ -130,11 +130,11 @@ class AsymmetricRegistrationOptimizer(RegistrationOptimizer):
         '''
         wmoving = self.forward_model.warp_forward(self.current_moving)
         self.similarity_metric.set_moving_image(wmoving)
-        self.similarity_metric.use_moving_image_dynamics(self.current_moving,
-                                                         self.forward_model, 1)
+        self.similarity_metric.use_moving_image_dynamics(
+            self.current_moving, self.forward_model)
         self.similarity_metric.set_fixed_image(self.current_fixed)
         self.similarity_metric.use_fixed_image_dynamics(
-            self.current_fixed, None, 1)
+            self.current_fixed, None)
         self.similarity_metric.initialize_iteration()
         fw_step = np.array(self.similarity_metric.compute_forward())
         self.forward_model.forward, mean_diff = self.update_rule.update(
@@ -202,13 +202,11 @@ class AsymmetricRegistrationOptimizer(RegistrationOptimizer):
         '''
         wmoving = self.forward_model.warp_forward(self.current_moving)
         self.similarity_metric.set_moving_image(wmoving)
-        self.similarity_metric.use_moving_image_dynamics(self.current_moving,
-                                                         self.forward_model,
-                                                         1)
+        self.similarity_metric.use_moving_image_dynamics(
+            self.current_moving, self.forward_model)
         self.similarity_metric.set_fixed_image(self.current_fixed)
-        self.similarity_metric.use_fixed_image_dynamics(self.current_fixed,
-                                                     None,
-                                                     -1)
+        self.similarity_metric.use_fixed_image_dynamics(
+            self.current_fixed, None)
         self.similarity_metric.initialize_iteration()
         self.similarity_metric.report_status()
 

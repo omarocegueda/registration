@@ -248,3 +248,71 @@ class TransformationModel(object):
             residual, stats = tf.compose_vector_fields3D(self.forward,
                                                          self.backward)
         return residual, stats
+
+    def compose(self, applyFirst):
+        r'''
+        Computes the composition G(F(.)) where G is this transformation and
+        F is the transformation given as parameter
+        '''
+        B=applyFirst.affine_post
+        C=self.affine_pre
+        if B==None:
+            affine_prod=C
+        elif C==None:
+            affine_prod=B
+        else:
+            affine_prod=C.dot(B)
+        if affine_prod!=None:
+            affine_prod_inv=linalg.inv(affine_prod).copy(order='C')
+        else:
+            affine_prod_inv=None
+        if self.dim == 2:
+            forward=applyFirst.forward.copy()
+            tf.append_affine_to_displacement_field_2d(forward, affine_prod)
+            forward, stats = tf.compose_vector_fields(forward,
+                                                      self.forward)
+            backward=self.backward.copy()
+            tf.append_affine_to_displacement_field_2d(backward, affine_prod_inv)
+            backward, stats = tf.compose_vector_fields(backward, 
+                                                       applyFirst.backward)
+        else:
+            forward=applyFirst.forward.copy()
+            tf.append_affine_to_displacement_field_3d(forward, affine_prod)
+            forward, stats = tf.compose_vector_fields3D(forward,
+                                                      self.forward)
+            backward=self.backward.copy()
+            tf.append_affine_to_displacement_field_3d(backward, affine_prod_inv)
+            backward, stats = tf.compose_vector_fields3D(backward, 
+                                                       applyFirst.backward)
+        composition=TransformationModel(forward, backward, 
+                                        applyFirst.affine_pre, self.affine_post)
+        return composition
+
+    def inverse(self):
+        r'''
+        Return the inverse of this transformation model. Warning: the matrices 
+        and displacement fields are not copied
+        '''
+        inv=TransformationModel(self.backward, self.forward, 
+                                self.affine_post_inv, self.affine_pre_inv)
+        return inv
+
+    def consolidate(self):
+        r'''
+        Eliminates the affine transformations from the representation of this
+        transformation by appending/prepending them to the deformation fields.
+        '''
+        if self.dim == 2:
+            tf.prepend_affine_to_displacement_field_2d(self.forward, self.affine_pre)
+            tf.append_affine_to_displacement_field_2d(self.forward, self.affine_post)
+            tf.prepend_affine_to_displacement_field_2d(self.backward, self.affine_post_inv)
+            tf.append_affine_to_displacement_field_2d(self.backward, self.affine_pre_inv)
+        else:
+            tf.prepend_affine_to_displacement_field_3d(self.forward, self.affine_pre)
+            tf.append_affine_to_displacement_field_3d(self.forward, self.affine_post)
+            tf.prepend_affine_to_displacement_field_3d(self.backward, self.affine_post_inv)
+            tf.append_affine_to_displacement_field_3d(self.backward, self.affine_pre_inv)
+        self.affine_post = None
+        self.affine_pre = None
+        self.affine_post_inv = None
+        self.affine_pre_inv = None
