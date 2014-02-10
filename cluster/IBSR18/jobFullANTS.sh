@@ -40,11 +40,12 @@ else
     echo " $exe "
     $exe
 fi
-
+oname=warpedDiff_${targetbase}_${referencebase}.nii.gz
+WarpImageMultiTransform 3 target/$target $oname $deformationField $affine -R reference/$reference
 for towarp in $( ls warp ); do
     towarpbase="${towarp%.*}"
     towarpbase="${towarpbase%.*}"
-    oname=${towarpbase}_${referencebase}.nii.gz
+    oname=warpedDiff_${towarpbase}_${referencebase}.nii.gz
     deformationField=${targetbase}_${referencebase}Warp.nii.gz
     WarpImageMultiTransform 3 warp/$towarp $oname $deformationField $affine -R reference/$reference --use-NN
 done
