@@ -714,7 +714,10 @@ double computeEnergySSD2DCPP(double *deltaField, double *sigmaField, double *gra
                 double dst=(nd[0]-d[0])*(nd[0]-d[0])+(nd[1]-d[1])*(nd[1]-d[1]);
                 localEnergy+=dst;
             }
-            localEnergy=0.5*lambdaParam*localEnergy + 0.5*(delta-dotp)*(delta-dotp)/sigma;
+            localEnergy=0.5*lambdaParam*localEnergy;
+            if((!isInfinite(sigma)) && (sigma>0)){
+                localEnergy+=0.5*(delta-dotp)*(delta-dotp)/sigma;
+            }
             energy+=localEnergy;
         }//cols
     }//rows
@@ -752,7 +755,10 @@ double computeEnergySSD3DCPP(double *deltaField, double *sigmaField, double *gra
                     double dst=(nd[0]-d[0])*(nd[0]-d[0])+(nd[1]-d[1])*(nd[1]-d[1])+(nd[2]-d[2])*(nd[2]-d[2]);
                     localEnergy+=dst;
                 }
-                localEnergy=0.5*lambdaParam*localEnergy + 0.5*(delta-dotp)*(delta-dotp)/sigma;
+                localEnergy=0.5*lambdaParam*localEnergy;
+                if((!isInfinite(sigma)) && (sigma>0)){
+                    localEnergy+=0.5*(delta-dotp)*(delta-dotp)/sigma;
+                }
                 energy+=localEnergy;
             }//cols
         }//rows
