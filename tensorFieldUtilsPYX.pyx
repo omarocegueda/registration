@@ -79,8 +79,8 @@ cdef extern from "tensorFieldUtilsCPP.h":
     int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal)
     int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jacard, int nlabels)
     int precomputeCCFactors3D(double *I, double *J, int ns, int nr, int nc, int radius, double *factors)
-    int computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out)
-    int computeCCBackwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out)
+    double computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out)
+    double computeCCBackwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out)
 
 cdef checkFortran(a):
     pass
@@ -907,15 +907,15 @@ def compute_cc_forward_step_3d(double[:,:,:,:] gradFixed, double[:,:,:,:] gradMo
     cdef int nr=gradFixed.shape[1]
     cdef int nc=gradFixed.shape[2]
     cdef double[:,:,:,:] step=np.ndarray((ns, nr, nc, 3), dtype=np.float64)
-    cdef int retVal
+    cdef double retVal
     retVal=computeCCForwardStep3D(&gradFixed[0,0,0,0], &gradMoving[0,0,0,0], ns, nr, nc, &factors[0,0,0,0], &step[0,0,0,0])
-    return step
+    return step, retVal
 
 def compute_cc_backward_step_3d(double[:,:,:,:] gradFixed, double[:,:,:,:] gradMoving, double[:,:,:,:] factors):
     cdef int ns=gradFixed.shape[0]
     cdef int nr=gradFixed.shape[1]
     cdef int nc=gradFixed.shape[2]
     cdef double[:,:,:,:] step=np.ndarray((ns, nr, nc, 3), dtype=np.float64)
-    cdef int retVal
+    cdef double retVal
     retVal=computeCCBackwardStep3D(&gradFixed[0,0,0,0], &gradMoving[0,0,0,0], ns, nr, nc, &factors[0,0,0,0], &step[0,0,0,0])
-    return step
+    return step, retVal

@@ -82,5 +82,5 @@ void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nv
 int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal);
 int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jacard, int nlabels);
 int precomputeCCFactors3D(double *I, double *J, int ns, int nr, int nc, int radius, double *factors);
-int computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out);
-int computeCCBackwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out);
+double computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out);
+double computeCCBackwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out);

@@ -7,6 +7,7 @@ import tensorFieldUtils as tf
 from SimilarityMetric import SimilarityMetric
 import matplotlib.pyplot as plt
 import registrationCommon as rcommon
+from scipy import ndimage
 class CCMetric(SimilarityMetric):
     r'''
     Similarity metric based on the Expectation-Maximization algorithm to handle
@@ -26,9 +27,10 @@ class CCMetric(SimilarityMetric):
         r'''
         Precomputes the cross-correlation factors
         '''
-        self.factors = tf.precompute_cc_factors_3d(self.fixed_image, 
-                                                   self.moving_image, 
+        self.factors = tf.precompute_cc_factors_3d(self.fixed_image,
+                                                   self.moving_image,
                                                    self.radius)
+        self.factors = np.array(self.factors)
         self.gradient_moving = np.empty(
             shape = (self.moving_image.shape)+(self.dim,), dtype = np.float64)
         i = 0
@@ -55,20 +57,43 @@ class CCMetric(SimilarityMetric):
         Computes the update displacement field to be used for registration of
         the moving image towards the fixed image
         '''
-        step=tf.compute_cc_forward_step_3d(self.gradient_fixed,
-                                      self.gradient_moving, 
+        displacement, self.energy=tf.compute_cc_forward_step_3d(self.gradient_fixed,
+                                      self.gradient_moving,
                                       self.factors)
-        return step
+        displacement=np.array(displacement)
+        displacement[..., 0] = ndimage.filters.gaussian_filter(displacement[..., 0],
+                                                               self.sigma_diff)
+        displacement[..., 1] = ndimage.filters.gaussian_filter(displacement[..., 1],
+                                                                self.sigma_diff)
+        displacement[..., 2] = ndimage.filters.gaussian_filter(displacement[..., 2],
+                                                                self.sigma_diff)
+
+
+
+        max_norm = np.sqrt(np.sum(displacement**2, -1)).max()
+        #if max_norm > self.max_step_length:
+        displacement *= self.max_step_length/max_norm
+        return displacement
 
     def compute_backward(self):
         r'''
         Computes the update displacement field to be used for registration of
         the fixed image towards the moving image
         '''
-        step=tf.compute_cc_backward_step_3d(self.gradient_fixed,
-                                      self.gradient_moving, 
+        displacement, energy=tf.compute_cc_backward_step_3d(self.gradient_fixed,
+                                      self.gradient_moving,
                                       self.factors)
-        return step
+        displacement=np.array(displacement)
+        displacement[..., 0] = ndimage.filters.gaussian_filter(displacement[..., 0],
+                                                               self.sigma_diff)
+        displacement[..., 1] = ndimage.filters.gaussian_filter(displacement[..., 1],
+                                                                self.sigma_diff)
+        displacement[..., 2] = ndimage.filters.gaussian_filter(displacement[..., 2],
+                                                                self.sigma_diff)
+        max_norm = np.sqrt(np.sum(displacement**2, -1)).max()
+        #if max_norm > self.max_step_length:
+        displacement *= self.max_step_length/max_norm
+        return displacement
 
 
     def get_energy(self):
@@ -124,7 +149,7 @@ class CCMetric(SimilarityMetric):
         else:
             fixed = self.fixed_image
             moving = self.moving_image
-            shape_fixed = self.fixedq_means_field.shape
+            shape_fixed = fixed.shape
             rcommon.overlayImages(moving[:, shape_fixed[1]//2, :],
                                   fixed[:, shape_fixed[1]//2, :])
             rcommon.overlayImages(moving[shape_fixed[0]//2, :, :],

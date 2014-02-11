@@ -702,7 +702,7 @@ double computeEnergySSD2DCPP(double *deltaField, double *sigmaField, double *gra
     for(int r=0;r<nrows;++r){
         for(int c=0;c<ncols;++c, ++pos, d+=2, g+=2){
             double delta=deltaField[pos];
-            double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
+            /*double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
             double dotp=d[0]*g[0]+d[1]*g[1];
             double localEnergy=0;
             if(r>0){
@@ -718,7 +718,8 @@ double computeEnergySSD2DCPP(double *deltaField, double *sigmaField, double *gra
             localEnergy=0.5*lambdaParam*localEnergy;
             if((!isInfinite(sigma)) && (sigma>0)){
                 localEnergy+=0.5*(delta-dotp)*(delta-dotp)/sigma;
-            }
+            }*/
+            double localEnergy=delta*delta;
             energy+=localEnergy;
         }//cols
     }//rows
@@ -738,7 +739,7 @@ double computeEnergySSD3DCPP(double *deltaField, double *sigmaField, double *gra
         for(int r=0;r<nrows;++r){
             for(int c=0;c<ncols;++c, ++pos, d+=3, g+=3){
                 double delta=deltaField[pos];
-                double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
+                /*double sigma=(sigmaField!=NULL)?sigmaField[pos]:1;
                 double dotp=d[0]*g[0]+d[1]*g[1]+d[2]*g[2];
                 double localEnergy=0;
                 if(s>0){
@@ -759,7 +760,8 @@ double computeEnergySSD3DCPP(double *deltaField, double *sigmaField, double *gra
                 localEnergy=0.5*lambdaParam*localEnergy;
                 if((!isInfinite(sigma)) && (sigma>0)){
                     localEnergy+=0.5*(delta-dotp)*(delta-dotp)/sigma;
-                }
+                }*/
+                double localEnergy=delta*delta;
                 energy+=localEnergy;
             }//cols
         }//rows
@@ -4196,8 +4198,11 @@ int precomputeCCFactors3D(double *I, double *J, int ns, int nr, int nc, int radi
                         lines[CNT][q] += 1;
                     }
                 }
+                memset(sums, 0, sizeof(sums));
                 for(int t=0;t<6;++t){
-                    sums[t]+=lines[t][q];
+                    for(int qq=0;qq<side;++qq){
+                        sums[t]+=lines[t][qq];
+                    }
                 }
                 if(k>=radius){
                     int s=k-radius;//s is the voxel that is affected by the cube with slices [s-radius..s+radius, :, :]
@@ -4237,7 +4242,7 @@ int precomputeCCFactors3D(double *I, double *J, int ns, int nr, int nc, int radi
     return 0;
 }
 
-int computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out){
+double computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out){
     double *deriv=out;
     int nvox=ns*nr*nc;
     double *F=factors;
@@ -4273,7 +4278,7 @@ int computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr
     return energy;
 }
 
-int computeCCBackwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out){
+double computeCCBackwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out){
     double *deriv=out;
     int nvox=ns*nr*nc;
     double *F=factors;

@@ -10,6 +10,7 @@ import registrationCommon as rcommon
 import tensorFieldUtils as tf
 from SymmetricRegistrationOptimizer import SymmetricRegistrationOptimizer
 from EMMetric import EMMetric
+from CCMetric import CCMetric
 import UpdateRule as UpdateRule
 from dipy.fixes import argparse as arg
 
@@ -63,17 +64,31 @@ parser.add_argument(
            with the obtained deformation field''')
 
 parser.add_argument(
-    '-s', '--smooth', action = 'store', metavar = 'lambda',
-    help = '''The regulaization parameter (lambda) of the deformation field
-           (higher values produce smoother deformation fields)''',
-    default = '25.0')
+    '-m', '--metric', action = 'store', metavar = 'metric',
+    help = '''Any of {EM[L], CC[L]} specifying the metric to be used
+    SSD=sum of squared diferences (monomodal), EM=Expectation Maximization
+    to fit the transfer functions (multimodal), CC=Cross Correlation (monomodal
+    and some multimodal) and the comma-separated (WITH NO SPACES) parameter list L:
+    EM[step_lentgh,lambda,qLevels,max_inner_iter]
+        step_length: the maximum norm among all vectors of the displacement at each iteration
+        lambda: the smoothing parameter (the greater the smoother)
+        qLevels: number of quantization levels (hidden variables) in the EM formulation
+        max_inner_iter: maximum number of iterations of each level of the multi-resolution Gauss-Seidel algorithm
+        e.g.: EM[0.25,25.0,256,20] (NO SPACES)
+    CC[step_length,sigma_smooth,neigh_radius]
+        step_length: the maximum norm among all vectors of the displacement at each iteration
+        sigma_smooth: std. dev. of the smoothing kernel to be used to smooth the gradient at each step
+        neigh_radius: radius of the squared neighborhood to be used to compute the Cross Correlation at each voxel
+        e.g.:CC[0.25,3.0,4] (NO SPACES)
+    ''',
+    default = 'CC[0.25,3.0,4]')
 
 parser.add_argument(
     '-i', '--iter', action = 'store', metavar = 'i_0,i_1,...,i_n',
-    help = '''A comma-separated list of integers indicating the maximum number
+    help = '''A comma-separated (WITH NO SPACES) list of integers indicating the maximum number
            of iterations at each level of the Gaussian Pyramid (similar to
-           ANTS), e.g. 10,100,100''',
-    default = '25x50x100')
+           ANTS), e.g. 10,100,100 (NO SPACES)''',
+    default = '25,50,100')
 
 parser.add_argument(
     '-inv_iter', '--inversion_iter', action = 'store', metavar = 'max_iter',
@@ -169,9 +184,8 @@ def check_arguments(params):
     r'''
     Verify all arguments were correctly parsed and interpreted
     '''
-    print(params.target, params.reference, params.affine, params.warp_dir,
-          float(params.smooth))
-    print('iter:', [int(i) for i in params.iter.split('x')])
+    print(params.target, params.reference, params.affine, params.warp_dir)
+    print('iter:', [int(i) for i in params.iter.split(',')])
     print(params.inner_iter, params.quantization_levels,
           params.single_gradient)
     print('Inversion:', params.inversion_iter, params.inversion_tolerance)
@@ -246,13 +260,24 @@ def register_3d(params):
     print('Registering %s to %s'%(params.target, params.reference))
     sys.stdout.flush()
     ####Initialize parameter dictionaries####
-    metric_parameters = {
-        'lambda':float(params.smooth),
-        'q_levels':int(params.quantization_levels),
-        'use_double_gradient':False if params.single_gradient else True,
-        'max_inner_iter':int(params.inner_iter)}
+    metric_name=params.metric[0:params.metric.find('[')]
+    metric_params_list=params.metric[params.metric.find('[')+1:params.metric.find(']')].split(',')
+    if metric_name=='EM':
+        metric_parameters = {
+            'max_step_length':float(metric_params_list[0]),
+            'lambda':float(metric_params_list[1]),
+            'q_levels':int(metric_params_list[2]),
+            'max_inner_iter':int(metric_params_list[3]),
+            'use_double_gradient':False if params.single_gradient else True}
+        similarity_metric = EMMetric(3, metric_parameters)
+    elif metric_name=='CC':
+        metric_parameters = {
+            'max_step_length':float(metric_params_list[0]),
+            'sigma_diff':float(metric_params_list[1]),
+            'radius':int(metric_params_list[2])}
+        similarity_metric = CCMetric(3, metric_parameters)
     optimizer_parameters = {
-        'max_iter':[int(i) for i in params.iter.split('x')],
+        'max_iter':[int(i) for i in params.iter.split(',')],
         'inversion_iter':int(params.inversion_iter),
         'inversion_tolerance':float(params.inversion_tolerance),
         'report_status':True if params.report_status else False}
@@ -260,6 +285,7 @@ def register_3d(params):
     moving_affine = moving.get_affine()
     fixed = nib.load(params.reference)
     fixed_affine = fixed.get_affine()
+    print 'Affine:', params.affine
     if not params.affine:
         transform = np.eye(4)
     else:
@@ -273,7 +299,7 @@ def register_3d(params):
     moving = (moving-moving.min())/(moving.max()-moving.min())
     fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
     ###################Run registration##################
-    similarity_metric = EMMetric(3, metric_parameters)
+
     update_rule = UpdateRule.Composition()
     registration_optimizer = SymmetricRegistrationOptimizer(
         fixed, moving, None, init_affine, similarity_metric, update_rule,
@@ -285,6 +311,59 @@ def register_3d(params):
     del similarity_metric
     del update_rule
     save_registration_results(init_affine, displacement, inverse, params)
+
+def test_exec():
+    target='target/IBSR_01_ana_strip.nii.gz'
+    reference='reference/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz'
+    affine='IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt'
+    paramiter='0x30x30'
+    inversion_iter='20'
+    inversion_tolerance='1e-3'
+    report_status=True
+    print('Registering %s to %s'%(target, reference))
+    sys.stdout.flush()
+    ####Initialize parameter dictionaries####
+    metric_parameters = {
+        'max_step_length':0.25,
+        'sigma_diff':3.0,
+        'radius':4}
+    similarity_metric = CCMetric(3, metric_parameters)
+    optimizer_parameters = {
+        'max_iter':[int(i) for i in paramiter.split(',')],
+        'inversion_iter':int(inversion_iter),
+        'inversion_tolerance':float(inversion_tolerance),
+        'report_status':True if report_status else False}
+    moving = nib.load(target)
+    moving_affine = moving.get_affine()
+    fixed = nib.load(reference)
+    fixed_affine = fixed.get_affine()
+    print 'Affine:', affine
+    if not affine:
+        transform = np.eye(4)
+    else:
+        transform = rcommon.readAntsAffine(affine)
+    init_affine = np.linalg.inv(moving_affine).dot(transform.dot(fixed_affine))
+    #print initAffine
+    moving = moving.get_data().squeeze().astype(np.float64)
+    fixed = fixed.get_data().squeeze().astype(np.float64)
+    moving = moving.copy(order='C')
+    fixed = fixed.copy(order='C')
+    moving = (moving-moving.min())/(moving.max()-moving.min())
+    fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
+    ###################Run registration##################
+
+    update_rule = UpdateRule.Composition()
+    registration_optimizer = SymmetricRegistrationOptimizer(
+        fixed, moving, None, init_affine, similarity_metric, update_rule,
+        optimizer_parameters)
+    registration_optimizer.optimize()
+    #displacement = registration_optimizer.get_forward()
+    #inverse = registration_optimizer.get_backward()
+    del registration_optimizer
+    del similarity_metric
+    del update_rule
+    #save_registration_results(init_affine, displacement, inverse, params)
+
 
 if __name__ == '__main__':
     register_3d(parser.parse_args())

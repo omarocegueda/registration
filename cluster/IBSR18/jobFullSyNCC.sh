@@ -1,10 +1,10 @@
 #!/bin/bash
 ####################################################
 # Author: Omar Ocegueda (omar@cimat.mx)
-#PBS -l mem=4gb
+#PBS -l pmem=4gb
 #PBS -l nodes=1:ppn=1
-#PBS -l walltime=03:00:00
-#PBS -N FullSyNEM
+#PBS -l walltime=06:00:00
+#PBS -N FullSyNCC
 #PBS -M omar@cimat.com
 export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
@@ -31,5 +31,5 @@ else
     echo "Affine mapping found ($affine). Skipping affine registration."
 fi
 #Diffeomorphic registration
-python dipyreg.py target/$target reference/$reference $affine warp --metric=EM[0.25,25.0,256,20]
+python dipyreg.py target/$target reference/$reference $affine warp --metric=CC[0.25,3.0,4] --iter=25,100,100
 date

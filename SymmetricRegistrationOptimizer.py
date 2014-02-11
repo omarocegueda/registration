@@ -278,12 +278,11 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
                                            self.current_fixed.shape)
                 self.backward_model.upsample(self.current_moving.shape,
                                             self.current_fixed.shape)
-            error = 1 + self.tolerance
             niter = 0
             self.energy_list = []
-            while (niter < self.max_iter[level]) and (self.tolerance < error):
+            while (niter < self.max_iter[level]):
                 niter += 1
-                error = self.__iterate()
+                self.__iterate()
             if self.report_status:
                 self.__report_status(level)
         residual, stats = self.forward_model.compute_inversion_error()
