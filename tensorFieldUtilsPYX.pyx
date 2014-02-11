@@ -78,6 +78,9 @@ cdef extern from "tensorFieldUtilsCPP.h":
     void getVotingSegmentation(int *votes, int nslices, int nrows, int ncols, int nvotes, int *seg)
     int getDisplacementRange(double *d, int nslices, int nrows, int ncols, double *affine, double *minVal, double *maxVal)
     int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jacard, int nlabels)
+    int precomputeCCFactors3D(double *I, double *J, int ns, int nr, int nc, int radius, double *factors)
+    int computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out)
+    int computeCCBackwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out)
 
 cdef checkFortran(a):
     pass
@@ -889,3 +892,30 @@ def compute_jacard(int[:,:,:] A, int[:,:,:] B, int nlabels):
     cdef double[:] jacard = np.ndarray((nlabels, ), dtype=np.float64)
     retVal=computeJacard(&A[0,0,0], &B[0,0,0], nslices, nrows, ncols, &jacard[0], nlabels)
     return jacard
+
+def precompute_cc_factors_3d(double[:,:,:] fixed, double[:,:,:] moving, int radius):
+    cdef int ns=fixed.shape[0]
+    cdef int nr=fixed.shape[1]
+    cdef int nc=fixed.shape[2]
+    cdef double[:,:,:,:] factors=np.ndarray((ns, nr, nc, 5), dtype=np.float64)
+    cdef int retVal
+    retVal=precomputeCCFactors3D(&fixed[0,0,0], &moving[0,0,0], ns, nr, nc, radius, &factors[0,0,0,0])
+    return factors
+    
+def compute_cc_forward_step_3d(double[:,:,:,:] gradFixed, double[:,:,:,:] gradMoving, double[:,:,:,:] factors):
+    cdef int ns=gradFixed.shape[0]
+    cdef int nr=gradFixed.shape[1]
+    cdef int nc=gradFixed.shape[2]
+    cdef double[:,:,:,:] step=np.ndarray((ns, nr, nc, 3), dtype=np.float64)
+    cdef int retVal
+    retVal=computeCCForwardStep3D(&gradFixed[0,0,0,0], &gradMoving[0,0,0,0], ns, nr, nc, &factors[0,0,0,0], &step[0,0,0,0])
+    return step
+
+def compute_cc_backward_step_3d(double[:,:,:,:] gradFixed, double[:,:,:,:] gradMoving, double[:,:,:,:] factors):
+    cdef int ns=gradFixed.shape[0]
+    cdef int nr=gradFixed.shape[1]
+    cdef int nc=gradFixed.shape[2]
+    cdef double[:,:,:,:] step=np.ndarray((ns, nr, nc, 3), dtype=np.float64)
+    cdef int retVal
+    retVal=computeCCBackwardStep3D(&gradFixed[0,0,0,0], &gradMoving[0,0,0,0], ns, nr, nc, &factors[0,0,0,0], &step[0,0,0,0])
+    return step

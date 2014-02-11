@@ -12,6 +12,7 @@ Created on Fri Sep 20 19:03:32 2013
 #include "bitsCPP.h"
 #include "derivatives.h"
 #include "tensorFieldUtilsCPP.h"
+#include "macros.h"
 using namespace std;
 
 void integrateTensorFieldProductsCPP(double *q, int *dims, double *diff, double *A, double *b){
@@ -4152,4 +4153,158 @@ int computeJacard(int *A, int *B, int nslices, int nrows, int ncols, double *jac
     delete[] cnt;
     delete[] sz;
     return 0;
+}
+
+
+int precomputeCCFactors3D(double *I, double *J, int ns, int nr, int nc, int radius, double *factors){
+    const int SI=0;
+    const int SI2=1;
+    const int SJ=2;
+    const int SJ2=3;
+    const int SIJ=4;
+    const int CNT=5;
+    int sliceSize=nc*nr;
+    int side=2*radius+1;
+    double *lines[6];
+    double sums[6];
+    for(int k=0;k<6;++k){
+        lines[k]=new double[side];
+    }
+    for(int r=0;r<nr;++r){
+        int firstr=MAX(0, r-radius);
+        int lastr=MIN(nr-1, r+radius);
+        for(int c=0;c<nc;++c){
+            int firstc=MAX(0, c-radius);
+            int lastc=MIN(nc-1, c+radius);
+            //compute factors for line [:,r,c]
+            memset(sums, 0, sizeof(sums));
+            //Compute all slices and set the sums on the fly
+            for(int k=0;k<ns;++k){//compute each slice [k, i={r-radius..r+radius}, j={c-radius, c+radius}]
+                int q=k%side;
+                for(int t=0;t<6;++t){
+                    sums[t]-=lines[t][q];
+                    lines[t][q]=0;
+                }
+                for(int i=firstr;i<=lastr;++i){
+                    for(int j=firstc;j<=lastc;++j){
+                        int p=k*sliceSize + i*nc + j;
+                        lines[SI][q]  += I[p];
+                        lines[SI2][q] += I[p]*I[p];
+                        lines[SJ][q]  += J[p];
+                        lines[SJ2][q] += J[p]*J[p];
+                        lines[SIJ][q] += I[p]*J[p];
+                        lines[CNT][q] += 1;
+                    }
+                }
+                for(int t=0;t<6;++t){
+                    sums[t]+=lines[t][q];
+                }
+                if(k>=radius){
+                    int s=k-radius;//s is the voxel that is affected by the cube with slices [s-radius..s+radius, :, :]
+                    int pos=s*sliceSize + r*nc + c;
+                    double *F=&factors[5*pos];
+                    double Imean=sums[SI]/sums[CNT];
+                    double Jmean=sums[SJ]/sums[CNT];
+                    F[0] = I[pos] - Imean;
+                    F[1] = J[pos] - Jmean;
+                    F[2] = sums[SIJ] - Jmean * sums[SI] - Imean * sums[SJ] + sums[CNT] * Jmean * Imean;
+                    F[3] = sums[SI2] - Imean * sums[SI] - Imean * sums[SI] + sums[CNT] * Imean * Imean;
+                    F[4] = sums[SJ2] - Jmean * sums[SJ] - Jmean * sums[SJ] + sums[CNT] * Jmean * Jmean;
+                }
+            }
+            //Finally set the values at the end of the line
+            for(int s=ns-radius;s<ns;++s){
+                int k=s+radius;//this would be the last slice to be processed for voxel [s,r,c], if it existed
+                int q=k%side;
+                for(int t=0;t<6;++t){
+                    sums[t]-=lines[t][q];
+                }
+                int pos=s*sliceSize + r*nc + c;
+                double *F=&factors[5*pos];
+                double Imean=sums[SI]/sums[CNT];
+                double Jmean=sums[SJ]/sums[CNT];
+                F[0] = I[pos] - Imean;
+                F[1] = J[pos] - Jmean;
+                F[2] = sums[SIJ] - Jmean * sums[SI] - Imean * sums[SJ] + sums[CNT] * Jmean * Imean;
+                F[3] = sums[SI2] - Imean * sums[SI] - Imean * sums[SI] + sums[CNT] * Imean * Imean;
+                F[4] = sums[SJ2] - Jmean * sums[SJ] - Jmean * sums[SJ] + sums[CNT] * Jmean * Jmean;
+            }
+        }
+    }
+    for(int k=0;k<6;++k){
+        delete[] lines[k];
+    }
+    return 0;
+}
+
+int computeCCForwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out){
+    double *deriv=out;
+    int nvox=ns*nr*nc;
+    double *F=factors;
+    double *gradI=gradFixed;
+    double *gradJ=gradMoving;
+    memset(out, 0, sizeof(double)*3*nvox);
+    double energy=0;
+    for(int s=0;s<ns;++s){
+        for(int r=0;r<nr;++r){
+            for(int c=0;c<nc;++c, deriv+=3, gradI+=3, gradJ+=3, F+=5){
+                double Ii  = F[0];
+                double Ji  = F[1];
+                double sfm = F[2];
+                double sff = F[3];
+                double smm = F[4];
+                if(sff==0.0 || smm==0.0){
+                    continue;
+                }
+                double localCorrelation = 0;
+                if(sff*smm>1e-5){
+                    localCorrelation=sfm*sfm/(sff*smm);
+                }
+                if(localCorrelation<1){//avoid bad values...
+                    energy-=localCorrelation;
+                }
+                double temp = 2.0 * sfm / (sff * smm) * ( Ji - sfm / sff * Ii );
+                for(int qq=0;qq<3;++qq){
+                    deriv[qq] -= temp*gradI[qq];
+                }
+            }
+        }
+    }
+    return energy;
+}
+
+int computeCCBackwardStep3D(double *gradFixed, double *gradMoving, int ns, int nr, int nc, double *factors, double *out){
+    double *deriv=out;
+    int nvox=ns*nr*nc;
+    double *F=factors;
+    double *gradI=gradFixed;
+    double *gradJ=gradMoving;
+    memset(out, 0, sizeof(double)*3*nvox);
+    double energy=0;
+    for(int s=0;s<ns;++s){
+        for(int r=0;r<nr;++r){
+            for(int c=0;c<nc;++c, deriv+=3, gradI+=3, gradJ+=3, F+=5){
+                double Ii  = F[0];
+                double Ji  = F[1];
+                double sfm = F[2];
+                double sff = F[3];
+                double smm = F[4];
+                if(sff==0.0 || smm==0.0){
+                    continue;
+                }
+                double localCorrelation = 0;
+                if(sff*smm>1e-5){
+                    localCorrelation=sfm*sfm/(sff*smm);
+                }
+                if(localCorrelation<1){//avoid bad values...
+                    energy-=localCorrelation;
+                }
+                double temp = 2.0 * sfm / (sff * smm) * ( Ii - sfm / smm * Ji );
+                for(int qq=0;qq<3;++qq){
+                    deriv[qq] -= temp*gradJ[qq];
+                }
+            }
+        }
+    }
+    return energy;
 }
