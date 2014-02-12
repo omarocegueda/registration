@@ -730,7 +730,7 @@ double computeEnergySSD3DCPP(double *deltaField, double *sigmaField, double *gra
     int nslices=dims[0];
     int nrows=dims[1];
     int ncols=dims[2];
-    int sliceSize=nrows*ncols;
+    //int sliceSize=nrows*ncols;
     double *d=displacementField;
     double *g=gradientField;
     int pos=0;
@@ -4171,6 +4171,7 @@ int precomputeCCFactors3D(double *I, double *J, int ns, int nr, int nc, int radi
     double sums[6];
     for(int k=0;k<6;++k){
         lines[k]=new double[side];
+        memset(lines[k], 0, sizeof(double)*side);
     }
     for(int r=0;r<nr;++r){
         int firstr=MAX(0, r-radius);

@@ -67,11 +67,7 @@ class CCMetric(SimilarityMetric):
                                                                 self.sigma_diff)
         displacement[..., 2] = ndimage.filters.gaussian_filter(displacement[..., 2],
                                                                 self.sigma_diff)
-
-
-
         max_norm = np.sqrt(np.sum(displacement**2, -1)).max()
-        #if max_norm > self.max_step_length:
         displacement *= self.max_step_length/max_norm
         return displacement
 
@@ -91,7 +87,6 @@ class CCMetric(SimilarityMetric):
         displacement[..., 2] = ndimage.filters.gaussian_filter(displacement[..., 2],
                                                                 self.sigma_diff)
         max_norm = np.sqrt(np.sum(displacement**2, -1)).max()
-        #if max_norm > self.max_step_length:
         displacement *= self.max_step_length/max_norm
         return displacement
 

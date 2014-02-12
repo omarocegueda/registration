@@ -12,6 +12,7 @@ from TransformationModel import TransformationModel
 from SSDMetric import SSDMetric
 from EMMetric import EMMetric
 from RegistrationOptimizer import RegistrationOptimizer
+from scipy import interpolate
 
 class SymmetricRegistrationOptimizer(RegistrationOptimizer):
     r'''
@@ -21,7 +22,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
     '''
     def get_default_parameters(self):
         return {'max_iter':[25, 50, 100], 'inversion_iter':20,
-                'inversion_tolerance':1e-3, 'tolerance':1e-6,
+                'inversion_tolerance':1e-3, 'tolerance':1e-4,
                 'report_status':True}
 
     def __init__(self,
@@ -40,6 +41,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         self.inversion_tolerance = self.parameters['inversion_tolerance']
         self.inversion_iter = self.parameters['inversion_iter']
         self.report_status = self.parameters['report_status']
+        self.energy_window = 12
 
     def __connect_functions(self):
         r'''
@@ -176,10 +178,10 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             bw_energy = self.similarity_metric.energy
         except NameError:
             pass
+        der = '-'
         try:
             n_iter = len(self.energy_list)
-            der = '-'
-            if len(self.energy_list)>=3:
+            if len(self.energy_list)>=self.energy_window:
                 der = self.__get_energy_derivative()
             print('%d:\t%0.6f\t%0.6f\t%0.6f\t%s'%(n_iter , fw_energy, bw_energy,
                 fw_energy + bw_energy, der))
@@ -207,7 +209,7 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
             self.similarity_metric.report_status()
         #toc = time.time()
         #print('Iter time: %f sec' % (toc - tic))
-        return md_forward+md_backward
+        return 1 if der=='-' else der
 
     def __get_energy_derivative(self):
         r'''
@@ -215,9 +217,18 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
         (iterations) at the last iteration
         '''
         n_iter = len(self.energy_list)
-        poly_der = np.poly1d(
-            np.polyfit(range(n_iter), self.energy_list, 2)).deriv()
-        der = poly_der(n_iter-1.5)
+        if n_iter<self.energy_window:
+            print 'Error: attempting to fit the energy profile with less points (',n_iter,') than required (energy_window=', self.energy_window,')'
+            return 1
+        x=range(self.energy_window)
+        y=self.energy_list[(n_iter-self.energy_window):n_iter]
+        ss=sum(y)
+        if(ss>0):
+            ss*=-1
+        y=[v/ss for v in y]
+        spline = interpolate.UnivariateSpline(x, y, s = 1e6, k=2)
+        derivative = spline.derivative()
+        der = derivative(0.5*self.energy_window)
         return der
 
     def __report_status(self, level):
@@ -280,9 +291,10 @@ class SymmetricRegistrationOptimizer(RegistrationOptimizer):
                                             self.current_fixed.shape)
             niter = 0
             self.energy_list = []
-            while (niter < self.max_iter[level]):
+            derivative = 1
+            while ((niter < self.max_iter[level]) and (self.tolerance<derivative)):
                 niter += 1
-                self.__iterate()
+                derivative = self.__iterate()
             if self.report_status:
                 self.__report_status(level)
         residual, stats = self.forward_model.compute_inversion_error()
