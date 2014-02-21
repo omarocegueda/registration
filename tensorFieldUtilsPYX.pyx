@@ -6,6 +6,7 @@ Created on Thu Sep 19 15:38:56 2013
 
 @author: khayyam
 """
+cimport cython
 from cython.view cimport memoryview
 from cython.view cimport array as cvarray
 from cpython cimport bool
@@ -919,3 +920,44 @@ def compute_cc_backward_step_3d(double[:,:,:,:] gradFixed, double[:,:,:,:] gradM
     cdef double retVal
     retVal=computeCCBackwardStep3D(&gradFixed[0,0,0,0], &gradMoving[0,0,0,0], ns, nr, nc, &factors[0,0,0,0], &step[0,0,0,0])
     return step, retVal
+
+ctypedef fused real:
+    cython.float
+    cython.double
+
+ctypedef fused discrete:
+    cython.short
+    cython.int
+    cython.longlong
+
+def test_fused(real[:,:,:,:] real_array, discrete[:,:,:,:] discrete_array):
+    r'''
+    import tensorFieldUtils as tf
+    a_double=np.array(range(1000000), dtype=np.float64)/10.0
+    a_float=np.array(range(1000000), dtype=np.float32)/10.0
+    b_int=np.array(range(1000000), dtype=np.int32)
+    b_short=np.array(range(1000000), dtype=np.int16)
+    b_long=np.array(range(1000000), dtype=np.int64)
+    print tf.test_multiple(a_double, b_short)
+    print tf.test_multiple(a_float, b_short)
+    print tf.test_multiple(a_double, b_int)
+    print tf.test_multiple(a_float, b_int)
+    print tf.test_multiple(a_double, b_long)
+    print tf.test_multiple(a_float, b_long)
+    timeit(tf.test_multiple(a_double, b_short))
+    timeit(tf.test_multiple(a_float, b_short))
+    timeit(tf.test_multiple(a_double, b_int))
+    timeit(tf.test_multiple(a_float, b_int))
+    timeit(tf.test_multiple(a_double, b_long))
+    timeit(tf.test_multiple(a_float, b_long))
+    '''
+#    cdef int n=len(real_array)
+#    cdef int m=len(discrete_array)
+#    cdef real sum_real = 0
+#    cdef discrete sum_discrete = 0
+#    cdef int i
+#    for i in range(n-1):
+#        sum_real += real_array[i]*real_array[i+1]
+#        sum_discrete += discrete_array[i]*discrete_array[i+1]
+#    return sum_real, sum_discrete
+    pass

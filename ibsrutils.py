@@ -8,6 +8,34 @@ import sys
 import os
 import registrationCommon as rcommon
 from scipy import stats
+import time
+
+def getTimeStats(fname):
+    '''
+    Retrieves the mean and standard deviation (in minutes) of a list L of 
+    date/time strings. Start times are L[2*i] and end times are L[2*i+1]
+    for 0<=2*i<len(L)-1
+    Example of expected date/time format: Sat Feb  8 19:46:07 EST 2014
+    '''
+    try:
+        with open(fname,'r') as F:
+            lines=[s.strip().replace('EST', 'CST') for s in F.readlines()]
+    except:
+        print('Error reading file %s'%(fname))
+        return
+    n = len(lines)
+    i = 0
+    deltas = []
+    while i + 1 < n:
+        start = time.strptime(lines[i],'%a %b %d %H:%M:%S %Z %Y')
+        end = time.strptime(lines[i+1],'%a %b %d %H:%M:%S %Z %Y')
+        t0 = time.mktime(start)
+        t1 = time.mktime(end)
+        delta = (t1 - t0) / 60.0
+        deltas.append(delta)
+        i += 2
+    print 'Mean time in minutes: %0.2f (%0.2f)'%(np.mean(deltas), np.std(deltas))
+    
 def changeExtension(fname, newExt):
     '''
     changeExtension('/opt/registration/data/myfile.nii.gz', '.ext')

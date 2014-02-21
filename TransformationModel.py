@@ -4,7 +4,7 @@ an affine pre-aligning transformation followed by a nonlinear transformation
 followed by an affine post-multiplication.
 '''
 import numpy as np
-import tensorFieldUtils as tf
+import VectorFieldUtils as vfu
 import numpy.linalg as linalg
 
 def scale_affine(affine, factor):
@@ -89,24 +89,16 @@ class TransformationModel(object):
         using tri-linear interpolation
         '''
         if len(image.shape) == 3:
-            if image.dtype is np.dtype('int32'):
-                warped = np.array(
-                    tf.warp_discrete_volumeNN(
-                        image, self.forward, self.affine_pre, self.affine_post))
-            elif image.dtype is np.dtype('float64'):
-                warped = np.array(
-                    tf.warp_volume(
-                        image, self.forward, self.affine_pre, self.affine_post))
+            warped = vfu.warp_volume(image, 
+                                     self.forward, 
+                                     self.affine_pre, 
+                                     self.affine_post)
         else:
-            if image.dtype is np.dtype('int32'):
-                warped = np.array(
-                    tf.warp_discrete_imageNN(
-                        image, self.forward, self.affine_pre, self.affine_post))
-            elif image.dtype is np.dtype('float64'):
-                warped = np.array(
-                    tf.warp_image(
-                        image, self.forward, self.affine_pre, self.affine_post))
-        return warped
+            warped = vfu.warp_image(image, 
+                                    self.forward, 
+                                    self.affine_pre, 
+                                    self.affine_post)
+        return np.array(warped)
 
     def warp_backward(self, image):
         r'''
@@ -114,28 +106,16 @@ class TransformationModel(object):
         image using tri-linear interpolation
         '''
         if len(image.shape) == 3:
-            if image.dtype is np.dtype('int32'):
-                warped = np.array(
-                    tf.warp_discrete_volumeNN(
-                        image, self.backward, self.affine_post_inv,
-                        self.affine_pre_inv))
-            elif image.dtype is np.dtype('float64'):
-                warped = np.array(
-                    tf.warp_volume(
-                        image, self.backward, self.affine_post_inv,
-                        self.affine_pre_inv))
+            warped = vfu.warp_volume(image, 
+                                     self.backward, 
+                                     self.affine_post_inv,
+                                     self.affine_pre_inv)
         else:
-            if image.dtype is np.dtype('int32'):
-                warped = np.array(
-                    tf.warp_discrete_imageNN(
-                        image, self.backward, self.affine_post_inv,
-                        self.affine_pre_inv))
-            elif image.dtype is np.dtype('float64'):
-                warped = np.array(
-                    tf.warp_image(
-                        image, self.backward, self.affine_post_inv,
-                        self.affine_pre_inv))
-        return warped
+            warped = vfu.warp_image(image,
+                                    self.backward,
+                                    self.affine_post_inv,
+                                    self.affine_pre_inv)
+        return np.array(warped)
 
     def warp_forward_nn(self, image):
         r'''
@@ -143,24 +123,16 @@ class TransformationModel(object):
         using nearest-neighbor interpolation
         '''
         if len(image.shape) == 3:
-            if image.dtype is np.dtype('int32'):
-                warped = np.array(
-                    tf.warp_discrete_volumeNN(
-                        image, self.forward, self.affine_pre, self.affine_post))
-            elif image.dtype is np.dtype('float64'):
-                warped = np.array(
-                    tf.warp_volumeNN(
-                        image, self.forward, self.affine_pre, self.affine_post))
+            warped = vfu.warp_volume_nn(image, 
+                                        self.forward, 
+                                        self.affine_pre, 
+                                        self.affine_post)
         else:
-            if image.dtype is np.dtype('int32'):
-                warped = np.array(
-                    tf.warp_discrete_imageNN(
-                        image, self.forward, self.affine_pre, self.affine_post))
-            elif image.dtype is np.dtype('float64'):
-                warped = np.array(
-                    tf.warp_imageNN(
-                        image, self.forward, self.affine_pre, self.affine_post))
-        return warped
+            warped = vfu.warp_image_nn(image, 
+                                       self.forward, 
+                                       self.affine_pre, 
+                                       self.affine_post)
+        return np.array(warped)
 
     def warp_backward_nn(self, image):
         r'''
@@ -168,28 +140,16 @@ class TransformationModel(object):
         image using nearest-neighbor interpolation
         '''
         if len(image.shape) == 3:
-            if image.dtype is np.dtype('int32'):
-                warped = np.array(
-                    tf.warp_discrete_volumeNN(
-                        image, self.backward, self.affine_post_inv,
-                        self.affine_pre_inv))
-            elif image.dtype is np.dtype('float64'):
-                warped = np.array(
-                    tf.warp_volumeNN(
-                        image, self.backward, self.affine_post_inv,
-                        self.affine_pre_inv))
+            warped = vfu.warp_volume_nn(image, 
+                                        self.backward, 
+                                        self.affine_post_inv,
+                                        self.affine_pre_inv)
         else:
-            if image.dtype is np.dtype('int32'):
-                warped = np.array(
-                    tf.warp_discrete_imageNN(
-                        image, self.backward, self.affine_post_inv,
-                        self.affine_pre_inv))
-            elif image.dtype is np.dtype('float64'):
-                warped = np.array(
-                    tf.warp_imageNN(
-                        image, self.backward, self.affine_post_inv,
-                            self.affine_pre_inv))
-        return warped
+            warped = vfu.warp_image_nn(image, 
+                                       self.backward, 
+                                       self.affine_post_inv,
+                                       self.affine_pre_inv)
+        return np.array(warped)
 
     def scale_affines(self, factor):
         r'''
@@ -213,23 +173,23 @@ class TransformationModel(object):
         if self.dim == 2:
             if self.forward != None:
                 self.forward = 2*np.array(
-                    tf.upsample_displacement_field(
+                    vfu.upsample_displacement_field(
                         self.forward,
                         np.array(new_domain_forward).astype(np.int32)))
             if self.backward != None:
                 self.backward = 2*np.array(
-                    tf.upsample_displacement_field(
+                    vfu.upsample_displacement_field(
                         self.backward,
                         np.array(new_domain_backward).astype(np.int32)))
         else:
             if self.forward != None:
                 self.forward = 2*np.array(
-                    tf.upsample_displacement_field3D(
+                    vfu.upsample_displacement_field3D(
                         self.forward,
                         np.array(new_domain_forward).astype(np.int32)))
             if self.backward != None:
                 self.backward = 2*np.array(
-                    tf.upsample_displacement_field3D(
+                    vfu.upsample_displacement_field3D(
                         self.backward,
                         np.array(new_domain_backward).astype(np.int32)))
         self.scale_affines(2.0)
@@ -242,10 +202,10 @@ class TransformationModel(object):
         transformations as well.
         '''
         if self.dim == 2:
-            residual, stats = tf.compose_vector_fields(self.forward,
+            residual, stats = vfu.compose_vector_fields(self.forward,
                                                        self.backward)
         else:
-            residual, stats = tf.compose_vector_fields3D(self.forward,
+            residual, stats = vfu.compose_vector_fields_3d(self.forward,
                                                          self.backward)
         return residual, stats
 
@@ -268,24 +228,26 @@ class TransformationModel(object):
             affine_prod_inv=None
         if self.dim == 2:
             forward=applyFirst.forward.copy()
-            tf.append_affine_to_displacement_field_2d(forward, affine_prod)
-            forward, stats = tf.compose_vector_fields(forward,
-                                                      self.forward)
+            vfu.append_affine_to_displacement_field_2d(forward, affine_prod)
+            forward, stats = vfu.compose_vector_fields(forward,
+                                                       self.forward)
             backward=self.backward.copy()
-            tf.append_affine_to_displacement_field_2d(backward, affine_prod_inv)
-            backward, stats = tf.compose_vector_fields(backward, 
-                                                       applyFirst.backward)
+            vfu.append_affine_to_displacement_field_2d(backward, affine_prod_inv)
+            backward, stats = vfu.compose_vector_fields(backward, 
+                                                        applyFirst.backward)
         else:
             forward=applyFirst.forward.copy()
-            tf.append_affine_to_displacement_field_3d(forward, affine_prod)
-            forward, stats = tf.compose_vector_fields3D(forward,
-                                                      self.forward)
+            vfu.append_affine_to_displacement_field_3d(forward, affine_prod)
+            forward, stats = vfu.compose_vector_fields_3d(forward,
+                                                         self.forward)
             backward=self.backward.copy()
-            tf.append_affine_to_displacement_field_3d(backward, affine_prod_inv)
-            backward, stats = tf.compose_vector_fields3D(backward, 
-                                                       applyFirst.backward)
-        composition=TransformationModel(forward, backward, 
-                                        applyFirst.affine_pre, self.affine_post)
+            vfu.append_affine_to_displacement_field_3d(backward, affine_prod_inv)
+            backward, stats = vfu.compose_vector_fields_3d(backward, 
+                                                          applyFirst.backward)
+        composition=TransformationModel(forward, 
+                                        backward, 
+                                        applyFirst.affine_pre, 
+                                        self.affine_post)
         return composition
 
     def inverse(self):
@@ -303,15 +265,15 @@ class TransformationModel(object):
         transformation by appending/prepending them to the deformation fields.
         '''
         if self.dim == 2:
-            tf.prepend_affine_to_displacement_field_2d(self.forward, self.affine_pre)
-            tf.append_affine_to_displacement_field_2d(self.forward, self.affine_post)
-            tf.prepend_affine_to_displacement_field_2d(self.backward, self.affine_post_inv)
-            tf.append_affine_to_displacement_field_2d(self.backward, self.affine_pre_inv)
+            vfu.prepend_affine_to_displacement_field_2d(self.forward, self.affine_pre)
+            vfu.append_affine_to_displacement_field_2d(self.forward, self.affine_post)
+            vfu.prepend_affine_to_displacement_field_2d(self.backward, self.affine_post_inv)
+            vfu.append_affine_to_displacement_field_2d(self.backward, self.affine_pre_inv)
         else:
-            tf.prepend_affine_to_displacement_field_3d(self.forward, self.affine_pre)
-            tf.append_affine_to_displacement_field_3d(self.forward, self.affine_post)
-            tf.prepend_affine_to_displacement_field_3d(self.backward, self.affine_post_inv)
-            tf.append_affine_to_displacement_field_3d(self.backward, self.affine_pre_inv)
+            vfu.prepend_affine_to_displacement_field_3d(self.forward, self.affine_pre)
+            vfu.append_affine_to_displacement_field_3d(self.forward, self.affine_post)
+            vfu.prepend_affine_to_displacement_field_3d(self.backward, self.affine_post_inv)
+            vfu.append_affine_to_displacement_field_3d(self.backward, self.affine_pre_inv)
         self.affine_post = None
         self.affine_pre = None
         self.affine_post_inv = None

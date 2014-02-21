@@ -7,7 +7,7 @@ import os
 import numpy as np
 import nibabel as nib
 import registrationCommon as rcommon
-import tensorFieldUtils as tf
+import VectorFieldUtils as vfu
 from SymmetricRegistrationOptimizer import SymmetricRegistrationOptimizer
 from EMMetric import EMMetric
 from CCMetric import CCMetric
@@ -197,11 +197,11 @@ def save_deformed_lattice_3d(displacement, oname):
     Applies the given displacement to a regular lattice and saves the resulting
     image to a Nifti file with the given name
     '''
-    min_val, max_val = tf.get_displacement_range(displacement, None)
+    min_val, max_val = vfu.get_displacement_range(displacement, None)
     shape = np.array([np.ceil(max_val[0]), np.ceil(max_val[1]),
                   np.ceil(max_val[2])], dtype = np.int32)
     lattice = np.array(rcommon.drawLattice3D(shape, 10))
-    warped = np.array(tf.warp_volume(lattice, displacement)).astype(np.int16)
+    warped = np.array(vfu.warp_volume(lattice, displacement)).astype(np.int16)
     img = nib.Nifti1Image(warped, np.eye(4))
     img.to_filename(oname)
 
@@ -217,14 +217,14 @@ def save_registration_results(init_affine, displacement, inverse, params):
     base_fixed = rcommon.getBaseFileName(params.reference)
     moving = nib.load(params.target).get_data().squeeze().astype(np.float64)
     moving = moving.copy(order='C')
-    warped = np.array(tf.warp_volume(moving, displacement)).astype(np.int16)
+    warped = np.array(vfu.warp_volume(moving, displacement)).astype(np.int16)
     img_warped = nib.Nifti1Image(warped, fixed_affine)
     img_warped.to_filename('warpedDiff_'+base_moving+'_'+base_fixed+'.nii.gz')
     #---warp the target image using the affine transformation only---
     moving = nib.load(params.target).get_data().squeeze().astype(np.float64)
     moving = moving.copy(order='C')
     warped = np.array(
-        tf.warp_volume_affine(moving, reference_shape, init_affine)
+        vfu.warp_volume_affine(moving, reference_shape, init_affine)
         ).astype(np.int16)
     img_warped = nib.Nifti1Image(warped, fixed_affine)
     img_warped.to_filename('warpedAffine_'+base_moving+'_'+base_fixed+'.nii.gz')
@@ -235,7 +235,7 @@ def save_registration_results(init_affine, displacement, inverse, params):
         to_warp = to_warp.copy(order='C')
         base_warp = rcommon.getBaseFileName(name)
         warped = np.array(
-            tf.warp_discrete_volumeNN(to_warp, displacement)).astype(np.int16)
+            vfu.warp_volume_nn(to_warp, displacement)).astype(np.int16)
         img_warped = nib.Nifti1Image(warped, fixed_affine)
         img_warped.to_filename('warpedDiff_'+base_warp+'_'+base_fixed+'.nii.gz')
     #---finally, the optional output

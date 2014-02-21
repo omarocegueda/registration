@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import nibabel as nib
 import registrationCommon as rcommon
-import tensorFieldUtils as tf
+import VectorFieldUtils as vfu
 import UpdateRule
 from SSDMetric import SSDMetric
 from EMMetric import EMMetric
@@ -51,10 +51,10 @@ class AsymmetricRegistrationOptimizer(RegistrationOptimizer):
         input images
         '''
         if self.dim == 2:
-            self.invert_vector_field = tf.invert_vector_field_fixed_point
+            self.invert_vector_field = vfu.invert_vector_field_fixed_point
             self.generate_pyramid = rcommon.pyramid_gaussian_2D
         else:
-            self.invert_vector_field = tf.invert_vector_field_fixed_point3D
+            self.invert_vector_field = vfu.invert_vector_field_fixed_point_3d
             self.generate_pyramid = rcommon.pyramid_gaussian_3D
 
     def __check_ready(self):
@@ -248,11 +248,11 @@ def test_optimizer_monomodal_2d():
     #######################show results#################################
     displacement = registration_optimizer.get_forward()
     direct_inverse = registration_optimizer.get_backward()
-    moving_to_fixed = np.array(tf.warp_image(moving, displacement))
-    fixed_to_moving = np.array(tf.warp_image(fixed, direct_inverse))
+    moving_to_fixed = np.array(vfu.warp_image(moving, displacement))
+    fixed_to_moving = np.array(vfu.warp_image(fixed, direct_inverse))
     rcommon.overlayImages(moving_to_fixed, fixed, True)
     rcommon.overlayImages(fixed_to_moving, moving, True)
-    direct_residual, stats = tf.compose_vector_fields(displacement,
+    direct_residual, stats = vfu.compose_vector_fields(displacement,
                                                       direct_inverse)
     direct_residual = np.array(direct_residual)
     rcommon.plotDiffeomorphism(displacement, direct_inverse, direct_residual,
@@ -323,10 +323,10 @@ def test_optimizer_multimodal_2d(lambda_param):
     #######################show results#################################
     displacement = registration_optimizer.get_forward()
     direct_inverse = registration_optimizer.get_backward()
-    moving_to_fixed = np.array(tf.warp_image(moving, displacement))
-    fixed_to_moving = np.array(tf.warp_image(warped_fixed, direct_inverse))
+    moving_to_fixed = np.array(vfu.warp_image(moving, displacement))
+    fixed_to_moving = np.array(vfu.warp_image(warped_fixed, direct_inverse))
     rcommon.overlayImages(moving_to_fixed, fixed_to_moving, True)
-    direct_residual, stats = tf.compose_vector_fields(displacement,
+    direct_residual, stats = vfu.compose_vector_fields(displacement,
                                                       direct_inverse)
     direct_residual = np.array(direct_residual)
     rcommon.plotDiffeomorphism(displacement, direct_inverse, direct_residual,
