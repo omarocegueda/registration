@@ -603,7 +603,7 @@ def upsample_displacement_field(double[:,:,:] field, int[:] targetShape):
     upsampleDisplacementField(&field[0,0,0], nr, nc, &up[0,0,0],nrows, ncols)
     return up
 
-def upsample_displacement_field3D(double[:,:,:,:] field, int[:] targetShape):
+def upsample_displacement_field_3d(double[:,:,:,:] field, int[:] targetShape):
     cdef int ns=field.shape[0]
     cdef int nr=field.shape[1]
     cdef int nc=field.shape[2]

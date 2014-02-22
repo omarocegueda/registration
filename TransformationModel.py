@@ -184,12 +184,12 @@ class TransformationModel(object):
         else:
             if self.forward != None:
                 self.forward = 2*np.array(
-                    vfu.upsample_displacement_field3D(
+                    vfu.upsample_displacement_field_3d(
                         self.forward,
                         np.array(new_domain_forward).astype(np.int32)))
             if self.backward != None:
                 self.backward = 2*np.array(
-                    vfu.upsample_displacement_field3D(
+                    vfu.upsample_displacement_field_3d(
                         self.backward,
                         np.array(new_domain_backward).astype(np.int32)))
         self.scale_affines(2.0)

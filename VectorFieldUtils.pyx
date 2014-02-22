@@ -20,29 +20,41 @@ cdef extern from "math.h":
     double sqrt(double x) nogil
     double floor (double x) nogil
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cdef inline int ifloor(double x) nogil:
     return int(floor(x))
 
-cdef inline __apply_affine_3d_x0(number x0, number x1, number x2, floating[:,:] affine):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline floating __apply_affine_3d_x0(number x0, number x1, number x2, floating[:,:] affine) nogil:
     return affine[0,0]*x0 + affine[0,1]*x1 + affine[0,2]*x2 + affine[0,3]
 
-cdef inline __apply_affine_3d_x1(number x0, number x1, number x2, floating[:,:] affine):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline floating __apply_affine_3d_x1(number x0, number x1, number x2, floating[:,:] affine) nogil:
     return affine[1,0]*x0 + affine[1,1]*x1 + affine[1,2]*x2 + affine[1,3]
 
-cdef inline __apply_affine_3d_x2(number x0, number x1, number x2,  floating[:,:] affine):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline floating __apply_affine_3d_x2(number x0, number x1, number x2,  floating[:,:] affine) nogil:
     return affine[2,0]*x0 + affine[2,1]*x1 + affine[2,2]*x2 + affine[2,3]
 
-cdef inline __apply_affine_2d_x0(number x0, number x1, floating[:,:] affine):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline floating __apply_affine_2d_x0(number x0, number x1, floating[:,:] affine) nogil:
     return affine[0,0]*x0 + affine[0,1]*x1 + affine[0,2]
 
-cdef inline __apply_affine_2d_x1(number x0, number x1, floating[:,:] affine):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline floating __apply_affine_2d_x1(number x0, number x1, floating[:,:] affine) nogil:
     return affine[1,0]*x0 + affine[1,1]*x1 + affine[1,2]
 
 ########################################################################
 #############displacement field composition and inversion###############
 ########################################################################
 @cython.boundscheck(False)
-@cython.wraparound(False) 
+@cython.wraparound(False)
 @cython.cdivision(True)
 cdef void __compose_vector_fields(floating[:,:,:] d1, floating[:,:,:] d2, floating[:,:,:] comp, floating[:] stats) nogil:
     cdef int nr1=d1.shape[0]
@@ -70,7 +82,8 @@ cdef void __compose_vector_fields(floating[:,:,:] d1, floating[:,:,:] d2, floati
             cbeta=djj-jj
             alpha=1-calpha
             beta=1-cbeta
-            comp[i,j,:]=d1[i,j,:]
+            comp[i,j,0]=d1[i,j,0]
+            comp[i,j,1]=d1[i,j,1]
             #---top-left
             comp[i,j,0]+=alpha*beta*d2[ii,jj,0]
             comp[i,j,1]+=alpha*beta*d2[ii,jj,1]
@@ -87,8 +100,8 @@ cdef void __compose_vector_fields(floating[:,:,:] d1, floating[:,:,:] d2, floati
             #---bottom-left
             jj-=1
             if((ii >= 0) and (jj >= 0) and (ii < nr2) and (jj < nc2)):
-                comp[i,j,0]+=d2[ii,jj,0]
-                comp[i,j,1]+=d2[ii,jj,1]
+                comp[i,j,0]+=calpha*beta*d2[ii,jj,0]
+                comp[i,j,1]+=calpha*beta*d2[ii,jj,1]
             #consider only displacements that land inside the image
             if(((dii >= 0) and (dii <= nr2-1)) and ((djj >= 0) and (djj <= nc2-1))):
                 nn=comp[i,j,0]**2+comp[i,j,1]**2
@@ -222,20 +235,14 @@ def invert_vector_field_fixed_point(floating[:,:,:] d, integral[:] inverseShape,
     if inverseShape!=None:
         nr2, nc2=inverseShape[0], inverseShape[1]
     cdef floating[:] stats=np.zeros(shape=(2,), dtype=cython.typeof(d[0,0,0]))
-    cdef floating[:,:,:] invd=np.zeros_like(d)
-    cdef floating[:,:,:] p, q
     cdef floating[:] substats = np.empty(shape = (3,), dtype=cython.typeof(d[0,0,0]))
-    if start==None:
-        new_temp=np.zeros(shape=(nr2,nc2,2), dtype=cython.typeof(d[0,0,0]))
-    else:
-        new_temp=np.array(start)
-    temp=[new_temp, invd]
-    current=0
+    cdef floating[:,:,:] p=np.zeros(shape=(nr2,nc2,2), dtype=cython.typeof(d[0,0,0]))
+    cdef floating[:,:,:] q=np.zeros(shape=(nr2,nc2,2), dtype=cython.typeof(d[0,0,0]))
+    if start!=None:
+        p[...]=start
     iter_count = 0
     while (iter_count < maxIter) and (tolerance < error):
-        current = 1 - current
-        p=temp[1-current]
-        q=temp[current]#these arrays need to be typed, their type can not be resolved by the compiler when calling __compose_vector_fields
+        p, q = q, p
         __compose_vector_fields(q, d, p, substats)
         difmag=0
         error=0
@@ -249,11 +256,9 @@ def invert_vector_field_fixed_point(floating[:,:,:] d, integral[:] inverseShape,
                     difmag=mag
         error/=(nr2*nc2)
         iter_count+=1
-    if(current == 1):#then the last computation was stored at temp[0]
-        invd[...]=temp[0][...]
     stats[0]=substats[1]
     stats[1]=iter_count
-    return invd
+    return p
 
 def invert_vector_field_fixed_point_3d(floating[:,:,:,:] d, int[:] inverseShape, int maxIter, floating tolerance, floating[:,:,:,:] start=None):
     cdef int ns1=d.shape[0]
@@ -266,23 +271,17 @@ def invert_vector_field_fixed_point_3d(floating[:,:,:,:] d, int[:] inverseShape,
         ns2, nr2, nc2=inverseShape[0], inverseShape[1], inverseShape[2]
     cdef floating[:] stats=np.empty(shape=(2,), dtype=cython.typeof(d[0,0,0,0]))
     cdef floating[:] substats=np.empty(shape=(3,), dtype=cython.typeof(d[0,0,0,0]))
-    cdef floating[:,:,:,:] invd=np.ndarray((ns2, nr2, nc2, 3), dtype=cython.typeof(d[0,0,0,0]))
-    cdef floating[:,:,:,:] p, q
+    cdef floating[:,:,:,:] p=np.ndarray((ns2, nr2, nc2, 3), dtype=cython.typeof(d[0,0,0,0]))
+    cdef floating[:,:,:,:] q=np.ndarray((ns2, nr2, nc2, 3), dtype=cython.typeof(d[0,0,0,0]))
     cdef floating error=1+tolerance
     cdef floating epsilon = 0.5
     cdef floating mag, difmag
-    cdef int k, i, j, iter_count, current
-    if start==None:
-        temp_new = np.zeros(shape=(ns2, nr2, nc2, 3), dtype=cython.typeof(d[0,0,0,0]))
-    else:
-        temp_new = np.array(start)
-    temp=[temp_new, invd]
-    current = 0
+    cdef int k, i, j, iter_count
+    if start!=None:
+        p[...] = start
     iter_count = 0
     while (iter_count < maxIter) and (tolerance < error):
-        current = 1 - current
-        p=temp[1-current]
-        q=temp[current]#these arrays need to be typed, their type can not be resolved by the compiler when calling __compose_vector_fields
+        p, q = q, p
         __compose_vector_fields_3d(q, d, p, substats)
         difmag=0
         error=0
@@ -297,11 +296,9 @@ def invert_vector_field_fixed_point_3d(floating[:,:,:,:] d, int[:] inverseShape,
                     if(difmag<mag):
                         difmag=mag
         error/=(ns2*nr2*nc2)
-    if(current == 1):#then the last computation was stored at temp[0]
-        invd=temp_new
     stats[0]=error
     stats[1]=iter_count
-    return invd
+    return p
 
 def prepend_affine_to_displacement_field_2d(floating[:,:,:] d, floating[:,:] affine):
     if affine==None:
@@ -341,7 +338,7 @@ def append_affine_to_displacement_field_2d(floating[:,:,:] d, floating[:,:] affi
             djj=d[i,j,1]+j
             d[i,j,0]=__apply_affine_2d_x0(dii,djj,affine)-i
             d[i,j,1]=__apply_affine_2d_x1(dii,djj,affine)-j
-    
+
 def append_affine_to_displacement_field_3d(floating[:,:,:,:] d, floating[:,:] affine):
     if affine==None:
         return
@@ -369,15 +366,15 @@ def upsample_displacement_field(floating[:,:,:] field, int[:] targetShape):
     cdef floating alpha, beta, calpha, cbeta
     cdef int i,j,ii,jj
     cdef floating[:,:,:] up = np.zeros(shape=(nrows, ncols,2), dtype=cython.typeof(field[0,0,0]))
-    for i in range(nr):
-        for j in range(nc):
+    for i in range(nrows):
+        for j in range(ncols):
             dii=0.5*i
             djj=0.5*j
-            if((dii<0) or (djj<0) or (dii>nrows-1) or (djj>ncols-1)):#no one is affected
+            if((dii<0) or (djj<0) or (dii>nr-1) or (djj>nc-1)):#no one is affected
                 continue
             ii=ifloor(dii)
             jj=ifloor(djj)
-            if((ii<0) or (jj<0) or (ii>=nrows) or (jj>=ncols)):#no one is affected
+            if((ii<0) or (jj<0) or (ii>=nr) or (jj>=nc)):#no one is affected
                 continue
             calpha=dii-ii#by definition these factors are nonnegative
             cbeta=djj-jj
@@ -388,32 +385,32 @@ def upsample_displacement_field(floating[:,:,:] field, int[:] targetShape):
             up[i,j,1]+=alpha*beta*field[ii,jj,1]
             #---top-right
             jj+=1
-            if(jj<ncols):
+            if(jj<nc):
                 up[i,j,0]+=alpha*cbeta*field[ii,jj,0]
                 up[i,j,1]+=alpha*cbeta*field[ii,jj,1]
             #---bottom-right
             ii+=1
-            if((ii>=0) and (jj>=0) and (ii<nrows) and (jj<ncols)):
+            if((ii>=0) and (jj>=0) and (ii<nr) and (jj<nc)):
                 up[i,j,0]+=calpha*cbeta*field[ii,jj,0]
                 up[i,j,1]+=calpha*cbeta*field[ii,jj,1]
             #---bottom-left
             jj-=1
-            if((ii>=0) and (jj>=0) and (ii<nrows) and (jj<ncols)):
+            if((ii>=0) and (jj>=0) and (ii<nr) and (jj<nc)):
                 up[i,j,0]+=calpha*beta*field[ii,jj,0]
                 up[i,j,1]+=calpha*beta*field[ii,jj,1]
     return up
 
-def upsample_displacement_field3D(floating[:,:,:,:] field, int[:] targetShape):
-    cdef int ns=field.shape[0]
-    cdef int nr=field.shape[1]
-    cdef int nc=field.shape[2]
-    cdef int nslices=targetShape[0]
-    cdef int nrows=targetShape[1]
-    cdef int ncols=targetShape[2]
+def upsample_displacement_field_3d(floating[:,:,:,:] field, int[:] targetShape):
+    cdef int nslices=field.shape[0]
+    cdef int nrows=field.shape[1]
+    cdef int ncols=field.shape[2]
+    cdef int ns=targetShape[0]
+    cdef int nr=targetShape[1]
+    cdef int nc=targetShape[2]
     cdef int i,j,k,ii,jj,kk
     cdef floating dkk, dii, djj
     cdef floating alpha, beta, gamma, calpha, cbeta, cgamma
-    cdef floating[:,:,:,:] up = np.zeros(shape=(nslices, nrows, ncols,3), dtype=cython.typeof(field[0,0,0,0]))
+    cdef floating[:,:,:,:] up = np.zeros(shape=(ns, nr, nc,3), dtype=cython.typeof(field[0,0,0,0]))
     for k in range(ns):
         for i in range(nr):
             for j in range(nc):
