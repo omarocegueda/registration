@@ -3,7 +3,7 @@ Similarity metric based on the Normalized Cross Correlation used by ANTS.
 '''
 import numpy as np
 import scipy as sp
-import tensorFieldUtils as tf
+import CrossCorrelationFunctions as ccf
 from SimilarityMetric import SimilarityMetric
 import matplotlib.pyplot as plt
 import registrationCommon as rcommon
@@ -27,7 +27,7 @@ class CCMetric(SimilarityMetric):
         r'''
         Precomputes the cross-correlation factors
         '''
-        self.factors = tf.precompute_cc_factors_3d(self.fixed_image,
+        self.factors = ccf.precompute_cc_factors_3d(self.fixed_image,
                                                    self.moving_image,
                                                    self.radius)
         self.factors = np.array(self.factors)
@@ -57,7 +57,7 @@ class CCMetric(SimilarityMetric):
         Computes the update displacement field to be used for registration of
         the moving image towards the fixed image
         '''
-        displacement, self.energy=tf.compute_cc_forward_step_3d(self.gradient_fixed,
+        displacement, self.energy=ccf.compute_cc_forward_step_3d(self.gradient_fixed,
                                       self.gradient_moving,
                                       self.factors)
         displacement=np.array(displacement)
@@ -76,7 +76,7 @@ class CCMetric(SimilarityMetric):
         Computes the update displacement field to be used for registration of
         the fixed image towards the moving image
         '''
-        displacement, energy=tf.compute_cc_backward_step_3d(self.gradient_fixed,
+        displacement, energy=ccf.compute_cc_backward_step_3d(self.gradient_fixed,
                                       self.gradient_moving,
                                       self.factors)
         displacement=np.array(displacement)

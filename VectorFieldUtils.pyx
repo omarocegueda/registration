@@ -1,21 +1,6 @@
 import numpy as np
 cimport cython
-ctypedef fused floating:
-    cython.double
-    cython.float
-
-ctypedef fused integral:
-    cython.short
-    cython.int
-    cython.longlong
-
-ctypedef fused number:
-    cython.double
-    cython.float
-    cython.short
-    cython.int
-    cython.longlong
-
+from FusedTypes cimport floating, integral, number
 cdef extern from "math.h":
     double sqrt(double x) nogil
     double floor (double x) nogil
