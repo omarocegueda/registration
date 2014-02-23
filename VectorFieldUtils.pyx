@@ -264,6 +264,8 @@ def invert_vector_field_fixed_point_3d(floating[:,:,:,:] d, int[:] inverseShape,
     cdef int k, i, j, iter_count
     if start!=None:
         p[...] = start
+    else:
+        p[...] = 0
     iter_count = 0
     while (iter_count < maxIter) and (tolerance < error):
         p, q = q, p

@@ -819,7 +819,7 @@ def invert_vector_field3D(double[:,:,:,:] d, double lambdaParam, int maxIter, do
     #print 'MSE:', stats[0], 'Last iteration:', int(stats[1])
     return invd
 
-def invert_vector_field_fixed_point3D(double[:,:,:,:] d, int[:] inverseShape, int maxIter, double tolerance, double[:,:,:,:] start=None):
+def invert_vector_field_fixed_point_3d(double[:,:,:,:] d, int[:] inverseShape, int maxIter, double tolerance, double[:,:,:,:] start=None):
     cdef int ns1=d.shape[0]
     cdef int nr1=d.shape[1]
     cdef int nc1=d.shape[2]

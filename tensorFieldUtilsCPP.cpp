@@ -3778,7 +3778,7 @@ int invertVectorFieldFixedPoint(double *d, int nr1, int nc1, int nr2, int nc2, i
             p[1]=q[1]-epsilon*p[1];
         }
     }
-    if(iter&1){//then the last computation was stored at temp[0]
+    if(!(iter&1)){//then the last computation was stored at temp[0]
         memcpy(invd, temp[0], sizeof(double)*2*nr2*nc2);
     }
     delete[] temp[0];
@@ -3866,7 +3866,7 @@ int invertVectorFieldFixedPoint3D(double *d, int ns1, int nr1, int nc1, int ns2,
             p[2]=q[2]-epsilon*p[2];
         }
     }
-    if(iter&1){//then the last computation was stored at temp[0]
+    if(!(iter&1)){//then the last computation was stored at temp[0]
         memcpy(invd, temp[0], sizeof(double)*nsitesInv);
     }
     delete[] temp[0];
