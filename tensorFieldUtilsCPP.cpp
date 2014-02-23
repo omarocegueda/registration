@@ -2323,10 +2323,11 @@ int upsampleDisplacementField(double *d1, int nrows, int ncols, double *up, int 
 int downsampleDisplacementField(double *d1, int nr, int nc, double *down){
     int nnr=(nr+1)/2;
     int nnc=(nc+1)/2;
-    unsigned char *cnt=new unsigned char[nnr*nnc];
-    memset(cnt, 0, sizeof(unsigned char)*nnr*nnc);
+    int newsize=nnr*nnc;
+    int *cnt=new int[newsize];
+    memset(cnt, 0, sizeof(int)*newsize);
     double *d=d1;
-    memset(down, 0, sizeof(double)*nnr*nnc*2);
+    memset(down, 0, sizeof(double)*newsize*2);
     for(int i=0;i<nr;++i){
         for(int j=0;j<nc;++j,d+=2){
             int ii=i/2;
@@ -2336,8 +2337,8 @@ int downsampleDisplacementField(double *d1, int nr, int nc, double *down){
             cnt[ii*nnc+jj]++;
         }
     }
-    d-=2;
-    for(int p=nnr*nnc-1;p>=0;--p, d-=2){
+    d=down;
+    for(int p=0;p<newsize;++p, d+=2){
         if(cnt[p]>0){
             d[0]/=cnt[p];
             d[1]/=cnt[p];
@@ -2350,8 +2351,8 @@ int downsampleDisplacementField(double *d1, int nr, int nc, double *down){
 int downsampleScalarField(double *d1, int nr, int nc, double *down){
     int nnr=(nr+1)/2;
     int nnc=(nc+1)/2;
-    unsigned char *cnt=new unsigned char[nnr*nnc];
-    memset(cnt, 0, sizeof(unsigned char)*nnr*nnc);
+    int *cnt=new int[nnr*nnc];
+    memset(cnt, 0, sizeof(int)*nnr*nnc);
     double *d=d1;
     memset(down, 0, sizeof(double)*nnr*nnc);
     for(int i=0;i<nr;++i){
@@ -2377,10 +2378,11 @@ int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *do
     int nnr=(nr+1)/2;
     int nnc=(nc+1)/2;
     int sliceSize=nnr*nnc;
-    unsigned char *cnt=new unsigned char[nns*sliceSize];
-    memset(cnt, 0, sizeof(unsigned char)*nns*sliceSize);
+    int newsize=sliceSize*nns;
+    unsigned char *cnt=new unsigned char[newsize];
+    memset(cnt, 0, sizeof(unsigned char)*newsize);
     double *d=d1;
-    memset(down, 0, sizeof(double)*nns*nnr*nnc*3);
+    memset(down, 0, sizeof(double)*newsize*3);
     for(int k=0;k<ns;++k){
         for(int i=0;i<nr;++i){
             for(int j=0;j<nc;++j,d+=3){
@@ -2394,8 +2396,8 @@ int downsampleDisplacementField3D(double *d1, int ns, int nr, int nc, double *do
             }
         }
     }
-    d-=3;
-    for(int p=sliceSize*nns-1;p>=0;--p, d-=3){
+    d=down;
+    for(int p=0;p<newsize;++p, d+=3){
         if(cnt[p]>0){
             d[0]/=cnt[p];
             d[1]/=cnt[p];

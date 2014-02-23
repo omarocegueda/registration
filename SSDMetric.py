@@ -3,7 +3,8 @@ Similarity metric defined by the sum of squared differences
 '''
 import numpy as np
 from scipy import gradient, ndimage
-import tensorFieldUtils as tf
+import SSDFunctions as ssd
+import VectorFieldUtils as vfu
 from SimilarityMetric import SimilarityMetric
 import registrationCommon as rcommon
 import matplotlib.pyplot as plt
@@ -114,14 +115,14 @@ class SSDMetric(SimilarityMetric):
             delta_field = self.moving_image - self.fixed_image
         gradient = self.gradient_moving+self.gradient_fixed
         if self.dim == 2:
-            forward = tf.compute_demons_step2D(delta_field, gradient,
+            forward = ssd.compute_demons_step2D(delta_field, gradient,
                                                max_step_length, scale)
             forward[..., 0] = ndimage.filters.gaussian_filter(forward[..., 0],
                                                                 sigma_diff)
             forward[..., 1] = ndimage.filters.gaussian_filter(forward[..., 1],
                                                                 sigma_diff)
         else:
-            forward = tf.compute_demons_step2D(delta_field, gradient,
+            forward = ssd.compute_demons_step3D(delta_field, gradient,
                                                max_step_length, scale)
             forward[..., 0] = ndimage.filters.gaussian_filter(forward[..., 0],
                                                                 sigma_diff)
@@ -179,14 +180,14 @@ def single_cycle_2d(n, k, delta_field, sigma_field, gradient_field,
     '''
     if n == 0:
         for i in range(k):
-            error = tf.iterate_residual_displacement_field_SSD2D(delta_field,
+            error = ssd.iterate_residual_displacement_field_SSD2D(delta_field,
                                                                  sigma_field,
                                                                  gradient_field,
                                                                  None,
                                                                  lambda_param,
                                                                  displacement)
             if printEnergy and depth == 0:
-                energy = tf.compute_energy_SSD2D(delta_field,
+                energy = ssd.compute_energy_SSD2D(delta_field,
                                                  sigma_field,
                                                  gradient_field,
                                                  lambda_param,
@@ -196,10 +197,10 @@ def single_cycle_2d(n, k, delta_field, sigma_field, gradient_field,
     #solve at coarcer grid
     subsigma_field = None
     if sigma_field != None:
-        subsigma_field = tf.downsample_scalar_field(sigma_field)
-    subdelta_field = tf.downsample_scalar_field(delta_field)
+        subsigma_field = vfu.downsample_scalar_field2D(sigma_field)
+    subdelta_field = vfu.downsample_scalar_field2D(delta_field)
     subgradient_field = np.array(
-        tf.downsample_displacement_field(gradient_field))
+        vfu.downsample_displacement_field2D(gradient_field))
     shape = np.array(displacement.shape).astype(np.int32)
     sub_displacement = np.zeros(
         shape = ((shape[0]+1)//2, (shape[1]+1)//2, 2 ), dtype = np.float64)
@@ -207,22 +208,22 @@ def single_cycle_2d(n, k, delta_field, sigma_field, gradient_field,
     single_cycle_2d(n-1, k, subdelta_field, subsigma_field, subgradient_field,
                   sublambda_param, sub_displacement, depth+1)
     displacement += np.array(
-        tf.upsample_displacement_field(sub_displacement, shape))
+        vfu.upsample_displacement_field(sub_displacement, shape))
     if printEnergy and depth == 0:
-        energy = tf.compute_energy_SSD2D(delta_field, sigma_field, 
+        energy = ssd.compute_energy_SSD2D(delta_field, sigma_field, 
                                          gradient_field, lambda_param, 
                                          displacement)
         print 'Energy after low-res iteration:', energy
     #post-smoothing
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD2D(delta_field,
+        error = ssd.iterate_residual_displacement_field_SSD2D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              None,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD2D(delta_field,
+            energy = ssd.compute_energy_SSD2D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -231,7 +232,7 @@ def single_cycle_2d(n, k, delta_field, sigma_field, gradient_field,
     try:
         energy
     except NameError:
-        energy = tf.compute_energy_SSD2D(delta_field, sigma_field, 
+        energy = ssd.compute_energy_SSD2D(delta_field, sigma_field, 
                                          gradient_field, lambda_param, 
                                          displacement)
     return energy
@@ -251,14 +252,14 @@ def v_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
     '''
     #presmoothing
     for i in range(k):
-        tf.iterate_residual_displacement_field_SSD2D(delta_field,
+        ssd.iterate_residual_displacement_field_SSD2D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD2D(delta_field,
+            energy = ssd.compute_energy_SSD2D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -268,51 +269,51 @@ def v_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
         try:
             energy
         except NameError:
-            energy = tf.compute_energy_SSD2D(delta_field, sigma_field, 
+            energy = ssd.compute_energy_SSD2D(delta_field, sigma_field, 
                                          gradient_field, lambda_param, 
                                          displacement)
         return energy
     #solve at coarcer grid
     residual = None
-    residual = tf.compute_residual_displacement_field_SSD2D(delta_field,
+    residual = ssd.compute_residual_displacement_field_SSD2D(delta_field,
                                                             sigma_field,
                                                             gradient_field,
                                                             target,
                                                             lambda_param,
                                                             displacement,
                                                             residual)
-    sub_residual = np.array(tf.downsample_displacement_field(residual))
+    sub_residual = np.array(vfu.downsample_displacement_field2D(residual))
     del residual
     subsigma_field = None
     if sigma_field != None:
-        subsigma_field = tf.downsample_scalar_field(sigma_field)
-    subdelta_field = tf.downsample_scalar_field(delta_field)
+        subsigma_field = vfu.downsample_scalar_field2D(sigma_field)
+    subdelta_field = vfu.downsample_scalar_field2D(delta_field)
     subgradient_field = np.array(
-        tf.downsample_displacement_field(gradient_field))
+        vfu.downsample_displacement_field2D(gradient_field))
     shape = np.array(displacement.shape).astype(np.int32)
-    #sub_displacement = np.array(tf.downsample_displacement_field(displacement))
+    #sub_displacement = np.array(vfu.downsample_displacement_field(displacement))
     sub_displacement = np.zeros(shape = ((shape[0]+1)//2, (shape[1]+1)//2, 2 ),
                                dtype = np.float64)
     sublambda_param = lambda_param*0.25
     v_cycle_2d(n-1, k, subdelta_field, subsigma_field, subgradient_field,
              sub_residual, sublambda_param, sub_displacement, depth+1)
     displacement += np.array(
-        tf.upsample_displacement_field(sub_displacement, shape))
+        vfu.upsample_displacement_field(sub_displacement, shape))
     if printEnergy and depth == 0:
-        energy = tf.compute_energy_SSD2D(delta_field, sigma_field, 
+        energy = ssd.compute_energy_SSD2D(delta_field, sigma_field, 
                                          gradient_field, lambda_param, 
                                          displacement)
         print 'Energy after low-res iteration:', energy
     #post-smoothing
     for i in range(k):
-        tf.iterate_residual_displacement_field_SSD2D(delta_field,
+        ssd.iterate_residual_displacement_field_SSD2D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD2D(delta_field,
+            energy = ssd.compute_energy_SSD2D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -321,7 +322,7 @@ def v_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
     try:
         energy
     except NameError:
-        energy = tf.compute_energy_SSD2D(delta_field, sigma_field, 
+        energy = ssd.compute_energy_SSD2D(delta_field, sigma_field, 
                                          gradient_field, lambda_param, 
                                          displacement)
     return energy
@@ -339,14 +340,14 @@ def w_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
     '''
     #presmoothing
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD2D(delta_field,
+        error = ssd.iterate_residual_displacement_field_SSD2D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD2D(delta_field,
+            energy = ssd.compute_energy_SSD2D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -354,81 +355,81 @@ def w_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
             print 'Energy after top-level iter', i+1, ' [first]:', energy
     if n == 0:
         return error
-    residual = tf.compute_residual_displacement_field_SSD2D(delta_field,
+    residual = ssd.compute_residual_displacement_field_SSD2D(delta_field,
                                                             sigma_field,
                                                             gradient_field,
                                                             target,
                                                             lambda_param,
                                                             displacement,
                                                             None)
-    sub_residual = np.array(tf.downsample_displacement_field(residual))
+    sub_residual = np.array(vfu.downsample_displacement_field2D(residual))
     del residual
     #solve at coarcer grid
     subsigma_field = None
     if sigma_field != None:
-        subsigma_field = tf.downsample_scalar_field(sigma_field)
-    subdelta_field = tf.downsample_scalar_field(delta_field)
+        subsigma_field = vfu.downsample_scalar_field2D(sigma_field)
+    subdelta_field = vfu.downsample_scalar_field2D(delta_field)
     subgradient_field = np.array(
-        tf.downsample_displacement_field(gradient_field))
+        vfu.downsample_displacement_field2D(gradient_field))
     shape = np.array(displacement.shape).astype(np.int32)
-    #sub_displacement = np.array(tf.downsample_displacement_field(displacement))
+    #sub_displacement = np.array(vfu.downsample_displacement_field(displacement))
     sub_displacement = np.zeros(shape = ((shape[0]+1)//2, (shape[1]+1)//2, 2 ),
                                dtype = np.float64)
     sublambda_param = lambda_param*0.25
     w_cycle_2d(n-1, k, subdelta_field, subsigma_field, subgradient_field,
              sub_residual, sublambda_param, sub_displacement, depth+1)
     displacement += np.array(
-        tf.upsample_displacement_field(sub_displacement, shape))
+        vfu.upsample_displacement_field(sub_displacement, shape))
     if printEnergy and depth == 0:
-        energy = tf.compute_energy_SSD2D(delta_field, sigma_field, 
+        energy = ssd.compute_energy_SSD2D(delta_field, sigma_field, 
                                          gradient_field, lambda_param, 
                                          displacement)
         print 'Energy after low-res iteration[first]:', energy
     #post-smoothing (second smoothing)
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD2D(delta_field,
+        error = ssd.iterate_residual_displacement_field_SSD2D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD2D(delta_field,
+            energy = ssd.compute_energy_SSD2D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
                                              displacement)
             print 'Energy after top-level iter', i+1, ' [second]:', energy
-    residual = tf.compute_residual_displacement_field_SSD2D(delta_field,
+    residual = ssd.compute_residual_displacement_field_SSD2D(delta_field,
                                                             sigma_field,
                                                             gradient_field,
                                                             target,
                                                             lambda_param,
                                                             displacement,
                                                             None)
-    sub_residual = np.array(tf.downsample_displacement_field(residual))
+    sub_residual = np.array(vfu.downsample_displacement_field2D(residual))
     del residual
-    #sub_displacement = np.array(tf.downsample_displacement_field(displacement))
+    #sub_displacement = np.array(vfu.downsample_displacement_field(displacement))
     sub_displacement = np.zeros(shape = ((shape[0]+1)//2, (shape[1]+1)//2, 2 ),
                                dtype = np.float64)
     w_cycle_2d(n-1, k, subdelta_field, subsigma_field, subgradient_field,
              sub_residual, sublambda_param, sub_displacement, depth+1)
     displacement += np.array(
-        tf.upsample_displacement_field(sub_displacement, shape))
+        vfu.upsample_displacement_field(sub_displacement, shape))
     if printEnergy and depth == 0:
-        energy = tf.compute_energy_SSD2D(delta_field, sigma_field, 
+        energy = ssd.compute_energy_SSD2D(delta_field, sigma_field, 
                                          gradient_field, lambda_param,
                                          displacement)
         print 'Energy after low-res iteration[second]:', energy
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD2D(delta_field,
+        error = ssd.iterate_residual_displacement_field_SSD2D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD2D(delta_field,
+            energy = ssd.compute_energy_SSD2D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -437,7 +438,7 @@ def w_cycle_2d(n, k, delta_field, sigma_field, gradient_field, target,
     try:
         energy
     except NameError:
-        energy = tf.compute_energy_SSD2D(delta_field, sigma_field,
+        energy = ssd.compute_energy_SSD2D(delta_field, sigma_field,
                                          gradient_field, lambda_param, 
                                          displacement)
     return energy
@@ -451,14 +452,14 @@ def single_cycle_3d(n, k, delta_field, sigma_field, gradient_field,
     '''
     if n == 0:
         for i in range(k):
-            error = tf.iterate_residual_displacement_field_SSD3D(delta_field,
+            error = ssd.iterate_residual_displacement_field_SSD3D(delta_field,
                                                                  sigma_field,
                                                                  gradient_field,
                                                                  None,
                                                                  lambda_param,
                                                                  displacement)
             if printEnergy and depth == 0:
-                energy = tf.compute_energy_SSD3D(delta_field,
+                energy = ssd.compute_energy_SSD3D(delta_field,
                                                  sigma_field,
                                                  gradient_field,
                                                  lambda_param,
@@ -468,10 +469,10 @@ def single_cycle_3d(n, k, delta_field, sigma_field, gradient_field,
     #solve at coarcer grid
     subsigma_field = None
     if sigma_field != None:
-        subsigma_field = tf.downsample_scalar_field3D(sigma_field)
-    subdelta_field = tf.downsample_scalar_field3D(delta_field)
+        subsigma_field = vfu.downsample_scalar_field3D(sigma_field)
+    subdelta_field = vfu.downsample_scalar_field3D(delta_field)
     subgradient_field = np.array(
-        tf.downsample_displacement_field3D(gradient_field))
+        vfu.downsample_displacement_field3D(gradient_field))
     shape = np.array(displacement.shape).astype(np.int32)
     sub_displacement = np.zeros(
         shape = ((shape[0]+1)//2, (shape[1]+1)//2, (shape[2]+1)//2, 3 ),
@@ -480,22 +481,22 @@ def single_cycle_3d(n, k, delta_field, sigma_field, gradient_field,
     single_cycle_3d(n-1, k, subdelta_field, subsigma_field, subgradient_field,
                   sublambda_param, sub_displacement, depth+1)
     displacement += np.array(
-        tf.upsample_displacement_field3D(sub_displacement, shape))
+        vfu.upsample_displacement_field3D(sub_displacement, shape))
     if printEnergy and depth == 0:
-        energy = tf.compute_energy_SSD3D(delta_field, sigma_field,
+        energy = ssd.compute_energy_SSD3D(delta_field, sigma_field,
                                          gradient_field, lambda_param,
                                          displacement)
         print 'Energy after low-res iteration:', energy
     #post-smoothing
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD3D(delta_field,
+        error = ssd.iterate_residual_displacement_field_SSD3D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              None,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD3D(delta_field,
+            energy = ssd.compute_energy_SSD3D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -504,7 +505,7 @@ def single_cycle_3d(n, k, delta_field, sigma_field, gradient_field,
     try:
         energy
     except NameError:
-        energy = tf.compute_energy_SSD3D(delta_field, sigma_field,
+        energy = ssd.compute_energy_SSD3D(delta_field, sigma_field,
                                          gradient_field, lambda_param,
                                          displacement)
     return energy
@@ -524,14 +525,14 @@ def v_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
     '''
     #presmoothing
     for i in range(k):
-        tf.iterate_residual_displacement_field_SSD3D(delta_field,
+        ssd.iterate_residual_displacement_field_SSD3D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD3D(delta_field,
+            energy = ssd.compute_energy_SSD3D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -541,26 +542,26 @@ def v_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
         try:
             energy
         except NameError:
-            energy = tf.compute_energy_SSD3D(delta_field, sigma_field,
+            energy = ssd.compute_energy_SSD3D(delta_field, sigma_field,
                                          gradient_field, lambda_param,
                                          displacement)
         return energy
     #solve at coarcer grid
-    residual = tf.compute_residual_displacement_field_SSD3D(delta_field,
+    residual = ssd.compute_residual_displacement_field_SSD3D(delta_field,
                                                             sigma_field,
                                                             gradient_field,
                                                             target,
                                                             lambda_param,
                                                             displacement,
                                                             None)
-    sub_residual = np.array(tf.downsample_displacement_field3D(residual))
+    sub_residual = np.array(vfu.downsample_displacement_field3D(residual))
     del residual
     subsigma_field = None
     if sigma_field != None:
-        subsigma_field = tf.downsample_scalar_field3D(sigma_field)
-    subdelta_field = tf.downsample_scalar_field3D(delta_field)
+        subsigma_field = vfu.downsample_scalar_field3D(sigma_field)
+    subdelta_field = vfu.downsample_scalar_field3D(delta_field)
     subgradient_field = np.array(
-        tf.downsample_displacement_field3D(gradient_field))
+        vfu.downsample_displacement_field3D(gradient_field))
     shape = np.array(displacement.shape).astype(np.int32)
     sub_displacement = np.zeros(
         shape = ((shape[0]+1)//2, (shape[1]+1)//2, (shape[2]+1)//2, 3 ),
@@ -572,23 +573,23 @@ def v_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
     del subsigma_field
     del subgradient_field
     del sub_residual
-    tf.accumulate_upsample_displacement_field3D(sub_displacement, displacement)
+    ssd.accumulate_upsample_displacement_field3D(sub_displacement, displacement)
     del sub_displacement
     if printEnergy and depth == 0:
-        energy = tf.compute_energy_SSD3D(delta_field, sigma_field, 
+        energy = ssd.compute_energy_SSD3D(delta_field, sigma_field, 
                                          gradient_field, lambda_param,
                                          displacement)
         print 'Energy after low-res iteration:', energy
     #post-smoothing
     for i in range(k):
-        tf.iterate_residual_displacement_field_SSD3D(delta_field,
+        ssd.iterate_residual_displacement_field_SSD3D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD3D(delta_field,
+            energy = ssd.compute_energy_SSD3D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -597,7 +598,7 @@ def v_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
     try:
         energy
     except NameError:
-        energy = tf.compute_energy_SSD3D(delta_field, sigma_field,
+        energy = ssd.compute_energy_SSD3D(delta_field, sigma_field,
                                          gradient_field, lambda_param,
                                          displacement)
     return energy
@@ -614,14 +615,14 @@ def w_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
     '''
     #presmoothing
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD3D(delta_field,
+        error = ssd.iterate_residual_displacement_field_SSD3D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD3D(delta_field,
+            energy = ssd.compute_energy_SSD3D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -629,22 +630,22 @@ def w_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
             print 'Energy after top-level iter', i+1, ' [first]:', energy
     if n == 0:
         return error
-    residual = tf.compute_residual_displacement_field_SSD3D(delta_field,
+    residual = ssd.compute_residual_displacement_field_SSD3D(delta_field,
                                                             sigma_field,
                                                             gradient_field,
                                                             target,
                                                             lambda_param,
                                                             displacement,
                                                             None)
-    sub_residual = np.array(tf.downsample_displacement_field3D(residual))
+    sub_residual = np.array(vfu.downsample_displacement_field3D(residual))
     del residual
     #solve at coarcer grid
     subsigma_field = None
     if sigma_field != None:
-        subsigma_field = tf.downsample_scalar_field3D(sigma_field)
-    subdelta_field = tf.downsample_scalar_field3D(delta_field)
+        subsigma_field = vfu.downsample_scalar_field3D(sigma_field)
+    subdelta_field = vfu.downsample_scalar_field3D(delta_field)
     subgradient_field = np.array(
-        tf.downsample_displacement_field3D(gradient_field))
+        vfu.downsample_displacement_field3D(gradient_field))
     shape = np.array(displacement.shape).astype(np.int32)
     sub_displacement = np.zeros(
         shape = ((shape[0]+1)//2, (shape[1]+1)//2, (shape[2]+1)//2, 3 ),
@@ -653,55 +654,55 @@ def w_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
     w_cycle_3d(n-1, k, subdelta_field, subsigma_field, subgradient_field,
              sub_residual, sublambda_param, sub_displacement, depth+1)
     displacement += np.array(
-        tf.upsample_displacement_field3D(sub_displacement, shape))
+        vfu.upsample_displacement_field3D(sub_displacement, shape))
     if printEnergy and depth == 0:
-        energy = tf.compute_energy_SSD3D(delta_field, sigma_field,
+        energy = ssd.compute_energy_SSD3D(delta_field, sigma_field,
                                          gradient_field, lambda_param, 
                                          displacement)
         print 'Energy after low-res iteration[first]:', energy
     #post-smoothing (second smoothing)
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD3D(delta_field,
+        error = ssd.iterate_residual_displacement_field_SSD3D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD3D(delta_field,
+            energy = ssd.compute_energy_SSD3D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
                                              displacement)
             print 'Energy after top-level iter', i+1, ' [second]:', energy
-    residual = tf.compute_residual_displacement_field_SSD3D(delta_field,
+    residual = ssd.compute_residual_displacement_field_SSD3D(delta_field,
                                                             sigma_field,
                                                             gradient_field,
                                                             target,
                                                             lambda_param,
                                                             displacement,
                                                             None)
-    sub_residual = np.array(tf.downsample_displacement_field3D(residual))
+    sub_residual = np.array(vfu.downsample_displacement_field3D(residual))
     del residual
     sub_displacement[...] = 0
     w_cycle_3d(n-1, k, subdelta_field, subsigma_field, subgradient_field,
              sub_residual, sublambda_param, sub_displacement, depth+1)
     displacement += np.array(
-        tf.upsample_displacement_field3D(sub_displacement, shape))
+        vfu.upsample_displacement_field3D(sub_displacement, shape))
     if printEnergy and depth == 0:
-        energy = tf.compute_energy_SSD3D(delta_field, sigma_field,
+        energy = ssd.compute_energy_SSD3D(delta_field, sigma_field,
                                          gradient_field, lambda_param,
                                          displacement)
         print 'Energy after low-res iteration[second]:', energy
     for i in range(k):
-        error = tf.iterate_residual_displacement_field_SSD3D(delta_field,
+        error = ssd.iterate_residual_displacement_field_SSD3D(delta_field,
                                                              sigma_field,
                                                              gradient_field,
                                                              target,
                                                              lambda_param,
                                                              displacement)
         if printEnergy and depth == 0:
-            energy = tf.compute_energy_SSD3D(delta_field,
+            energy = ssd.compute_energy_SSD3D(delta_field,
                                              sigma_field,
                                              gradient_field,
                                              lambda_param,
@@ -710,7 +711,7 @@ def w_cycle_3d(n, k, delta_field, sigma_field, gradient_field, target,
     try:
         energy
     except NameError:
-        energy = tf.compute_energy_SSD3D(delta_field, sigma_field,
+        energy = ssd.compute_energy_SSD3D(delta_field, sigma_field,
                                          gradient_field, lambda_param, 
                                          displacement)
     return energy

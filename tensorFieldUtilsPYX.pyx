@@ -563,14 +563,14 @@ cpdef count_supporting_data_per_pixel(double[:,:,:] forward):
     countSupportingDataPerPixel(&forward[0,0,0], nrows, ncols, &counts[0,0])
     return counts
 
-def downsample_scalar_field(double[:,:] field):
+def downsample_scalar_field2D(double[:,:] field):
     cdef int nr=field.shape[0]
     cdef int nc=field.shape[1]
     cdef double[:,:] down = np.ndarray(((nr+1)//2, (nc+1)//2), dtype=np.float64)
     downsampleScalarField(&field[0,0], nr, nc, &down[0,0])
     return down
 
-def downsample_displacement_field(double[:,:,:] field):
+def downsample_displacement_field2D(double[:,:,:] field):
     cdef int nr=field.shape[0]
     cdef int nc=field.shape[1]
     cdef double[:,:,:] down = np.ndarray(((nr+1)//2, (nc+1)//2,2), dtype=np.float64)

@@ -462,6 +462,193 @@ def upsample_displacement_field_3d(floating[:,:,:,:] field, int[:] targetShape):
                         up[k,i,j,2]+=calpha*beta*cgamma*field[kk,ii,jj,2]
     return up
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+def accumulate_upsample_displacement_field3D(floating[:,:,:,:] field, floating[:,:,:,:] up):
+    cdef int nslices=field.shape[0]
+    cdef int nrows=field.shape[1]
+    cdef int ncols=field.shape[2]
+    cdef int ns=up.shape[0]
+    cdef int nr=up.shape[1]
+    cdef int nc=up.shape[2]
+    cdef int i,j,k,ii,jj,kk
+    cdef floating dkk, dii, djj
+    cdef floating alpha, beta, gamma, calpha, cbeta, cgamma
+    for k in range(ns):
+        for i in range(nr):
+            for j in range(nc):
+                dkk=0.5*k
+                dii=0.5*i
+                djj=0.5*j
+                if((dkk<0) or (dii<0) or (djj<0) or (dii>nrows-1) or (djj>ncols-1) or (dkk>nslices-1)):#no one is affected
+                    continue
+                kk=ifloor(dkk)
+                ii=ifloor(dii)
+                jj=ifloor(djj)
+                if((kk<0) or (ii<0) or (jj<0) or (ii>=nrows) or (jj>=ncols) or (kk>=nslices)):#no one is affected
+                    continue
+                cgamma=dkk-kk
+                calpha=dii-ii#by definition these factors are nonnegative
+                cbeta=djj-jj
+                alpha=1-calpha
+                beta=1-cbeta
+                gamma=1-cgamma
+                #---top-left
+                up[k,i,j,0]+=alpha*beta*gamma*field[kk,ii,jj,0]
+                up[k,i,j,1]+=alpha*beta*gamma*field[kk,ii,jj,1]
+                up[k,i,j,2]+=alpha*beta*gamma*field[kk,ii,jj,2]
+                #---top-right
+                jj+=1
+                if(jj<ncols):
+                    up[k,i,j,0]+=alpha*cbeta*gamma*field[kk,ii,jj,0]
+                    up[k,i,j,1]+=alpha*cbeta*gamma*field[kk,ii,jj,1]
+                    up[k,i,j,2]+=alpha*cbeta*gamma*field[kk,ii,jj,2]
+                #---bottom-right
+                ii+=1
+                if((ii>=0)and(jj>=0)and(ii<nrows)and(jj<ncols)):
+                    up[k,i,j,0]+=calpha*cbeta*gamma*field[kk,ii,jj,0]
+                    up[k,i,j,1]+=calpha*cbeta*gamma*field[kk,ii,jj,1]
+                    up[k,i,j,2]+=calpha*cbeta*gamma*field[kk,ii,jj,2]
+                #---bottom-left
+                jj-=1
+                if((ii>=0)and(jj>=0)and(ii<nrows)and(jj<ncols)):
+                    up[k,i,j,0]+=calpha*beta*gamma*field[kk,ii,jj,0]
+                    up[k,i,j,1]+=calpha*beta*gamma*field[kk,ii,jj,1]
+                    up[k,i,j,2]+=calpha*beta*gamma*field[kk,ii,jj,2]
+                kk+=1
+                if(kk<nslices):
+                    ii-=1
+                    up[k,i,j,0]+=alpha*beta*cgamma*field[kk,ii,jj,0]
+                    up[k,i,j,1]+=alpha*beta*cgamma*field[kk,ii,jj,1]
+                    up[k,i,j,2]+=alpha*beta*cgamma*field[kk,ii,jj,2]
+                    jj+=1
+                    if(jj<ncols):
+                        up[k,i,j,0]+=alpha*cbeta*cgamma*field[kk,ii,jj,0]
+                        up[k,i,j,1]+=alpha*cbeta*cgamma*field[kk,ii,jj,1]
+                        up[k,i,j,2]+=alpha*cbeta*cgamma*field[kk,ii,jj,2]
+                    #---bottom-right
+                    ii+=1
+                    if((ii>=0)and(jj>=0)and(ii<nrows)and(jj<ncols)):
+                        up[k,i,j,0]+=calpha*cbeta*cgamma*field[kk,ii,jj,0];
+                        up[k,i,j,1]+=calpha*cbeta*cgamma*field[kk,ii,jj,1];
+                        up[k,i,j,2]+=calpha*cbeta*cgamma*field[kk,ii,jj,2];
+                    #---bottom-left
+                    jj-=1
+                    if((ii>=0)and(jj>=0)and(ii<nrows)and(jj<ncols)):
+                        up[k,i,j,0]+=calpha*beta*cgamma*field[kk,ii,jj,0]
+                        up[k,i,j,1]+=calpha*beta*cgamma*field[kk,ii,jj,1]
+                        up[k,i,j,2]+=calpha*beta*cgamma*field[kk,ii,jj,2]
+    return up
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+def downsample_scalar_field3D(floating[:,:,:] field):
+    cdef int ns=field.shape[0]
+    cdef int nr=field.shape[1]
+    cdef int nc=field.shape[2]
+    cdef int nns=(ns+1)//2
+    cdef int nnr=(nr+1)//2
+    cdef int nnc=(nc+1)//2
+    cdef int i,j,k,ii,jj,kk
+    cdef floating[:,:,:] down = np.zeros((nns, nnr, nnc), dtype=cython.typeof(field[0,0,0]))
+    cdef int[:,:,:] cnt = np.zeros((nns, nnr, nnc), dtype=np.int32)
+    for k in range(ns):
+        for i in range(nr):
+            for j in range(nc):
+                kk=k//2
+                ii=i//2
+                jj=j//2
+                down[kk,ii,jj]+=field[k, i, j]
+                cnt[kk,ii,jj]+=1
+    for k in range(nns):
+        for i in range(nnr):
+            for j in range(nnc):
+                if cnt[k,i,j]>0:
+                    down[k,i,j]/=cnt[k,i,j]
+    return down
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+def downsample_displacement_field3D(floating[:,:,:,:] field):
+    cdef int ns=field.shape[0]
+    cdef int nr=field.shape[1]
+    cdef int nc=field.shape[2]
+    cdef int nns=(ns+1)//2
+    cdef int nnr=(nr+1)//2
+    cdef int nnc=(nc+1)//2
+    cdef int i,j,k,ii,jj,kk
+    cdef floating[:,:,:,:] down = np.zeros((nns, nnr, nnc, 3), dtype=cython.typeof(field[0,0,0,0]))
+    cdef int[:,:,:] cnt = np.zeros((nns, nnr, nnc), dtype=np.int32)
+    for k in range(ns):
+        for i in range(nr):
+            for j in range(nc):
+                kk=k//2
+                ii=i//2
+                jj=j//2
+                down[kk,ii,jj,0]+=field[k, i, j,0]
+                down[kk,ii,jj,1]+=field[k, i, j,1]
+                down[kk,ii,jj,2]+=field[k, i, j,2]
+                cnt[kk,ii,jj]+=1
+    for k in range(nns):
+        for i in range(nnr):
+            for j in range(nnc):
+                if cnt[k,i,j]>0:
+                    down[k,i,j,0]/=cnt[k,i,j]
+                    down[k,i,j,1]/=cnt[k,i,j]
+                    down[k,i,j,2]/=cnt[k,i,j]
+    return down
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+def downsample_scalar_field2D(floating[:,:] field):
+    cdef int nr=field.shape[0]
+    cdef int nc=field.shape[1]
+    cdef int nnr = (nr+1)//2
+    cdef int nnc = (nc+1)//2
+    cdef int i,j,ii,jj
+    cdef floating[:,:] down = np.zeros(shape=(nnr, nnc), dtype=cython.typeof(field[0,0]))
+    cdef int[:,:] cnt = np.zeros(shape=(nnr, nnc), dtype=np.int32)
+    for i in range(nr):
+        for j in range(nc):
+            ii=i//2
+            jj=j//2
+            down[ii,jj]+=field[i, j]
+            cnt[ii,jj]+=1
+    for i in range(nnr):
+        for j in range(nnc):
+            if cnt[i,j]>0:
+                down[i,j]/=cnt[i,j]
+    return down
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+def downsample_displacement_field2D(floating[:,:,:] field):
+    cdef int nr=field.shape[0]
+    cdef int nc=field.shape[1]
+    cdef int nnr = (nr+1)//2
+    cdef int nnc = (nc+1)//2
+    cdef int i,j,ii,jj
+    cdef floating[:,:,:] down = np.zeros((nnr, nnc, 2), dtype=cython.typeof(field[0,0,0]))
+    cdef int[:,:] cnt = np.zeros((nnr, nnc), dtype=np.int32)
+    for i in range(nr):
+        for j in range(nc):
+            ii=i//2
+            jj=j//2
+            down[ii,jj,0]+=field[i, j,0]
+            down[ii,jj,1]+=field[i, j,1]
+            cnt[ii,jj]+=1
+    for i in range(nnr):
+        for j in range(nnc):
+            if cnt[i,j]>0:
+                down[i,j,0]/=cnt[i,j]
+                down[i,j,1]/=cnt[i,j]
+    return down
+
 def get_displacement_range(floating[:,:,:,:] d, floating[:,:] affine):
     cdef int nslices=d.shape[0]
     cdef int nrows=d.shape[1]
