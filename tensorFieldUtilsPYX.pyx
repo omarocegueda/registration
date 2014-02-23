@@ -474,7 +474,7 @@ cpdef compose_vector_fields(double[:,:,:] d1, double[:,:,:] d2):
     #print 'Max displacement:', stats[0], 'Mean displacement:', stats[1], '(', stats[2], ')'
     return comp, stats
 
-cpdef compose_vector_fields3D(double[:,:,:,:] d1, double[:,:,:,:] d2):
+cpdef compose_vector_fields_3d(double[:,:,:,:] d1, double[:,:,:,:] d2):
     cdef int ns1=d1.shape[0]
     cdef int nr1=d1.shape[1]
     cdef int nc1=d1.shape[2]
@@ -930,7 +930,7 @@ ctypedef fused discrete:
     cython.int
     cython.longlong
 
-def test_fused(real[:,:,:,:] real_array, discrete[:,:,:,:] discrete_array):
+def test_fused(real[:] real_array, discrete[:] discrete_array):
     r'''
     import tensorFieldUtils as tf
     a_double=np.array(range(1000000), dtype=np.float64)/10.0
@@ -951,13 +951,12 @@ def test_fused(real[:,:,:,:] real_array, discrete[:,:,:,:] discrete_array):
     timeit(tf.test_multiple(a_double, b_long))
     timeit(tf.test_multiple(a_float, b_long))
     '''
-#    cdef int n=len(real_array)
-#    cdef int m=len(discrete_array)
-#    cdef real sum_real = 0
-#    cdef discrete sum_discrete = 0
-#    cdef int i
-#    for i in range(n-1):
-#        sum_real += real_array[i]*real_array[i+1]
-#        sum_discrete += discrete_array[i]*discrete_array[i+1]
-#    return sum_real, sum_discrete
-    pass
+    cdef int n=len(real_array)
+    cdef int m=len(discrete_array)
+    cdef real sum_real = 0
+    cdef discrete sum_discrete = 0
+    cdef int i
+    for i in range(n-1):
+        sum_real += real_array[i]*real_array[i+1]
+        sum_discrete += discrete_array[i]*discrete_array[i+1]
+    return sum_real, sum_discrete

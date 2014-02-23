@@ -837,7 +837,7 @@ def warp_volume_nn(number[:,:,:] volume, floating[:,:,:,:] displacement, floatin
     cdef floating dkk, dii, djj, tmp0, tmp1
     cdef floating alpha, beta, gamma, calpha, cbeta, cgamma
     cdef int k,i,j,kk,ii,jj
-    cdef number[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=cython.typeof(volume[0,0,0]))
+    cdef number[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.asarray(volume).dtype)
     for k in range(nslices):
         for i in range(nrows):
             for j in range(ncols):
@@ -891,7 +891,7 @@ def warp_volume_affine_nn(number[:,:,:] volume, int[:]refShape, floating[:,:] af
     cdef floating dkk, dii, djj, tmp0, tmp1
     cdef floating alpha, beta, gamma, calpha, cbeta, cgamma
     cdef int k,i,j,kk,ii,jj
-    cdef number[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=cython.typeof(volume[0,0,0]))
+    cdef number[:,:,:] warped = np.ndarray((nslices, nrows, ncols), dtype=np.asarray(volume).dtype)
     for k in range(nslices):
         for i in range(nrows):
             for j in range(ncols):
@@ -1041,7 +1041,7 @@ def warp_image_nn(number[:,:] image, floating[:,:,:] displacement, floating[:,:]
     if displacement!=None:
         nrows=displacement.shape[0]
         ncols=displacement.shape[1]
-    cdef number[:,:] warped = np.ndarray((nrows, ncols), dtype=cython.typeof(image[0,0]))
+    cdef number[:,:] warped = np.ndarray((nrows, ncols), dtype=np.asarray(image).dtype)
     for i in range(nrows):
         for j in range(ncols):
             if(affinePre!=None):
@@ -1083,7 +1083,7 @@ def warp_image_affine_nn(number[:,:] image, int[:]refShape, floating[:,:] affine
     cdef floating dii, djj, tmp0
     cdef floating alpha, beta, calpha, cbeta
     cdef int i,j,ii,jj
-    cdef number[:,:] warped = np.ndarray((nrows, ncols), dtype=cython.typeof(image[0,0]))
+    cdef number[:,:] warped = np.ndarray((nrows, ncols), dtype=np.asarray(image).dtype)
     for i in range(nrows):
         for j in range(ncols):
             if(affine!=None):
