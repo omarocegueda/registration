@@ -5,7 +5,7 @@ random variables that are estimated at each iteration of the algorithm.
 '''
 import numpy as np
 import scipy as sp
-import tensorFieldUtils as tf
+import EMFunctions as em
 from SimilarityMetric import SimilarityMetric
 import matplotlib.pyplot as plt
 import registrationCommon as rcommon
@@ -52,8 +52,8 @@ class EMMetric(SimilarityMetric):
         dimension of the input images
         '''
         if self.dim == 2:
-            self.quantize = tf.quantizePositiveImageCYTHON
-            self.compute_stats = tf.computeMaskedImageClassStatsCYTHON
+            self.quantize = em.quantize_positive_image
+            self.compute_stats = em.compute_masked_image_class_stats
             if self.iteration_type == EMMetric.SINGLECYCLE_ITER:
                 self.multi_resolution_iteration = SSDMetric.single_cycle_2d
             elif self.iteration_type == EMMetric.VCYCLE_ITER:
@@ -61,8 +61,8 @@ class EMMetric(SimilarityMetric):
             else:
                 self.multi_resolution_iteration = SSDMetric.w_cycle_2d
         else:
-            self.quantize = tf.quantizePositiveVolumeCYTHON
-            self.compute_stats = tf.computeMaskedVolumeClassStatsCYTHON
+            self.quantize = em.quantize_positive_volume
+            self.compute_stats = em.compute_masked_volume_class_stats
             if self.iteration_type == EMMetric.SINGLECYCLE_ITER:
                 self.multi_resolution_iteration = SSDMetric.single_cycle_3d
             elif self.iteration_type == EMMetric.VCYCLE_ITER:

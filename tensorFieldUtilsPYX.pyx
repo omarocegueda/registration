@@ -124,7 +124,7 @@ cpdef quantizeImageCYTHON(double[:,:]v, int numLevels):
     quantizeImageCPP(&v[0,0], &dims[0], numLevels, &out[0,0], &levels[0], &hist[0])
     return out, levels, hist
 
-cpdef quantizePositiveImageCYTHON(double[:,:]v, int numLevels):
+cpdef quantize_positive_image(double[:,:]v, int numLevels):
     '''
     out, levels, hist=quantizeVolumeCYTHON(v, numLevels)
     '''
@@ -138,7 +138,7 @@ cpdef quantizePositiveImageCYTHON(double[:,:]v, int numLevels):
     quantizePositiveImageCPP(&v[0,0], &dims[0], numLevels, &out[0,0], &levels[0], &hist[0])
     return out, levels, hist
 
-cpdef quantizePositiveVolumeCYTHON(double[:,:,:]v, int numLevels):
+cpdef quantize_positive_volume(double[:,:,:]v, int numLevels):
     '''
     out, levels, hist=quantizeVolumeCYTHON(v, numLevels)
     '''
@@ -179,7 +179,7 @@ cpdef computeImageClassStatsCYTHON(double[:,:] v, int numLabels, int[:,:] labels
     computeImageClassStatsCPP(&v[0,0], &dims[0], numLabels, &labels[0,0], &means[0], &variances[0])
     return means, variances
 
-cpdef computeMaskedImageClassStatsCYTHON(int[:,:] mask, double[:,:] v, int numLabels, int[:,:] labels):
+cpdef compute_masked_image_class_stats(int[:,:] mask, double[:,:] v, int numLabels, int[:,:] labels):
     cdef int[:] dims=cvarray(shape=(2,), itemsize=sizeof(int), format="i")
     dims[0]=v.shape[0]
     dims[1]=v.shape[1]
@@ -203,7 +203,7 @@ cpdef computeVolumeClassStatsCYTHON(double[:,:,:] v, int numLabels, int[:,:,:] l
     computeVolumeClassStatsCPP(&v[0,0,0], &dims[0], numLabels, &labels[0,0,0], &means[0], &variances[0])
     return means, variances
 
-cpdef computeMaskedVolumeClassStatsCYTHON(int[:,:,:] mask, double[:,:,:] v, int numLabels, int[:,:,:] labels):
+cpdef compute_masked_volume_class_stats(int[:,:,:] mask, double[:,:,:] v, int numLabels, int[:,:,:] labels):
     cdef int[:] dims=cvarray(shape=(3,), itemsize=sizeof(int), format="i")
     dims[0]=v.shape[0]
     dims[1]=v.shape[1]

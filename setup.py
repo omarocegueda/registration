@@ -14,6 +14,7 @@ ext_modules = [Extension("tensorFieldUtils", ["tensorFieldUtilsPYX.pyx", "tensor
 ext_modules.append(Extension("VectorFieldUtils", ["VectorFieldUtils.pyx"],include_dirs=get_numpy_include_dirs()))
 ext_modules.append(Extension("CrossCorrelationFunctions", ["CrossCorrelationFunctions.pyx"],include_dirs=get_numpy_include_dirs()))
 ext_modules.append(Extension("SSDFunctions", ["SSDFunctions.pyx"],include_dirs=get_numpy_include_dirs()))
+ext_modules.append(Extension("EMFunctions", ["EMFunctions.pyx"],include_dirs=get_numpy_include_dirs()))
 ext_modules.append(Extension("ecqmmf", ["ecqmmfCYTHON.pyx", "ecqmmfCPP.cpp","bitsCPP.cpp"],include_dirs=get_numpy_include_dirs(), language="c++"))
 ext_modules.append(Extension("ecqmmf_reg", ["ecqmmf_regCYTHON.pyx", "ecqmmf_regCPP.cpp", "bitsCPP.cpp", "hungarian.cpp"],include_dirs=get_numpy_include_dirs(), language="c++"))
 setup(
