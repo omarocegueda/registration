@@ -184,7 +184,7 @@ def iterate_residual_displacement_field_SSD3D(floating[:,:,:] deltaField, floati
                     opt=xx*xx+yy*yy+zz*zz
                     if(maxDisplacement<opt):
                         maxDisplacement=opt
-                elif(sigma==0):
+                elif(sigma<1e-10):
                         nrm2=gradientField[s,r,c,0]**2+gradientField[s,r,c,1]**2+gradientField[s,r,c,2]**2
                         if(nrm2==0):
                             displacementField[s,r,c,:] = 0
