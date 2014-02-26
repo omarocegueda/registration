@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import nibabel as nib
 import registrationCommon as rcommon
 import VectorFieldUtils as vfu
-import tensorFieldUtils as tf
 import UpdateRule
 from TransformationModel import TransformationModel
 from SSDMetric import SSDMetric
