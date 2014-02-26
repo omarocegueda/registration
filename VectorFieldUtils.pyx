@@ -291,6 +291,7 @@ def invert_vector_field_fixed_point_3d(floating[:,:,:,:] d, int[:] inverseShape,
                     if(difmag<mag):
                         difmag=mag
         error/=(ns2*nr2*nc2)
+        iter_count+=1
     stats[0]=error
     stats[1]=iter_count
     return p

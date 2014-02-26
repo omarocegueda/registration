@@ -20,6 +20,7 @@ cdef void solve2DSymmetricPositiveDefiniteSystem(floating[:] A, floating[:] y, f
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+@cython.cdivision(True)
 cdef void solve3DSymmetricPositiveDefiniteSystem(floating[:] A, floating[:] y, floating[:] out):
     r'''
     Solves the symmetric positive-definite linear system Mx = y given by 
@@ -39,6 +40,48 @@ cdef void solve3DSymmetricPositiveDefiniteSystem(floating[:] A, floating[:] y, f
     cdef floating y2=(y[2]*a-A[2]*y0)/a - (e*(y[1]*a-b*y0))/(a*A[3]-b*b)
     out[2]=y2/f
     out[1]=(y1-e*out[2])/d
+    out[0]=(y0-b*out[1]-c*out[2])/a
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+cdef void solve3DRegularizedSymmetricSystem(floating[:] g, floating sigma, floating lambdaParam, int nn, floating[:] y, floating[:] bb, floating[:] out):
+    r'''
+    Solves the symmetric positive-definite linear system resulting at each 
+    voxel from the EM metric for volume registration
+    '''
+    cdef floating a,b,c,d,e,f, diag, y0, y1, y2, nrm2
+    if(isinf(sigma)):
+        out[0]=y[0]/nn
+        out[1]=y[1]/nn
+        out[2]=y[2]/nn
+        return
+    diag = sigma*lambdaParam*nn
+    a=g[0]**2 + diag
+    b=g[0]*g[1]
+    c=g[0]*g[2]
+    d=a*(g[1]**2+diag)-(b**2)
+    e=0 if a == 0 else g[1]*g[2]-(b*c)/a
+    f=0 if a== 0 or d==0 else g[2]**2+diag-(c**2)/a - (a*e**2)/d
+    if f==0:
+        nrm2=g[0]**2 + g[1]**2 + g[2]**2
+        if(nrm2==0):
+            out[0] = 0
+            out[1] = 0
+            out[2] = 0
+        else:
+            out[0]=(bb[0])/nrm2
+            out[1]=(bb[1])/nrm2
+            out[2]=(bb[2])/nrm2
+        return
+    y[0]=bb[0] + sigma*lambdaParam*y[0]
+    y[1]=bb[1] + sigma*lambdaParam*y[1]
+    y[2]=bb[2] + sigma*lambdaParam*y[2]
+    y0=y[0]
+    y1=(y[1]*a-y0*b)/a
+    y2=(y[2]*a-g[0]*g[2]*y0)/a - (e*(y[1]*a-b*y0))/d
+    out[2]=y2/f
+    out[1]=a*(y1-e*out[2])/d
     out[0]=(y0-b*out[1]-c*out[2])/a
 
 @cython.boundscheck(False)
@@ -137,7 +180,6 @@ def iterate_residual_displacement_field_SSD3D(floating[:,:,:] deltaField, floati
     cdef int ncols=deltaField.shape[2]
     cdef int s,r,c,ds, dr, dc, nn
     cdef floating[:] b = np.ndarray(shape=(3,), dtype=cython.typeof(deltaField[0,0,0]))
-    cdef floating[:] d = np.ndarray(shape=(3,), dtype=cython.typeof(deltaField[0,0,0]))
     cdef floating[:] y = np.ndarray(shape=(3,), dtype=cython.typeof(deltaField[0,0,0]))
     cdef floating[:] A = np.ndarray(shape=(6,), dtype=cython.typeof(deltaField[0,0,0]))
     cdef floating xx,yy,zz, opt, nrm2, delta, sigma, maxDisplacement
@@ -171,50 +213,16 @@ def iterate_residual_displacement_field_SSD3D(floating[:,:,:] deltaField, floati
                     y[0]+=displacementField[ds, dr, dc, 0]
                     y[1]+=displacementField[ds, dr, dc, 1]
                     y[2]+=displacementField[ds, dr, dc, 2]
-                if(isinf(sigma)):
-                    xx=displacementField[s,r,c,0]
-                    yy=displacementField[s,r,c,1]
-                    zz=displacementField[s,r,c,2]
-                    displacementField[s,r,c,0]=y[0]/nn;
-                    displacementField[s,r,c,1]=y[1]/nn;
-                    displacementField[s,r,c,2]=y[2]/nn;
-                    xx-=displacementField[s,r,c,0]
-                    yy-=displacementField[s,r,c,1]
-                    zz-=displacementField[s,r,c,2]
-                    opt=xx*xx+yy*yy+zz*zz
-                    if(maxDisplacement<opt):
-                        maxDisplacement=opt
-                elif(sigma==0):
-                        nrm2=gradientField[s,r,c,0]**2+gradientField[s,r,c,1]**2+gradientField[s,r,c,2]**2
-                        if(nrm2==0):
-                            displacementField[s,r,c,:] = 0
-                        else:
-                            displacementField[s,r,c,0]=(b[0])/nrm2
-                            displacementField[s,r,c,1]=(b[1])/nrm2
-                            displacementField[s,r,c,2]=(b[2])/nrm2
-                else:
-                    y[0]=b[0] + sigma*lambdaParam*y[0]
-                    y[1]=b[1] + sigma*lambdaParam*y[1]
-                    y[2]=b[2] + sigma*lambdaParam*y[2]
-                    A[0]=gradientField[s,r,c,0]*gradientField[s,r,c,0] + sigma*lambdaParam*nn
-                    A[1]=gradientField[s,r,c,0]*gradientField[s,r,c,1]
-                    A[2]=gradientField[s,r,c,0]*gradientField[s,r,c,2]
-                    A[3]=gradientField[s,r,c,1]*gradientField[s,r,c,1] + sigma*lambdaParam*nn
-                    A[4]=gradientField[s,r,c,1]*gradientField[s,r,c,2]
-                    A[5]=gradientField[s,r,c,2]**2 + sigma*lambdaParam*nn
-                    xx=displacementField[s,r,c,0]
-                    yy=displacementField[s,r,c,1]
-                    zz=displacementField[s,r,c,2]
-                    solve3DSymmetricPositiveDefiniteSystem(A,y,d)
-                    displacementField[s,r,c,0] = d[0]
-                    displacementField[s,r,c,1] = d[1]
-                    displacementField[s,r,c,2] = d[2]
-                    xx-=displacementField[s,r,c,0]
-                    yy-=displacementField[s,r,c,1]
-                    zz-=displacementField[s,r,c,2]
-                    opt=xx*xx+yy*yy+zz*zz;
-                    if(maxDisplacement<opt):
-                        maxDisplacement=opt
+                xx=displacementField[s,r,c,0]
+                yy=displacementField[s,r,c,1]
+                zz=displacementField[s,r,c,2]
+                solve3DRegularizedSymmetricSystem(gradientField[s,r,c], sigma, lambdaParam, nn, y, b, displacementField[s,r,c])
+                xx-=displacementField[s,r,c,0]
+                yy-=displacementField[s,r,c,1]
+                zz-=displacementField[s,r,c,2]
+                opt=xx*xx+yy*yy+zz*zz
+                if(maxDisplacement<opt):
+                    maxDisplacement=opt
     return sqrt(maxDisplacement)
 
 @cython.boundscheck(False)
