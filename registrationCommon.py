@@ -440,3 +440,80 @@ def readAntsAffine(fname):
     ###########################################################################################
     return T
 
+def create_3d_grid(min_bounds=[0, 0, 0], max_bounds=[128, 256, 256], nlines=[20, 20, 20], npoints=50):
+    r"""
+    Creates a set of streamlines forming a regular 3D grid
+    """
+    grid = []
+    #Create the lines along the first axis
+    for i in range(nlines[1]):
+        for j in range(nlines[2]):
+            z0, z1 = min_bounds[0], max_bounds[0]
+            y = min_bounds[1] + i * (max_bounds[1] - min_bounds[1])/(nlines[1]-1)
+            x = min_bounds[2] + j * (max_bounds[2] - min_bounds[2])/(nlines[2]-1)
+            t = np.linspace(z0, z1, npoints)
+            streamline = np.vstack((t, np.zeros_like(t)+y, np.zeros_like(t)+x)).T
+            grid.append(streamline)
+    #Create the lines along the second axis
+    for k in range(nlines[1]):
+        for j in range(nlines[2]):
+            y0, y1 = min_bounds[1], max_bounds[1]
+            z = min_bounds[0] + k * (max_bounds[0] - min_bounds[0])/(nlines[0]-1)
+            x = min_bounds[2] + j * (max_bounds[2] - min_bounds[2])/(nlines[2]-1)
+            t = np.linspace(y0, y1, npoints)
+            streamline = np.vstack((np.zeros_like(t)+z, t, np.zeros_like(t)+x)).T
+            grid.append(streamline)
+    #Create the lines along the third axis
+    for k in range(nlines[0]):
+        for i in range(nlines[1]):
+            x0, x1 = min_bounds[2], max_bounds[2]
+            z = min_bounds[0] + k * (max_bounds[0] - min_bounds[0])/(nlines[0]-1)
+            y = min_bounds[1] + i * (max_bounds[1] - min_bounds[1])/(nlines[1]-1)
+            t = np.linspace(x0, x1, npoints)
+            streamline = np.vstack((np.zeros_like(t)+z, np.zeros_like(t)+y, t)).T
+            grid.append(streamline)
+    return grid
+
+def create_2d_grid(min_bounds=[0, 0], max_bounds=[256, 256], nlines=[20, 20], npoints=50):
+    r"""
+    Creates a set of streamlines forming a regular 2D grid
+    """
+    grid = []
+    #Create the lines along the first axis
+    for j in range(nlines[1]):
+        y0, y1 = min_bounds[0], max_bounds[0]
+        x = min_bounds[1] + j * (max_bounds[1] - min_bounds[1])/(nlines[1]-1)
+        t = np.linspace(y0, y1, npoints)
+        streamline = np.vstack((t, np.zeros_like(t)+x)).T
+        grid.append(streamline)
+    #Create the lines along the second axis
+    for i in range(nlines[0]):
+        x0, x1 = min_bounds[1], max_bounds[1]
+        y = min_bounds[0] + i * (max_bounds[0] - min_bounds[0])/(nlines[0]-1)
+        t = np.linspace(x0, x1, npoints)
+        streamline = np.vstack((np.zeros_like(t)+y, t)).T
+        grid.append(streamline)
+    return grid
+
+def plot_interactive_2d_grid(grid):
+    extended_grid = []
+    for line in grid:
+        extended_line = np.zeros(shape = (line.shape[0], 3))
+        extended_line[...,1:3] = line
+        extended_grid.append(extended_line) 
+    ren = fvtk.ren()
+    ren.SetBackground(*fvtk.colors.white)
+    grid_actor = fvtk.streamtube(extended_grid, fvtk.colors.red, linewidth=0.3)
+    fvtk.add(ren, grid_actor)
+    fvtk.camera(ren, pos=(0, 0, 0), focal=(30, 0, 0))
+    fvtk.show(ren)
+
+def warp_all_streamlines(streamlines, mapping):
+    import vector_fields as vf
+    warped = []
+    for stremline in streamlines:
+        line = streamline.astype(floating)
+        wline = vf.warp_2d_stream_line(line, mapping.forward, 
+                                       mapping.affine_pre, mapping.affine_post)
+        warped.append(wline)
+    return warped
