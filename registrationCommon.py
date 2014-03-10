@@ -373,6 +373,44 @@ def plotDiffeomorphism(GT, GTinv, GTres, titlePrefix, delta=10):
     #priorEnergy=g00**2+g01**2+g10**2+g11**2
     return [gtLattice, gtInvLattice, gtResidual, detJacobian]
 
+def plot_2d_diffeomorphic_map(mapping, delta=10, fname = None):
+    #Create a grid on the moving domain
+    nrows_moving = mapping.forward.shape[0]
+    ncols_moving = mapping.forward.shape[1]
+    X1,X0=np.mgrid[0:nrows_moving, 0:ncols_moving]
+    lattice_moving=drawLattice2D((nrows_moving+delta)/(delta+1), 
+                                 (ncols_moving+delta)/(delta+1), delta)
+    lattice_moving=lattice_moving[0:nrows_moving, 0:ncols_moving]
+    #Warp in the forward direction (since the lattice is in the moving domain)
+    warped_forward = mapping.transform(lattice_moving)
+
+    #Create a grid on the static domain
+    nrows_static = mapping.backward.shape[0]
+    ncols_static = mapping.backward.shape[1]
+    X1,X0=np.mgrid[0:nrows_static, 0:ncols_static]
+    lattice_static=drawLattice2D((nrows_static+delta)/(delta+1), 
+                                 (ncols_static+delta)/(delta+1), delta)
+    lattice_static=lattice_static[0:nrows_static, 0:ncols_static]
+    #Warp in the backward direction (since the lattice is in the static domain)
+    warped_backward = mapping.transform_inverse(lattice_static)
+
+    #Now plot the grids
+    plt.figure()
+    plt.subplot(1, 3, 1)
+    plt.imshow(warped_forward, cmap=plt.cm.gray)
+    plt.title('Direct transform')
+    plt.subplot(1, 3, 2)
+    plt.imshow(lattice_moving, cmap=plt.cm.gray)
+    plt.title('Original grid')
+    plt.subplot(1, 3, 3)
+    plt.imshow(warped_backward, cmap=plt.cm.gray)
+    plt.title('Inverse transform')
+    if fname is not None:
+      from time import sleep
+      sleep(1)
+      plt.savefig(fname, bbox_inches='tight')
+
+
 def computeJacobianField(displacement):
     g00,g01=sp.gradient(displacement[...,0])
     g10,g11=sp.gradient(displacement[...,1])

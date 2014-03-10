@@ -11,6 +11,7 @@ from Cython.Distutils import build_ext
 
 #ext_modules = [Extension("tensorFieldUtils", ["tensorFieldUtils.pyx"])]
 ext_modules = [Extension("tensorFieldUtils", ["tensorFieldUtilsPYX.pyx", "tensorFieldUtilsCPP.cpp", "bitsCPP.cpp", "derivatives.cpp"],include_dirs=get_numpy_include_dirs(), language="c++")]
+ext_modules.append(Extension("grad_corr", ["grad_corr.pyx"],include_dirs=get_numpy_include_dirs()))
 ext_modules.append(Extension("ecqmmf", ["ecqmmfCYTHON.pyx", "ecqmmfCPP.cpp","bitsCPP.cpp"],include_dirs=get_numpy_include_dirs(), language="c++"))
 ext_modules.append(Extension("ecqmmf_reg", ["ecqmmf_regCYTHON.pyx", "ecqmmf_regCPP.cpp", "bitsCPP.cpp", "hungarian.cpp"],include_dirs=get_numpy_include_dirs(), language="c++"))
 setup(
