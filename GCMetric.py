@@ -31,25 +31,23 @@ class GCMetric(SimilarityMetric):
         Precomputes the cross-correlation factors
         """
         sigma=0.001
-        self.factors = gc.precompute_gc_factors_2d(self.static_image, self.moving_image)
-        i = 0
-        while i < 6:
-            self.factors[..., i] = ndimage.filters.gaussian_filter(self.factors[..., i],
-                                                                   sigma)
-            i+=1
-        self.factors = np.array(self.factors)
-        self.gradient_moving = np.empty(
-            shape = (self.moving_image.shape)+(self.dim,), dtype = floating)
-        i = 0
-        for grad in sp.gradient(self.moving_image):
-            self.gradient_moving[..., i] = grad
-            i += 1
+        self.factors = np.ndarray(self.moving_image.shape + (6,), dtype = np.float32)
+
+        #Gradient and Hessian of static
         self.gradient_static = np.empty(
             shape = (self.static_image.shape)+(self.dim,), dtype = floating)
-        i = 0
-        for grad in sp.gradient(self.static_image):
-            self.gradient_static[..., i] = grad
-            i += 1
+        self.gradient_static[...,0], self.gradient_static[...,1] = sp.gradient(self.static_image)
+        self.factors[..., 0], d2sdrc = sp.gradient(self.gradient_static[...,0])
+        d2sdcr, self.factors[..., 2] = sp.gradient(self.gradient_static[...,1])
+        self.factors[..., 1] = 0.5 * (d2sdrc + d2sdcr)
+
+        #Gradient and Hessian of moving
+        self.gradient_moving = np.empty(
+            shape = (self.moving_image.shape)+(self.dim,), dtype = floating)
+        self.gradient_moving[...,0], self.gradient_moving[...,1] = sp.gradient(self.moving_image)
+        self.factors[..., 3], d2mdrc = sp.gradient(self.gradient_moving[...,0])
+        d2mdcr, self.factors[..., 5] = sp.gradient(self.gradient_moving[...,1])
+        self.factors[..., 4] = 0.5 * (d2mdrc + d2mdcr)
 
     def free_iteration(self):
         r"""
@@ -70,7 +68,7 @@ class GCMetric(SimilarityMetric):
         displacement[..., 0] = ndimage.filters.gaussian_filter(displacement[..., 0],
                                                                self.sigma_diff)
         displacement[..., 1] = ndimage.filters.gaussian_filter(displacement[..., 1],
-                                                                self.sigma_diff)
+                                                               self.sigma_diff)
         max_norm = np.sqrt(np.sum(displacement**2, -1)).max()
         displacement *= self.step_length/max_norm
         return displacement

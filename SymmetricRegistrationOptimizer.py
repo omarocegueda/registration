@@ -495,9 +495,9 @@ def test_2d():
     # similarity_metric = metrics.CCMetric(2, step_length, sigma_diff, radius)
     
     #Configure the GC metric
-    smooth = 3
-    step_length = 0.5
-    similarity_metric = GCMetric(2, step_length, smooth)
+    # smooth = 3
+    # step_length = 0.25
+    # similarity_metric = GCMetric(2, step_length, smooth)
 
     #Configure the SSD metric
     # smooth = 4
@@ -506,8 +506,28 @@ def test_2d():
     # step_type = 0
     # similarity_metric = metrics.SSDMetric(2, smooth, inner_iter, step_length, step_type) 
 
+    #Configure the EM metric
+    use_newton = False
+    q_levels=256
+    double_gradient=False
+    inner_iter=20
+    if use_newton:
+        #Newton step
+        iter_type='v_cycle'
+        smooth=25.0
+        step_length=0.25
+        similarity_metric = metrics.EMMetric(
+            2, smooth, inner_iter, step_length, q_levels, double_gradient, iter_type)
+    else:
+        #Demons step
+        iter_type='demons'
+        smooth=2.5
+        step_length=0.25
+        similarity_metric = metrics.EMMetric(
+            2, smooth, inner_iter, step_length, q_levels, double_gradient, iter_type)
+
     #Configure the optimizer
-    opt_iter = [100, 100, 100, 100,100]
+    opt_iter = [100, 100, 100, 100]
     opt_tol = 1e-4
     inv_iter = 40
     inv_tol = 1e-3

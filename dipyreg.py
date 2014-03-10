@@ -68,12 +68,13 @@ parser.add_argument(
     SSD=sum of squared diferences (monomodal), EM=Expectation Maximization
     to fit the transfer functions (multimodal), CC=Cross Correlation (monomodal
     and some multimodal) and the comma-separated (WITH NO SPACES) parameter list L:
-    EM[step_lentgh,lambda,qLevels,max_inner_iter]
+    EM[step_lentgh,lambda,qLevels,max_inner_iter,step_type]
         step_length: the maximum norm among all vectors of the displacement at each iteration
         lambda: the smoothing parameter (the greater the smoother)
         qLevels: number of quantization levels (hidden variables) in the EM formulation
         max_inner_iter: maximum number of iterations of each level of the multi-resolution Gauss-Seidel algorithm
-        e.g.: EM[0.25,25.0,256,20] (NO SPACES)
+        step_type : energy minimization step, either 'v_cycle' (Newton step using multi-resolution GS) or 'demons'
+        e.g.: EM[0.25,25.0,256,20,'v_cycle'] (NO SPACES)
     CC[step_length,sigma_smooth,neigh_radius]
         step_length: the maximum norm among all vectors of the displacement at each iteration
         sigma_smooth: std. dev. of the smoothing kernel to be used to smooth the gradient at each step
@@ -259,7 +260,7 @@ def register_3d(params):
         step_length=float(metric_params_list[0])
         q_levels=int(metric_params_list[2])
         double_gradient=False if params.single_gradient else True
-        iter_type='v_cycle'
+        iter_type = metric_params_list[4]
         similarity_metric = metrics.EMMetric(
             3, smooth, inner_iter, step_length, q_levels, double_gradient, iter_type)
     elif metric_name=='CC':
