@@ -93,12 +93,19 @@ if __name__=='__main__':
                 mkdir_p(os.path.join(dirName,'target'))
                 mkdir_p(os.path.join(dirName,'reference'))
                 mkdir_p(os.path.join(dirName,'warp'))
+                mkdir_p(os.path.join(dirName,'jaccard'))
                 subprocess.call('ln '+target[0]+' '+dirName+'/target', shell=True)
                 subprocess.call('ln '+reference[0]+' '+dirName+'/reference', shell=True)
                 subprocess.call('ln jobFullSyNEM.sh '+dirName, shell=True)
                 subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
                 for w in target[1:]:
                     subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
+                for w in reference[1:]:
+                    subprocess.call('ln '+w+' '+dirName+'/jaccard', shell=True)
+                with open('jaccard_pairs.lst','w') as f
+                    n = len(target[i])-1
+                    for j in range(n):
+                        f.write(target[i][1+j]+' '+reference[i][1+j])
         sys.exit(0)
     if sys.argv[1]=='s2':#provide two file lists: moving and fixed
         if argc<4:
@@ -133,12 +140,19 @@ if __name__=='__main__':
             mkdir_p(os.path.join(dirName,'target'))
             mkdir_p(os.path.join(dirName,'reference'))
             mkdir_p(os.path.join(dirName,'warp'))
+            mkdir_p(os.path.join(dirName,'jaccard'))
             subprocess.call('ln '+target+' '+dirName+'/target', shell=True)
             subprocess.call('ln '+reference+' '+dirName+'/reference', shell=True)
             subprocess.call('ln jobFullSyNEM.sh '+dirName, shell=True)
             subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
             for w in namesMoving[i][1:]:
                 subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
+            for w in namesFixed[i][1:]:
+                subprocess.call('ln '+w+' '+dirName+'/jaccard', shell=True)
+            with open('jaccard_pairs.lst','w') as f
+                n = len(namesMoving[i])-1
+                for j in range(n):
+                    f.write(namesMoving[i][1+j]+' '+namesFixed[i][1+j])
         sys.exit(0)
     ############################Submit###################################
     if sys.argv[1]=='u':

@@ -209,6 +209,8 @@ def save_registration_results(mapping, params):
     r'''
     Warp the target image using the obtained deformation field
     '''
+    import os
+    import ibsrutils
     fixed = nib.load(params.reference)
     fixed_affine = fixed.get_affine()
     reference_shape = np.array(fixed.shape, dtype=np.int32)
@@ -229,6 +231,19 @@ def save_registration_results(mapping, params):
         warped = np.array(mapping.transform(to_warp, 'nn')).astype(np.int16)
         img_warped = nib.Nifti1Image(warped, fixed_affine)
         img_warped.to_filename('warpedDiff_'+base_warp+'_'+base_fixed+'.nii.gz')
+    #---now the jaccard indices
+    if os.path.exists('jaccard_pairs.lst'):
+        with open('jaccard_pairs.lst','r') as f:
+            for line in f.readlines():
+                aname, bname = line.strip().split()
+                abase = rcommon.getBaseFileName(aname)
+                bbase = rcommon.getBaseFileName(bname)
+                aname = 'warpedDiff_'+abase+'_'+bbase+'.nii.gz'
+                bname = 'jaccard/'+bname
+                if os.path.exists(aname) and os.path.exists(bname):
+                    ibsrutils.computeJacard(aname, bname)
+                else:
+                    print 'Pair not found ['+aname+'], ['+bname+']'
     #---finally, the optional output
     if params.output_list == None:
         return
