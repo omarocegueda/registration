@@ -240,9 +240,9 @@ def save_registration_results(mapping, params):
                 bbase = rcommon.getBaseFileName(bname)
                 aname = 'warpedDiff_'+abase+'_'+bbase+'.nii.gz'
                 if os.path.exists(aname) and os.path.exists(cname):
-                    ibsrutils.computeJacard(aname, cname)
+                    ibsrutils.computeJacard(cname, aname)
                 else:
-                    print 'Pair not found ['+aname+'], ['+cname+']'
+                    print 'Pair not found ['+cname+'], ['+aname+']'
     #---finally, the optional output
     if params.output_list == None:
         return
