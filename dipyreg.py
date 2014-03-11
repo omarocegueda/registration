@@ -235,15 +235,14 @@ def save_registration_results(mapping, params):
     if os.path.exists('jaccard_pairs.lst'):
         with open('jaccard_pairs.lst','r') as f:
             for line in f.readlines():
-                aname, bname = line.strip().split()
+                aname, bname, cname= line.strip().split()
                 abase = rcommon.getBaseFileName(aname)
                 bbase = rcommon.getBaseFileName(bname)
                 aname = 'warpedDiff_'+abase+'_'+bbase+'.nii.gz'
-                bname = 'jaccard/'+bname
-                if os.path.exists(aname) and os.path.exists(bname):
-                    ibsrutils.computeJacard(aname, bname)
+                if os.path.exists(aname) and os.path.exists(cname):
+                    ibsrutils.computeJacard(aname, cname)
                 else:
-                    print 'Pair not found ['+aname+'], ['+bname+']'
+                    print 'Pair not found ['+aname+'], ['+cname+']'
     #---finally, the optional output
     if params.output_list == None:
         return

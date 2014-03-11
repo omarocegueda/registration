@@ -93,7 +93,6 @@ if __name__=='__main__':
                 mkdir_p(os.path.join(dirName,'target'))
                 mkdir_p(os.path.join(dirName,'reference'))
                 mkdir_p(os.path.join(dirName,'warp'))
-                mkdir_p(os.path.join(dirName,'jaccard'))
                 subprocess.call('ln '+target[0]+' '+dirName+'/target', shell=True)
                 subprocess.call('ln '+reference[0]+' '+dirName+'/reference', shell=True)
                 subprocess.call('ln jobFullSyNEM.sh '+dirName, shell=True)
@@ -102,10 +101,10 @@ if __name__=='__main__':
                     subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
                 for w in reference[1:]:
                     subprocess.call('ln '+w+' '+dirName+'/jaccard', shell=True)
-                with open('jaccard_pairs.lst','w') as f:
+                with open(dirName+'/jaccard_pairs.lst','w') as f:
                     n = len(target)-1
                     for k in range(n):
-                        f.write(target[1+k]+' '+reference[1+k])
+                        f.write(target[1+k]+' '+reference[0]+' '+reference[1+k]+'\n')
         sys.exit(0)
     if sys.argv[1]=='s2':#provide two file lists: moving and fixed
         if argc<4:
@@ -140,7 +139,6 @@ if __name__=='__main__':
             mkdir_p(os.path.join(dirName,'target'))
             mkdir_p(os.path.join(dirName,'reference'))
             mkdir_p(os.path.join(dirName,'warp'))
-            mkdir_p(os.path.join(dirName,'jaccard'))
             subprocess.call('ln '+target+' '+dirName+'/target', shell=True)
             subprocess.call('ln '+reference+' '+dirName+'/reference', shell=True)
             subprocess.call('ln jobFullSyNEM.sh '+dirName, shell=True)
@@ -149,10 +147,10 @@ if __name__=='__main__':
                 subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
             for w in namesFixed[i][1:]:
                 subprocess.call('ln '+w+' '+dirName+'/jaccard', shell=True)
-            with open('jaccard_pairs.lst','w') as f:
+            with open(dirName+'/jaccard_pairs.lst','w') as f:
                 n = len(namesMoving[i])-1
                 for j in range(n):
-                    f.write(namesMoving[i][1+j]+' '+namesFixed[i][1+j])
+                    f.write(namesMoving[i][1+j]+' '+namesFixed[i][0]+' '+namesFixed[i][1+j]+'\n')
         sys.exit(0)
     ############################Submit###################################
     if sys.argv[1]=='u':
