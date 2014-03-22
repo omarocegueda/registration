@@ -316,7 +316,11 @@ def register_3d(params):
     #Run the registration
     if 'affine_only' in params.output_list:
         print('Applying affine only')
-        mapping = imwarp.DiffeomorphicMap(None, None, None, init_affine)        
+        sh_direct=fixed.shape + (3,)
+        sh_inv=moving.shape + (3,)
+        direct = np.zeros(shape = sh_direct, dtype=np.float32)
+        inv = np.zeros(shape = sh_inv, dtype=np.float32)
+        mapping=imwarp.DiffeomorphicMap(3, direct, inv, None, init_affine)        
     else:
         registration_optimizer.verbosity = 2
         mapping = registration_optimizer.optimize(fixed, moving, init_affine)
