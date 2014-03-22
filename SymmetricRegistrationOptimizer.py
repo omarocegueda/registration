@@ -441,6 +441,104 @@ def test_optimizer_multimodal_2d(lambda_param):
     print('Mean displacement error: %0.6f (%0.6f)'%
         (mean_displacement_error, stdev_displacement_error))
 
+def test_2d():
+    import dipy.align.metrics as metrics
+    import dipy.align.imwarp as imwarp
+    from GCMetric import GCMetric
+    import scipy as sp
+    import grad_corr as gcorr
+    #Prepare the data
+    fname_moving = 'data/IBSR_nifti_stripped/IBSR_01/IBSR_01_ana_strip.nii.gz'
+    fname_static = 'data/IBSR_nifti_stripped/IBSR_05/IBSR_05_ana_strip.nii.gz'
+
+    nib_moving = nib.load(fname_moving)
+    nib_static = nib.load(fname_static)
+    moving = nib_moving.get_data().squeeze().astype(np.float32)
+    static = nib_static.get_data().squeeze().astype(np.float32)
+    moving = np.copy(moving, order = 'C')
+    static = np.copy(static, order = 'C')
+    shape_moving = moving.shape
+    shape_static = static.shape
+    moving = moving[:, shape_moving[1]//2, :].copy()
+    static = static[:, shape_static[1]//2, :].copy()
+    moving = (moving-moving.min())/(moving.max()-moving.min())
+    static = (static-static.min())/(static.max()-static.min())
+    moving = moving.T
+    static = static.T
+    #Test the gradient
+    # gradient_moving = np.empty((moving.shape)+(2,), dtype = np.float32)
+    # i = 0
+    # for grad in sp.gradient(moving):
+    #     gradient_moving[..., i] = grad
+    #     i += 1
+    # plt.figure()
+    # plt.imshow(gradient_moving[..., 0])
+    # plt.figure()
+    # plt.imshow(gradient_moving[..., 1])
+    #Test the Hessians
+    # factors = gcorr.precompute_gc_factors_2d(static, moving)
+    # plt.figure()
+    # plt.subplot(2,2,1)
+    # plt.imshow(factors[:,:,0])
+    # plt.subplot(2,2,2)
+    # plt.imshow(factors[:,:,1])
+    # plt.subplot(2,2,3)
+    # plt.imshow(factors[:,:,1])
+    # plt.subplot(2,2,4)
+    # plt.imshow(factors[:,:,2])
+    rcommon.overlayImages(static, moving, True)
+    
+    #Configure the CC metric
+    # step_length = 0.25
+    # sigma_diff = 3.0
+    # radius = 4
+    # similarity_metric = metrics.CCMetric(2, step_length, sigma_diff, radius)
+    
+    #Configure the GC metric
+    # smooth = 3
+    # step_length = 0.25
+    # similarity_metric = GCMetric(2, step_length, smooth)
+
+    #Configure the SSD metric
+    # smooth = 4
+    # inner_iter =5
+    # step_length = 0.25
+    # step_type = 0
+    # similarity_metric = metrics.SSDMetric(2, smooth, inner_iter, step_length, step_type) 
+
+    #Configure the EM metric
+    use_newton = False
+    q_levels=256
+    double_gradient=False
+    inner_iter=20
+    if use_newton:
+        #Newton step
+        iter_type='v_cycle'
+        smooth=25.0
+        step_length=0.25
+        similarity_metric = metrics.EMMetric(
+            2, smooth, inner_iter, step_length, q_levels, double_gradient, iter_type)
+    else:
+        #Demons step
+        iter_type='demons'
+        smooth=2.5
+        step_length=0.25
+        similarity_metric = metrics.EMMetric(
+            2, smooth, inner_iter, step_length, q_levels, double_gradient, iter_type)
+
+    #Configure the optimizer
+    opt_iter = [100, 100, 100, 100]
+    opt_tol = 1e-4
+    inv_iter = 40
+    inv_tol = 1e-3
+    registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
+        similarity_metric, opt_iter, opt_tol, inv_iter, inv_tol)
+    registration_optimizer.verbosity = 2
+    mapping = registration_optimizer.optimize(static, moving, None)
+    rcommon.plot_2d_diffeomorphic_map(mapping)
+    warped = mapping.transform(moving)
+    rcommon.overlayImages(static, warped, True)
+
 if __name__ == '__main__':
     start_time = time.time()
     test_optimizer_multimodal_2d(50)

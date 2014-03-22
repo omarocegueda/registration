@@ -9,7 +9,7 @@
 export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
 export PATH=$HOME/opt:$PATH
-export PYTHONPATH=$HOME/opt/lib/python2.7/site-packages:$PYTHONPATH
+export PYTHONPATH=$HOME/opt/dipy:$HOME/opt/lib/python2.7/site-packages:$PYTHONPATH
 ###################################
 date
 reference=$(ls reference)
@@ -31,5 +31,6 @@ else
     echo "Affine mapping found ($affine). Skipping affine registration."
 fi
 #Diffeomorphic registration
-python dipyreg.py target/$target reference/$reference $affine warp --metric=EM[0.25,25.0,256,20]
+#python dipyreg.py target/$target reference/$reference $affine warp --metric=EM[0.25,25.0,256,20,v_cycle]
+python dipyreg.py target/$target reference/$reference $affine warp --metric=EM[0.25,1.0,256,20,demons]
 date

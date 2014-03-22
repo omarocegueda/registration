@@ -99,6 +99,12 @@ if __name__=='__main__':
                 subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
                 for w in target[1:]:
                     subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
+                for w in reference[1:]:
+                    subprocess.call('ln '+w+' '+dirName+'/jaccard', shell=True)
+                with open(dirName+'/jaccard_pairs.lst','w') as f:
+                    n = len(target)-1
+                    for k in range(n):
+                        f.write(target[1+k]+' '+reference[0]+' '+reference[1+k]+'\n')
         sys.exit(0)
     if sys.argv[1]=='s2':#provide two file lists: moving and fixed
         if argc<4:
@@ -139,6 +145,12 @@ if __name__=='__main__':
             subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
             for w in namesMoving[i][1:]:
                 subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
+            for w in namesFixed[i][1:]:
+                subprocess.call('ln '+w+' '+dirName+'/jaccard', shell=True)
+            with open(dirName+'/jaccard_pairs.lst','w') as f:
+                n = len(namesMoving[i])-1
+                for j in range(n):
+                    f.write(namesMoving[i][1+j]+' '+namesFixed[i][0]+' '+namesFixed[i][1+j]+'\n')
         sys.exit(0)
     ############################Submit###################################
     if sys.argv[1]=='u':

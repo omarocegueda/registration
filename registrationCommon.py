@@ -373,6 +373,44 @@ def plotDiffeomorphism(GT, GTinv, GTres, titlePrefix, delta=10):
     #priorEnergy=g00**2+g01**2+g10**2+g11**2
     return [gtLattice, gtInvLattice, gtResidual, detJacobian]
 
+def plot_2d_diffeomorphic_map(mapping, delta=10, fname = None):
+    #Create a grid on the moving domain
+    nrows_moving = mapping.forward.shape[0]
+    ncols_moving = mapping.forward.shape[1]
+    X1,X0=np.mgrid[0:nrows_moving, 0:ncols_moving]
+    lattice_moving=drawLattice2D((nrows_moving+delta)/(delta+1), 
+                                 (ncols_moving+delta)/(delta+1), delta)
+    lattice_moving=lattice_moving[0:nrows_moving, 0:ncols_moving]
+    #Warp in the forward direction (since the lattice is in the moving domain)
+    warped_forward = mapping.transform(lattice_moving)
+
+    #Create a grid on the static domain
+    nrows_static = mapping.backward.shape[0]
+    ncols_static = mapping.backward.shape[1]
+    X1,X0=np.mgrid[0:nrows_static, 0:ncols_static]
+    lattice_static=drawLattice2D((nrows_static+delta)/(delta+1), 
+                                 (ncols_static+delta)/(delta+1), delta)
+    lattice_static=lattice_static[0:nrows_static, 0:ncols_static]
+    #Warp in the backward direction (since the lattice is in the static domain)
+    warped_backward = mapping.transform_inverse(lattice_static)
+
+    #Now plot the grids
+    plt.figure()
+    plt.subplot(1, 3, 1)
+    plt.imshow(warped_forward, cmap=plt.cm.gray)
+    plt.title('Direct transform')
+    plt.subplot(1, 3, 2)
+    plt.imshow(lattice_moving, cmap=plt.cm.gray)
+    plt.title('Original grid')
+    plt.subplot(1, 3, 3)
+    plt.imshow(warped_backward, cmap=plt.cm.gray)
+    plt.title('Inverse transform')
+    if fname is not None:
+      from time import sleep
+      sleep(1)
+      plt.savefig(fname, bbox_inches='tight')
+
+
 def computeJacobianField(displacement):
     g00,g01=sp.gradient(displacement[...,0])
     g10,g11=sp.gradient(displacement[...,1])
@@ -440,3 +478,80 @@ def readAntsAffine(fname):
     ###########################################################################################
     return T
 
+def create_3d_grid(min_bounds=[0, 0, 0], max_bounds=[128, 256, 256], nlines=[20, 20, 20], npoints=50):
+    r"""
+    Creates a set of streamlines forming a regular 3D grid
+    """
+    grid = []
+    #Create the lines along the first axis
+    for i in range(nlines[1]):
+        for j in range(nlines[2]):
+            z0, z1 = min_bounds[0], max_bounds[0]
+            y = min_bounds[1] + i * (max_bounds[1] - min_bounds[1])/(nlines[1]-1)
+            x = min_bounds[2] + j * (max_bounds[2] - min_bounds[2])/(nlines[2]-1)
+            t = np.linspace(z0, z1, npoints)
+            streamline = np.vstack((t, np.zeros_like(t)+y, np.zeros_like(t)+x)).T
+            grid.append(streamline)
+    #Create the lines along the second axis
+    for k in range(nlines[1]):
+        for j in range(nlines[2]):
+            y0, y1 = min_bounds[1], max_bounds[1]
+            z = min_bounds[0] + k * (max_bounds[0] - min_bounds[0])/(nlines[0]-1)
+            x = min_bounds[2] + j * (max_bounds[2] - min_bounds[2])/(nlines[2]-1)
+            t = np.linspace(y0, y1, npoints)
+            streamline = np.vstack((np.zeros_like(t)+z, t, np.zeros_like(t)+x)).T
+            grid.append(streamline)
+    #Create the lines along the third axis
+    for k in range(nlines[0]):
+        for i in range(nlines[1]):
+            x0, x1 = min_bounds[2], max_bounds[2]
+            z = min_bounds[0] + k * (max_bounds[0] - min_bounds[0])/(nlines[0]-1)
+            y = min_bounds[1] + i * (max_bounds[1] - min_bounds[1])/(nlines[1]-1)
+            t = np.linspace(x0, x1, npoints)
+            streamline = np.vstack((np.zeros_like(t)+z, np.zeros_like(t)+y, t)).T
+            grid.append(streamline)
+    return grid
+
+def create_2d_grid(min_bounds=[0, 0], max_bounds=[256, 256], nlines=[20, 20], npoints=50):
+    r"""
+    Creates a set of streamlines forming a regular 2D grid
+    """
+    grid = []
+    #Create the lines along the first axis
+    for j in range(nlines[1]):
+        y0, y1 = min_bounds[0], max_bounds[0]
+        x = min_bounds[1] + j * (max_bounds[1] - min_bounds[1])/(nlines[1]-1)
+        t = np.linspace(y0, y1, npoints)
+        streamline = np.vstack((t, np.zeros_like(t)+x)).T
+        grid.append(streamline)
+    #Create the lines along the second axis
+    for i in range(nlines[0]):
+        x0, x1 = min_bounds[1], max_bounds[1]
+        y = min_bounds[0] + i * (max_bounds[0] - min_bounds[0])/(nlines[0]-1)
+        t = np.linspace(x0, x1, npoints)
+        streamline = np.vstack((np.zeros_like(t)+y, t)).T
+        grid.append(streamline)
+    return grid
+
+def plot_interactive_2d_grid(grid):
+    extended_grid = []
+    for line in grid:
+        extended_line = np.zeros(shape = (line.shape[0], 3))
+        extended_line[...,1:3] = line
+        extended_grid.append(extended_line) 
+    ren = fvtk.ren()
+    ren.SetBackground(*fvtk.colors.white)
+    grid_actor = fvtk.streamtube(extended_grid, fvtk.colors.red, linewidth=0.3)
+    fvtk.add(ren, grid_actor)
+    fvtk.camera(ren, pos=(0, 0, 0), focal=(30, 0, 0))
+    fvtk.show(ren)
+
+def warp_all_streamlines(streamlines, mapping):
+    import vector_fields as vf
+    warped = []
+    for stremline in streamlines:
+        line = streamline.astype(floating)
+        wline = vf.warp_2d_stream_line(line, mapping.forward, 
+                                       mapping.affine_pre, mapping.affine_post)
+        warped.append(wline)
+    return warped

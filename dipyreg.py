@@ -8,10 +8,9 @@ import numpy as np
 import nibabel as nib
 import registrationCommon as rcommon
 import tensorFieldUtils as tf
-from SymmetricRegistrationOptimizer import SymmetricRegistrationOptimizer
-from EMMetric import EMMetric
-from CCMetric import CCMetric
-import UpdateRule as UpdateRule
+import dipy.align.imwarp as imwarp
+import dipy.align.metrics as metrics
+import dipy.align.vector_fields as vf
 from dipy.fixes import argparse as arg
 
 parser = arg.ArgumentParser(
@@ -69,12 +68,13 @@ parser.add_argument(
     SSD=sum of squared diferences (monomodal), EM=Expectation Maximization
     to fit the transfer functions (multimodal), CC=Cross Correlation (monomodal
     and some multimodal) and the comma-separated (WITH NO SPACES) parameter list L:
-    EM[step_lentgh,lambda,qLevels,max_inner_iter]
+    EM[step_lentgh,lambda,qLevels,max_inner_iter,step_type]
         step_length: the maximum norm among all vectors of the displacement at each iteration
         lambda: the smoothing parameter (the greater the smoother)
         qLevels: number of quantization levels (hidden variables) in the EM formulation
         max_inner_iter: maximum number of iterations of each level of the multi-resolution Gauss-Seidel algorithm
-        e.g.: EM[0.25,25.0,256,20] (NO SPACES)
+        step_type : energy minimization step, either 'v_cycle' (Newton step using multi-resolution GS) or 'demons'
+        e.g.: EM[0.25,25.0,256,20,'v_cycle'] (NO SPACES)
     CC[step_length,sigma_smooth,neigh_radius]
         step_length: the maximum norm among all vectors of the displacement at each iteration
         sigma_smooth: std. dev. of the smoothing kernel to be used to smooth the gradient at each step
@@ -194,21 +194,23 @@ def check_arguments(params):
 
 def save_deformed_lattice_3d(displacement, oname):
     r'''
-    Applies the given displacement to a regular lattice and saves the resulting
+    Applies the given mapping to a regular lattice and saves the resulting
     image to a Nifti file with the given name
     '''
-    min_val, max_val = tf.get_displacement_range(displacement, None)
+    min_val, max_val = vf.get_displacement_range(displacement, None)
     shape = np.array([np.ceil(max_val[0]), np.ceil(max_val[1]),
                   np.ceil(max_val[2])], dtype = np.int32)
-    lattice = np.array(rcommon.drawLattice3D(shape, 10))
-    warped = np.array(tf.warp_volume(lattice, displacement)).astype(np.int16)
+    lattice = np.array(rcommon.drawLattice3D(shape, 10), dtype = np.float32)
+    warped = np.array(vf.warp_volume(lattice, displacement)).astype(np.int16)
     img = nib.Nifti1Image(warped, np.eye(4))
     img.to_filename(oname)
 
-def save_registration_results(init_affine, displacement, inverse, params):
+def save_registration_results(mapping, params):
     r'''
     Warp the target image using the obtained deformation field
     '''
+    import os
+    import ibsrutils
     fixed = nib.load(params.reference)
     fixed_affine = fixed.get_affine()
     reference_shape = np.array(fixed.shape, dtype=np.int32)
@@ -217,41 +219,44 @@ def save_registration_results(init_affine, displacement, inverse, params):
     base_fixed = rcommon.getBaseFileName(params.reference)
     moving = nib.load(params.target).get_data().squeeze().astype(np.float64)
     moving = moving.copy(order='C')
-    warped = np.array(tf.warp_volume(moving, displacement)).astype(np.int16)
+    warped = np.array(mapping.transform(moving, 'tri')).astype(np.int16)
     img_warped = nib.Nifti1Image(warped, fixed_affine)
     img_warped.to_filename('warpedDiff_'+base_moving+'_'+base_fixed+'.nii.gz')
-    #---warp the target image using the affine transformation only---
-    moving = nib.load(params.target).get_data().squeeze().astype(np.float64)
-    moving = moving.copy(order='C')
-    warped = np.array(
-        tf.warp_volume_affine(moving, reference_shape, init_affine)
-        ).astype(np.int16)
-    img_warped = nib.Nifti1Image(warped, fixed_affine)
-    img_warped.to_filename('warpedAffine_'+base_moving+'_'+base_fixed+'.nii.gz')
     #---warp all volumes in the warp directory using NN interpolation
     names = [os.path.join(warp_dir, name) for name in os.listdir(warp_dir)]
     for name in names:
         to_warp = nib.load(name).get_data().squeeze().astype(np.int32)
         to_warp = to_warp.copy(order='C')
         base_warp = rcommon.getBaseFileName(name)
-        warped = np.array(
-            tf.warp_discrete_volumeNN(to_warp, displacement)).astype(np.int16)
+        warped = np.array(mapping.transform(to_warp, 'nn')).astype(np.int16)
         img_warped = nib.Nifti1Image(warped, fixed_affine)
         img_warped.to_filename('warpedDiff_'+base_warp+'_'+base_fixed+'.nii.gz')
+    #---now the jaccard indices
+    if os.path.exists('jaccard_pairs.lst'):
+        with open('jaccard_pairs.lst','r') as f:
+            for line in f.readlines():
+                aname, bname, cname= line.strip().split()
+                abase = rcommon.getBaseFileName(aname)
+                bbase = rcommon.getBaseFileName(bname)
+                aname = 'warpedDiff_'+abase+'_'+bbase+'.nii.gz'
+                if os.path.exists(aname) and os.path.exists(cname):
+                    ibsrutils.computeJacard(cname, aname)
+                else:
+                    print 'Pair not found ['+cname+'], ['+aname+']'
     #---finally, the optional output
     if params.output_list == None:
         return
     if 'lattice' in params.output_list:
         save_deformed_lattice_3d(
-            displacement,
+            mapping.forward,
             'latticeDispDiff_'+base_moving+'_'+base_fixed+'.nii.gz')
     if 'inv_lattice' in params.output_list:
         save_deformed_lattice_3d(
-            inverse, 'invLatticeDispDiff_'+base_moving+'_'+base_fixed+'.nii.gz')
+            mapping.backward, 'invLatticeDispDiff_'+base_moving+'_'+base_fixed+'.nii.gz')
     if 'displacement' in params.output_list:
-        np.save('dispDiff_'+base_moving+'_'+base_fixed+'.npy', displacement)
+        np.save('dispDiff_'+base_moving+'_'+base_fixed+'.npy', mapping.forward)
     if 'inverse' in params.output_list:
-        np.save('invDispDiff_'+base_moving+'_'+base_fixed+'.npy', inverse)
+        np.save('invDispDiff_'+base_moving+'_'+base_fixed+'.npy', mapping.backward)
 
 def register_3d(params):
     r'''
@@ -259,28 +264,32 @@ def register_3d(params):
     '''
     print('Registering %s to %s'%(params.target, params.reference))
     sys.stdout.flush()
-    ####Initialize parameter dictionaries####
     metric_name=params.metric[0:params.metric.find('[')]
     metric_params_list=params.metric[params.metric.find('[')+1:params.metric.find(']')].split(',')
+
+    #Initialize the appropriate metric
     if metric_name=='EM':
-        metric_parameters = {
-            'max_step_length':float(metric_params_list[0]),
-            'lambda':float(metric_params_list[1]),
-            'q_levels':int(metric_params_list[2]),
-            'max_inner_iter':int(metric_params_list[3]),
-            'use_double_gradient':False if params.single_gradient else True}
-        similarity_metric = EMMetric(3, metric_parameters)
+        smooth=float(metric_params_list[1])
+        inner_iter=int(metric_params_list[3])
+        step_length=float(metric_params_list[0])
+        q_levels=int(metric_params_list[2])
+        double_gradient=False if params.single_gradient else True
+        iter_type = metric_params_list[4]
+        similarity_metric = metrics.EMMetric(
+            3, smooth, inner_iter, step_length, q_levels, double_gradient, iter_type)
     elif metric_name=='CC':
-        metric_parameters = {
-            'max_step_length':float(metric_params_list[0]),
-            'sigma_diff':float(metric_params_list[1]),
-            'radius':int(metric_params_list[2])}
-        similarity_metric = CCMetric(3, metric_parameters)
-    optimizer_parameters = {
-        'max_iter':[int(i) for i in params.iter.split(',')],
-        'inversion_iter':int(params.inversion_iter),
-        'inversion_tolerance':float(params.inversion_tolerance),
-        'report_status':True if params.report_status else False}
+        step_length = float(metric_params_list[0])
+        sigma_diff = float(metric_params_list[1])
+        radius = int(metric_params_list[2])
+        similarity_metric = metrics.CCMetric(3, step_length, sigma_diff, radius)
+    #Initialize the optimizer
+    opt_iter = [int(i) for i in params.iter.split(',')]
+    opt_tol = 1e-4
+    inv_iter = int(params.inversion_iter)
+    inv_tol = float(params.inversion_tolerance)
+    registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
+        similarity_metric, opt_iter, opt_tol, inv_iter, inv_tol)
+    #Load the data
     moving = nib.load(params.target)
     moving_affine = moving.get_affine()
     fixed = nib.load(params.reference)
@@ -291,26 +300,19 @@ def register_3d(params):
     else:
         transform = rcommon.readAntsAffine(params.affine)
     init_affine = np.linalg.inv(moving_affine).dot(transform.dot(fixed_affine))
-    #print initAffine
+    #Preprocess the data
     moving = moving.get_data().squeeze().astype(np.float64)
     fixed = fixed.get_data().squeeze().astype(np.float64)
     moving = moving.copy(order='C')
     fixed = fixed.copy(order='C')
     moving = (moving-moving.min())/(moving.max()-moving.min())
     fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
-    ###################Run registration##################
-
-    update_rule = UpdateRule.Composition()
-    registration_optimizer = SymmetricRegistrationOptimizer(
-        fixed, moving, None, init_affine, similarity_metric, update_rule,
-        optimizer_parameters)
-    registration_optimizer.optimize()
-    displacement = registration_optimizer.get_forward()
-    inverse = registration_optimizer.get_backward()
+    #Run the registration
+    registration_optimizer.verbosity = 2
+    mapping = registration_optimizer.optimize(fixed, moving, init_affine)
     del registration_optimizer
     del similarity_metric
-    del update_rule
-    save_registration_results(init_affine, displacement, inverse, params)
+    save_registration_results(mapping, params)
 
 def test_exec():
     target='target/IBSR_01_ana_strip.nii.gz'
