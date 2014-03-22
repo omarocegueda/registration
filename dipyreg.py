@@ -123,6 +123,12 @@ parser.add_argument(
            after each pyramid level''')
 
 parser.add_argument(
+    '-aff', '--affine_only', dest = 'output_list',
+    action = 'append_const', const='affine_only',
+    help = r'''Indicates that only affine registration (provided as parameter)
+           will be performed to warp the target images''')
+
+parser.add_argument(
     '-sd', '--save_displacement', dest = 'output_list',
     action = 'append_const', const='displacement',
     help = r'''Specifies that the displacement field must be saved. The
@@ -308,8 +314,12 @@ def register_3d(params):
     moving = (moving-moving.min())/(moving.max()-moving.min())
     fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
     #Run the registration
-    registration_optimizer.verbosity = 2
-    mapping = registration_optimizer.optimize(fixed, moving, init_affine)
+    if 'affine_only' in params.output_list:
+        print('Applying affine only')
+        mapping = imwarp.DiffeomorphicMap(None, None, None, init_affine)        
+    else:
+        registration_optimizer.verbosity = 2
+        mapping = registration_optimizer.optimize(fixed, moving, init_affine)
     del registration_optimizer
     del similarity_metric
     save_registration_results(mapping, params)
