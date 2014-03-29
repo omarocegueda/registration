@@ -183,7 +183,7 @@ def plotPyramids(L, R):
         plt.imshow(R[i], cmap = plt.cm.gray)
         plt.title('Level: '+str(i))
 
-def renormalizeImage(image):
+def renormalize_image(image):
     m=np.min(image)
     M=np.max(image)
     if(M-m<1e-8):
@@ -196,8 +196,8 @@ def plotOverlaidPyramids(L, R):
     for i in range(n):
         plt.subplot(1,n,i+1)
         colorImage=np.zeros(shape=(L[i].shape)+(3,), dtype=np.int8)
-        ll=renormalizeImage(L[i]).astype(np.int8)
-        rr=renormalizeImage(R[i]).astype(np.int8)
+        ll=renormalize_image(L[i]).astype(np.int8)
+        rr=renormalize_image(R[i]).astype(np.int8)
         colorImage[...,0]=ll*(ll>ll[0,0])
         colorImage[...,1]=rr*(rr>rr[0,0])
         plt.imshow(colorImage)
@@ -210,8 +210,8 @@ def plotOverlaidPyramids3DCoronal(L, R):
         sh=L[i].shape
         plt.subplot(1,n,i+1)
         colorImage=np.zeros(shape=(sh[0], sh[2], 3), dtype=np.int8)
-        ll=renormalizeImage(L[i][:,sh[1]//2,:]).astype(np.int8)
-        rr=renormalizeImage(R[i][:,sh[1]//2,:]).astype(np.int8)
+        ll=renormalize_image(L[i][:,sh[1]//2,:]).astype(np.int8)
+        rr=renormalize_image(R[i][:,sh[1]//2,:]).astype(np.int8)
         colorImage[...,0]=ll*(ll>ll[0,0])
         colorImage[...,1]=rr*(rr>rr[0,0])
         plt.imshow(colorImage)
@@ -283,8 +283,8 @@ def pyramid_gaussian_2D(image, max_layer, mask=None):
 
 def overlayImages(img0, img1, createFig=True):
     colorImage=np.zeros(shape=(img0.shape)+(3,), dtype=np.int8)
-    colorImage[...,0]=renormalizeImage(img0)
-    colorImage[...,1]=renormalizeImage(img1)
+    colorImage[...,0]=renormalize_image(img0)
+    colorImage[...,1]=renormalize_image(img1)
     fig=None
     if(createFig):
         fig=plt.figure()
@@ -555,3 +555,24 @@ def warp_all_streamlines(streamlines, mapping):
                                        mapping.affine_pre, mapping.affine_post)
         warped.append(wline)
     return warped
+
+def plot_middle_slices(V, fname=None):
+    sh=V.shape
+    axial = renormalize_image(V[sh[0]//2, :, :]).astype(np.int8)
+    coronal = renormalize_image(V[:, sh[1]//2, :]).astype(np.int8)
+    sagital = renormalize_image(V[:, :, sh[2]//2]).astype(np.int8)
+
+    plt.figure()
+    plt.subplot(1,3,1)
+    plt.imshow(axial, cmap = plt.cm.gray)
+    plt.title('Axial')
+    plt.subplot(1,3,2)
+    plt.imshow(coronal, cmap = plt.cm.gray)
+    plt.title('Coronal')
+    plt.subplot(1,3,3)
+    plt.imshow(sagital, cmap = plt.cm.gray)
+    plt.title('Sagital')
+    if fname is not None:
+        from time import sleep
+        sleep(1)
+        plt.savefig(fname, bbox_inches='tight')
