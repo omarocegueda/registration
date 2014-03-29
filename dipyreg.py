@@ -314,7 +314,7 @@ def register_3d(params):
     moving = (moving-moving.min())/(moving.max()-moving.min())
     fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
     #Run the registration
-    if 'affine_only' in params.output_list:
+    if params.output_list is not None and 'affine_only' in params.output_list:
         print('Applying affine only')
         sh_direct=fixed.shape + (3,)
         sh_inv=moving.shape + (3,)
@@ -323,7 +323,7 @@ def register_3d(params):
         mapping=imwarp.DiffeomorphicMap(3, direct, inv, None, init_affine)        
     else:
         registration_optimizer.verbosity = 2
-        mapping = registration_optimizer.optimize(fixed, moving, init_affine)
+        mapping = registration_optimizer.optimize(fixed, moving, fixed_affine, moving_affine, transform)
     del registration_optimizer
     del similarity_metric
     save_registration_results(mapping, params)
@@ -379,6 +379,29 @@ def test_exec():
     del similarity_metric
     del update_rule
     #save_registration_results(init_affine, displacement, inverse, params)
+
+def test_scale_space():
+    import nibabel as nib
+    import registrationCommon as rcommon
+    import dipy.align.imwarp as imwarp
+    target='target/IBSR_01_ana_strip.nii.gz'
+    nib_moving = nib.load(target)
+    zooms = np.asarray(nib_moving.get_header().get_zooms())
+    zooms[2]*=20
+    zooms*=3
+    moving = nib_moving.get_data().squeeze().astype(np.float64)
+    moving = (moving-moving.min())/(moving.max()-moving.min())
+    moving_ss = [(filtered, size, spacing, scaling) 
+        for (filtered, size, spacing, scaling) in imwarp.scale_space(moving, 3, zooms)]
+    print("Scale space len: %d"%(len(moving_ss),))
+    for i in range(len(moving_ss)):
+        rcommon.plot_middle_slices(moving_ss[i][0])
+    moving_ss = [(filtered, size, spacing, scaling) 
+        for (filtered, size, spacing, scaling) in imwarp.scale_space(moving[:,:,moving.shape[2]//2], 3, zooms)]
+    plt.figure()
+    plt.imshow(moving_ss[0][0])
+
+
 
 
 if __name__ == '__main__':
