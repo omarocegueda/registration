@@ -225,7 +225,7 @@ def save_registration_results(mapping, params):
     base_fixed = rcommon.getBaseFileName(params.reference)
     moving = nib.load(params.target).get_data().squeeze().astype(np.float64)
     moving = moving.copy(order='C')
-    warped = np.array(mapping.transform(moving, 'tri')).astype(np.int16)
+    warped = np.array(mapping.transform(moving, None, 'tri')).astype(np.int16)
     img_warped = nib.Nifti1Image(warped, fixed_affine)
     img_warped.to_filename('warpedDiff_'+base_moving+'_'+base_fixed+'.nii.gz')
     #---warp all volumes in the warp directory using NN interpolation
@@ -234,7 +234,7 @@ def save_registration_results(mapping, params):
         to_warp = nib.load(name).get_data().squeeze().astype(np.int32)
         to_warp = to_warp.copy(order='C')
         base_warp = rcommon.getBaseFileName(name)
-        warped = np.array(mapping.transform(to_warp, 'nn')).astype(np.int16)
+        warped = np.array(mapping.transform(to_warp, None, 'nn')).astype(np.int16)
         img_warped = nib.Nifti1Image(warped, fixed_affine)
         img_warped.to_filename('warpedDiff_'+base_warp+'_'+base_fixed+'.nii.gz')
     #---now the jaccard indices
@@ -320,10 +320,11 @@ def register_3d(params):
         sh_inv=moving.shape + (3,)
         direct = np.zeros(shape = sh_direct, dtype=np.float32)
         inv = np.zeros(shape = sh_inv, dtype=np.float32)
-        mapping=imwarp.DiffeomorphicMap(3, direct, inv, None, init_affine)        
+        mapping=imwarp.DiffeomorphicMap(3, direct, inv, None, init_affine)    
     else:
         registration_optimizer.verbosity = 2
         mapping = registration_optimizer.optimize(fixed, moving, fixed_affine, moving_affine, transform)
+        mapping.consolidate()
     del registration_optimizer
     del similarity_metric
     save_registration_results(mapping, params)
