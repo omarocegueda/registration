@@ -225,7 +225,7 @@ def save_registration_results(mapping, params):
     base_fixed = rcommon.getBaseFileName(params.reference)
     moving = nib.load(params.target).get_data().squeeze().astype(np.float64)
     moving = moving.copy(order='C')
-    warped = np.array(mapping.transform(moving, None, 'tri')).astype(np.int16)
+    warped = np.array(mapping.transform(moving, 'tri')).astype(np.int16)
     img_warped = nib.Nifti1Image(warped, fixed_affine)
     img_warped.to_filename('warpedDiff_'+base_moving+'_'+base_fixed+'.nii.gz')
     #---warp all volumes in the warp directory using NN interpolation
@@ -234,7 +234,7 @@ def save_registration_results(mapping, params):
         to_warp = nib.load(name).get_data().squeeze().astype(np.int32)
         to_warp = to_warp.copy(order='C')
         base_warp = rcommon.getBaseFileName(name)
-        warped = np.array(mapping.transform(to_warp, None, 'nn')).astype(np.int16)
+        warped = np.array(mapping.transform(to_warp, 'nn')).astype(np.int16)
         img_warped = nib.Nifti1Image(warped, fixed_affine)
         img_warped.to_filename('warpedDiff_'+base_warp+'_'+base_fixed+'.nii.gz')
     #---now the jaccard indices
@@ -330,56 +330,46 @@ def register_3d(params):
     save_registration_results(mapping, params)
 
 def test_exec():
-    target='target/IBSR_01_ana_strip.nii.gz'
-    reference='reference/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz'
-    affine='IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt'
-    paramiter='0x30x30'
-    inversion_iter='20'
-    inversion_tolerance='1e-3'
-    report_status=True
-    print('Registering %s to %s'%(target, reference))
-    sys.stdout.flush()
-    ####Initialize parameter dictionaries####
-    metric_parameters = {
-        'max_step_length':0.25,
-        'sigma_diff':3.0,
-        'radius':4}
-    similarity_metric = CCMetric(3, metric_parameters)
-    optimizer_parameters = {
-        'max_iter':[int(i) for i in paramiter.split(',')],
-        'inversion_iter':int(inversion_iter),
-        'inversion_tolerance':float(inversion_tolerance),
-        'report_status':True if report_status else False}
+    target='target/IBSR_18_ana_strip.nii.gz'
+    reference='reference/IBSR_10_ana_strip.nii.gz'
+    affine='IBSR_18_ana_strip_IBSR_10_ana_stripAffine.txt'
+    
     moving = nib.load(target)
     moving_affine = moving.get_affine()
     fixed = nib.load(reference)
     fixed_affine = fixed.get_affine()
-    print 'Affine:', affine
-    if not affine:
-        transform = np.eye(4)
-    else:
-        transform = rcommon.readAntsAffine(affine)
-    init_affine = np.linalg.inv(moving_affine).dot(transform.dot(fixed_affine))
-    #print initAffine
     moving = moving.get_data().squeeze().astype(np.float64)
     fixed = fixed.get_data().squeeze().astype(np.float64)
     moving = moving.copy(order='C')
     fixed = fixed.copy(order='C')
     moving = (moving-moving.min())/(moving.max()-moving.min())
     fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
-    ###################Run registration##################
 
-    update_rule = UpdateRule.Composition()
-    registration_optimizer = SymmetricRegistrationOptimizer(
-        fixed, moving, None, init_affine, similarity_metric, update_rule,
-        optimizer_parameters)
-    registration_optimizer.optimize()
-    #displacement = registration_optimizer.get_forward()
-    #inverse = registration_optimizer.get_backward()
-    del registration_optimizer
-    del similarity_metric
-    del update_rule
-    #save_registration_results(init_affine, displacement, inverse, params)
+    print 'Affine:', affine
+    if not affine:
+        transform = np.eye(4)
+    else:
+        transform = rcommon.readAntsAffine(affine)
+
+    print('Registering %s to %s'%(target, reference))
+    sys.stdout.flush()
+    ####Initialize parameter dictionaries####
+    step_length = 0.25
+    sigma_diff = 3.0
+    radius = 4
+    similarity_metric = metrics.CCMetric(3, step_length, sigma_diff, radius)
+
+    opt_iter = [1, 10, 10]
+    opt_tol = 1e-4
+    inv_iter = 20
+    inv_tol = 1e-3
+    registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
+        similarity_metric, opt_iter, opt_tol, inv_iter, inv_tol)
+
+    ###################Run registration##################
+    registration_optimizer.verbosity = 11
+    mapping = registration_optimizer.optimize(fixed, moving, fixed_affine, moving_affine, transform)
+    mapping.consolidate()
 
 def test_scale_space():
     import nibabel as nib
