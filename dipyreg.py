@@ -68,15 +68,13 @@ parser.add_argument(
     SSD=sum of squared diferences (monomodal), EM=Expectation Maximization
     to fit the transfer functions (multimodal), CC=Cross Correlation (monomodal
     and some multimodal) and the comma-separated (WITH NO SPACES) parameter list L:
-    EM[step_lentgh,lambda,qLevels,max_inner_iter,step_type]
-        step_length: the maximum norm among all vectors of the displacement at each iteration
+    EM[lambda,qLevels,max_inner_iter,step_type]
         lambda: the smoothing parameter (the greater the smoother)
         qLevels: number of quantization levels (hidden variables) in the EM formulation
         max_inner_iter: maximum number of iterations of each level of the multi-resolution Gauss-Seidel algorithm
         step_type : energy minimization step, either 'v_cycle' (Newton step using multi-resolution GS) or 'demons'
-        e.g.: EM[0.25,25.0,256,20,'v_cycle'] (NO SPACES)
-    CC[step_length,sigma_smooth,neigh_radius]
-        step_length: the maximum norm among all vectors of the displacement at each iteration
+        e.g.: EM[25.0,256,20,'v_cycle'] (NO SPACES)
+    CC[sigma_smooth,neigh_radius]
         sigma_smooth: std. dev. of the smoothing kernel to be used to smooth the gradient at each step
         neigh_radius: radius of the squared neighborhood to be used to compute the Cross Correlation at each voxel
         e.g.:CC[0.25,3.0,4] (NO SPACES)
@@ -89,6 +87,12 @@ parser.add_argument(
            of iterations at each level of the Gaussian Pyramid (similar to
            ANTS), e.g. 10,100,100 (NO SPACES)''',
     default = '25,50,100')
+
+parser.add_argument(
+    '-stepl', '--step_length', action = 'store',
+    metavar = 'step_length',
+    help = '''The length of the maximum displacement vector of the update displacement field at each iteration''',
+    default = '0.25')
 
 parser.add_argument(
     '-inv_iter', '--inversion_iter', action = 'store', metavar = 'max_iter',
@@ -275,26 +279,26 @@ def register_3d(params):
 
     #Initialize the appropriate metric
     if metric_name=='EM':
-        smooth=float(metric_params_list[1])
-        inner_iter=int(metric_params_list[3])
-        step_length=float(metric_params_list[0])
-        q_levels=int(metric_params_list[2])
+        smooth=float(metric_params_list[0])
+        q_levels=int(metric_params_list[1])
+        inner_iter=int(metric_params_list[2])
+        iter_type = metric_params_list[3]
         double_gradient=False if params.single_gradient else True
-        iter_type = metric_params_list[4]
         similarity_metric = metrics.EMMetric(
             3, smooth, inner_iter, step_length, q_levels, double_gradient, iter_type)
     elif metric_name=='CC':
-        step_length = float(metric_params_list[0])
         sigma_diff = float(metric_params_list[1])
         radius = int(metric_params_list[2])
-        similarity_metric = metrics.CCMetric(3, step_length, sigma_diff, radius)
+        similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
     #Initialize the optimizer
     opt_iter = [int(i) for i in params.iter.split(',')]
+    step_length = float(params.step_length)
     opt_tol = 1e-4
     inv_iter = int(params.inversion_iter)
     inv_tol = float(params.inversion_tolerance)
+    ss_sigma_factor = 0.2
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
-        similarity_metric, opt_iter, opt_tol, inv_iter, inv_tol)
+        similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
     #Load the data
     moving = nib.load(params.target)
     moving_affine = moving.get_affine()
@@ -354,17 +358,18 @@ def test_exec():
     print('Registering %s to %s'%(target, reference))
     sys.stdout.flush()
     ####Initialize parameter dictionaries####
-    step_length = 0.25
-    sigma_diff = 3.0
+    sigma_diff = 2.0
     radius = 4
-    similarity_metric = metrics.CCMetric(3, step_length, sigma_diff, radius)
+    similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
 
     opt_iter = [1, 10, 10]
+    step_length = 0.25
     opt_tol = 1e-4
     inv_iter = 20
     inv_tol = 1e-3
+    ss_sigma_factor = 0.5
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
-        similarity_metric, opt_iter, opt_tol, inv_iter, inv_tol)
+        similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
 
     ###################Run registration##################
     registration_optimizer.verbosity = 11

@@ -19,7 +19,9 @@ def getTimeStats(fname):
     '''
     try:
         with open(fname,'r') as F:
-            lines=[s.strip().replace('CST', 'EST') for s in F.readlines()]
+            lines=[s.strip().replace(' CST ', ' ') for s in F.readlines()]
+            lines=[s.strip().replace(' EST ', ' ') for s in lines]
+            lines=[s.strip().replace(' EDT ', ' ') for s in lines]
     except:
         print('Error reading file %s'%(fname))
         return
@@ -27,8 +29,8 @@ def getTimeStats(fname):
     i = 0
     deltas = []
     while i + 1 < n:
-        start = time.strptime(lines[i],'%a %b %d %H:%M:%S %Z %Y')
-        end = time.strptime(lines[i+1],'%a %b %d %H:%M:%S %Z %Y')
+        start = time.strptime(lines[i],'%a %b %d %H:%M:%S %Y')
+        end = time.strptime(lines[i+1],'%a %b %d %H:%M:%S %Y')
         t0 = time.mktime(start)
         t1 = time.mktime(end)
         delta = (t1 - t0) / 60.0
