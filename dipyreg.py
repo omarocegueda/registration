@@ -95,6 +95,13 @@ parser.add_argument(
     default = '0.25')
 
 parser.add_argument(
+    '-sssf', '--ss_sigma_factor', action = 'store',
+    metavar = 'ss_sigma_factor',
+    help = '''parameter of the scale-space smoothing kernel. For example, the std. dev. of the kernel will be 
+              factor*(2^i) in the isotropic case where i=0,1,..,n_scales is the scale''',
+    default = '0.2')
+
+parser.add_argument(
     '-inv_iter', '--inversion_iter', action = 'store', metavar = 'max_iter',
     help = '''The maximum number of iterations for the displacement field
            inversion algorithm''',
@@ -296,7 +303,7 @@ def register_3d(params):
     opt_tol = 1e-4
     inv_iter = int(params.inversion_iter)
     inv_tol = float(params.inversion_tolerance)
-    ss_sigma_factor = 0.2
+    ss_sigma_factor = params.ss_sigma_factor
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
         similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
     #Load the data
@@ -367,7 +374,7 @@ def test_exec():
     opt_tol = 1e-4
     inv_iter = 20
     inv_tol = 1e-3
-    ss_sigma_factor = 0.5
+    ss_sigma_factor = params.ss_sigma_factor
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
         similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
 
