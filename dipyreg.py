@@ -292,10 +292,10 @@ def register_3d(params):
         iter_type = metric_params_list[3]
         double_gradient=False if params.single_gradient else True
         similarity_metric = metrics.EMMetric(
-            3, smooth, inner_iter, step_length, q_levels, double_gradient, iter_type)
+            3, smooth, inner_iter, q_levels, double_gradient, iter_type)
     elif metric_name=='CC':
-        sigma_diff = float(metric_params_list[1])
-        radius = int(metric_params_list[2])
+        sigma_diff = float(metric_params_list[0])
+        radius = int(metric_params_list[1])
         similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
     #Initialize the optimizer
     opt_iter = [int(i) for i in params.iter.split(',')]
@@ -303,7 +303,7 @@ def register_3d(params):
     opt_tol = 1e-4
     inv_iter = int(params.inversion_iter)
     inv_tol = float(params.inversion_tolerance)
-    ss_sigma_factor = params.ss_sigma_factor
+    ss_sigma_factor = float(params.ss_sigma_factor)
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
         similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
     #Load the data
@@ -335,7 +335,6 @@ def register_3d(params):
     else:
         registration_optimizer.verbosity = 2
         mapping = registration_optimizer.optimize(fixed, moving, fixed_affine, moving_affine, transform)
-        mapping.consolidate()
     del registration_optimizer
     del similarity_metric
     save_registration_results(mapping, params)
@@ -374,7 +373,7 @@ def test_exec():
     opt_tol = 1e-4
     inv_iter = 20
     inv_tol = 1e-3
-    ss_sigma_factor = params.ss_sigma_factor
+    ss_sigma_factor = float(params.ss_sigma_factor)
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
         similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
 
