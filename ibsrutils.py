@@ -236,6 +236,8 @@ def showRegistrationResultMidSlices(fnameMoving, fnameFixed, fnameAffine=None):
         
         showRegistrationResultMidSlices('warpedAffine_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
         showRegistrationResultMidSlices('warpedDiff_IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', 'data/t1/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz', None)
+
+        showRegistrationResultMidSlices('warpedDiff_IBSR_16_ana_strip_IBSR_10_ana_strip.nii.gz', 'data/IBSR_nifti_stripped/IBSR_10/IBSR_10_ana_strip.nii.gz', None)
         
         
     '''
