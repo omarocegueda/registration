@@ -129,6 +129,10 @@ parser.add_argument(
     help = '''The number levels to be used for the EM quantization''')
 
 parser.add_argument(
+    '-mask0', '--mask0', action = 'store_true',
+    help = '''Set to zero all voxels of the scale space that are zero in the original image''')
+
+parser.add_argument(
     '-rs', '--report_status', action = 'store_true',
     help = '''Instructs the algorithm to show the overlaid registered images
            after each pyramid level''')
@@ -293,6 +297,7 @@ def register_3d(params):
         double_gradient=False if params.single_gradient else True
         similarity_metric = metrics.EMMetric(
             3, smooth, inner_iter, q_levels, double_gradient, iter_type)
+        similarity_metric.mask0 = True
     elif metric_name=='CC':
         sigma_diff = float(metric_params_list[0])
         radius = int(metric_params_list[1])
@@ -340,9 +345,9 @@ def register_3d(params):
     save_registration_results(mapping, params)
 
 def test_exec():
-    target='target/IBSR_18_ana_strip.nii.gz'
+    target='target/IBSR_16_ana_strip.nii.gz'
     reference='reference/IBSR_10_ana_strip.nii.gz'
-    affine='IBSR_18_ana_strip_IBSR_10_ana_stripAffine.txt'
+    affine='IBSR_16_ana_strip_IBSR_10_ana_stripAffine.txt'
     
     moving = nib.load(target)
     moving_affine = moving.get_affine()
@@ -364,16 +369,26 @@ def test_exec():
     print('Registering %s to %s'%(target, reference))
     sys.stdout.flush()
     ####Initialize parameter dictionaries####
-    sigma_diff = 2.0
-    radius = 4
-    similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
-
+    sel_metric = 'EM'
+    if sel_metric is 'CC':
+        sigma_diff = 2.0
+        radius = 4
+        similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
+    else:
+        smooth = 2.0
+        inner_iter = 20
+        q_levels = 256
+        double_gradient = False
+        iter_type = 'demons'
+        similarity_metric = metrics.EMMetric(
+            3, smooth, inner_iter, q_levels, double_gradient, iter_type)
+        similarity_metric.mask0 = True
     opt_iter = [1, 10, 10]
     step_length = 0.25
     opt_tol = 1e-4
     inv_iter = 20
     inv_tol = 1e-3
-    ss_sigma_factor = float(params.ss_sigma_factor)
+    ss_sigma_factor = 0.2
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
         similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
 
