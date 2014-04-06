@@ -345,9 +345,7 @@ def register_3d(params):
     metric_params_list=params.metric[params.metric.find('[')+1:params.metric.find(']')].split(',')
 
     #Initialize the appropriate metric
-    selected_callback = None
     if metric_name=='EM':
-        selected_callback = callback_EM
         smooth=float(metric_params_list[0])
         q_levels=int(metric_params_list[1])
         inner_iter=int(metric_params_list[2])
@@ -357,7 +355,6 @@ def register_3d(params):
             3, smooth, inner_iter, q_levels, double_gradient, iter_type)
         similarity_metric.mask0 = True
     elif metric_name=='CC':
-        selected_callback = callback_CC
         sigma_diff = float(metric_params_list[0])
         radius = int(metric_params_list[1])
         similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
@@ -369,7 +366,7 @@ def register_3d(params):
     inv_tol = float(params.inversion_tolerance)
     ss_sigma_factor = float(params.ss_sigma_factor)
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
-        similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol, selected_callback)
+        similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol, None)
 
     #Load the data
     moving = nib.load(params.target)
