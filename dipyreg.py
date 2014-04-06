@@ -12,6 +12,8 @@ import dipy.align.imwarp as imwarp
 import dipy.align.metrics as metrics
 import dipy.align.vector_fields as vf
 from dipy.fixes import argparse as arg
+import matplotlib.pyplot as plt
+from dipy.align import VerbosityLevels
 
 parser = arg.ArgumentParser(
     description=
@@ -201,6 +203,60 @@ parser.add_argument(
            is 'b.nii.gz', then the resulting deformation field will be saved as
            'invLatticeDispDiff_a_b.npy'.''')
 
+def renormalize_image(image):
+    m=np.min(image)
+    M=np.max(image)
+    if(M-m<1e-8):
+        return image
+    return 127.0*(image-m)/(M-m)
+
+def overlay_images(L, R, ltitle='Left', rtitle='Right', fname=None):
+    sh=L.shape
+
+    colorImage=np.zeros(shape=(sh[0], sh[1], 3), dtype=np.int8)
+    ll=renormalize_image(L).astype(np.int8)
+    rr=renormalize_image(R).astype(np.int8)
+    colorImage[...,0]=ll*(ll>ll[0,0])
+    colorImage[...,1]=rr*(rr>rr[0,0])
+
+    plt.figure()
+    plt.subplot(1,3,1)
+    plt.imshow(ll, cmap = plt.cm.gray)
+    plt.title(ltitle)
+    plt.subplot(1,3,2)
+    plt.imshow(colorImage)
+    plt.title('Overlay')
+    plt.subplot(1,3,3)
+    plt.imshow(rr, cmap = plt.cm.gray)
+    plt.title(rtitle)
+    if fname is not None:
+        from time import sleep
+        sleep(1)
+        plt.savefig(fname, bbox_inches='tight')
+
+
+def callback_EM(optimizer, status):
+    if status == imwarp.RegistrationStages.ITER_END:
+        wmoving = optimizer.metric.moving_image
+        wstatic = optimizer.metric.static_image
+        if optimizer.dim == 2:
+            overlay_images(wmoving, wstatic, 'Moving', 'Static')
+        else:
+            overlay_images(wmoving[:,wmoving.shape[1]//2,:], 
+                           wstatic[:,wstatic.shape[1]//2,:], 
+                           'Moving', 'Static')
+
+def callback_CC(optimizer, status):
+    if status == imwarp.RegistrationStages.ITER_START:
+        wmoving = optimizer.metric.moving_image
+        wstatic = optimizer.metric.static_image
+        if optimizer.dim == 2:
+            overlay_images(wmoving, wstatic, 'Moving', 'Static')
+        else:
+            overlay_images(wmoving[:,wmoving.shape[1]//2,:], 
+                           wstatic[:,wstatic.shape[1]//2,:], 
+                           'Moving', 'Static')
+
 def check_arguments(params):
     r'''
     Verify all arguments were correctly parsed and interpreted
@@ -289,7 +345,9 @@ def register_3d(params):
     metric_params_list=params.metric[params.metric.find('[')+1:params.metric.find(']')].split(',')
 
     #Initialize the appropriate metric
+    selected_callback = None
     if metric_name=='EM':
+        selected_callback = callback_EM
         smooth=float(metric_params_list[0])
         q_levels=int(metric_params_list[1])
         inner_iter=int(metric_params_list[2])
@@ -299,6 +357,7 @@ def register_3d(params):
             3, smooth, inner_iter, q_levels, double_gradient, iter_type)
         similarity_metric.mask0 = True
     elif metric_name=='CC':
+        selected_callback = callback_CC
         sigma_diff = float(metric_params_list[0])
         radius = int(metric_params_list[1])
         similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
@@ -310,7 +369,8 @@ def register_3d(params):
     inv_tol = float(params.inversion_tolerance)
     ss_sigma_factor = float(params.ss_sigma_factor)
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
-        similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
+        similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol, selected_callback)
+
     #Load the data
     moving = nib.load(params.target)
     moving_affine = moving.get_affine()
@@ -338,7 +398,7 @@ def register_3d(params):
         inv = np.zeros(shape = sh_inv, dtype=np.float32)
         mapping=imwarp.DiffeomorphicMap(3, direct, inv, None, init_affine)    
     else:
-        registration_optimizer.verbosity = 2
+        registration_optimizer.verbosity = VerbosityLevels.DIAGNOSE
         mapping = registration_optimizer.optimize(fixed, moving, fixed_affine, moving_affine, transform)
     del registration_optimizer
     del similarity_metric
@@ -370,11 +430,14 @@ def test_exec():
     sys.stdout.flush()
     ####Initialize parameter dictionaries####
     sel_metric = 'EM'
+    selected_callback = None
     if sel_metric is 'CC':
+        selected_callback = callback_CC
         sigma_diff = 2.0
         radius = 4
         similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
     else:
+        selected_callback = callback_EM
         smooth = 2.0
         inner_iter = 20
         q_levels = 256
@@ -383,17 +446,17 @@ def test_exec():
         similarity_metric = metrics.EMMetric(
             3, smooth, inner_iter, q_levels, double_gradient, iter_type)
         similarity_metric.mask0 = True
-    opt_iter = [1, 10, 10]
+    opt_iter = [25, 100, 100]
     step_length = 0.25
     opt_tol = 1e-4
     inv_iter = 20
     inv_tol = 1e-3
     ss_sigma_factor = 0.2
     registration_optimizer = imwarp.SymmetricDiffeomorphicRegistration(
-        similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol)
+        similarity_metric, opt_iter, step_length, ss_sigma_factor, opt_tol, inv_iter, inv_tol, selected_callback)
 
     ###################Run registration##################
-    registration_optimizer.verbosity = 11
+    registration_optimizer.verbosity = VerbosityLevels.DIAGNOSE
     mapping = registration_optimizer.optimize(fixed, moving, fixed_affine, moving_affine, transform)
     mapping.consolidate()
 
