@@ -361,7 +361,7 @@ def register_3d(params):
     #Initialize the optimizer
     opt_iter = [int(i) for i in params.iter.split(',')]
     step_length = float(params.step_length)
-    opt_tol = 1e-4
+    opt_tol = 1e-6
     inv_iter = int(params.inversion_iter)
     inv_tol = float(params.inversion_tolerance)
     ss_sigma_factor = float(params.ss_sigma_factor)
