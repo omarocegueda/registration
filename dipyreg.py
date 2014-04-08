@@ -74,8 +74,8 @@ parser.add_argument(
         lambda: the smoothing parameter (the greater the smoother)
         qLevels: number of quantization levels (hidden variables) in the EM formulation
         max_inner_iter: maximum number of iterations of each level of the multi-resolution Gauss-Seidel algorithm
-        step_type : energy minimization step, either 'v_cycle' (Newton step using multi-resolution GS) or 'demons'
-        e.g.: EM[25.0,256,20,'v_cycle'] (NO SPACES)
+        step_type : energy minimization step, either 'gauss_newton' (optimized using multi-resolution Gauss Seidel)
+        or 'demons' e.g.: EM[25.0,256,20,'gauss_newton'] (NO SPACES), EM[25.0,256,20,'demons'] (NO SPACES)
     CC[sigma_smooth,neigh_radius]
         sigma_smooth: std. dev. of the smoothing kernel to be used to smooth the gradient at each step
         neigh_radius: radius of the squared neighborhood to be used to compute the Cross Correlation at each voxel
