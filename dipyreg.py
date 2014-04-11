@@ -70,12 +70,17 @@ parser.add_argument(
     SSD=sum of squared diferences (monomodal), EM=Expectation Maximization
     to fit the transfer functions (multimodal), CC=Cross Correlation (monomodal
     and some multimodal) and the comma-separated (WITH NO SPACES) parameter list L:
+    SSD[lambda,max_inner_iter,step_type]
+        lambda: the smoothing parameter (the greater the smoother)
+        max_inner_iter: maximum number of iterations of each level of the multi-resolution Gauss-Seidel algorithm
+        step_type : energy minimization step, either 'gauss_newton' (optimized using multi-resolution Gauss Seidel)
+        or 'demons' e.g.: SSD[25.0,20,'gauss_newton'] (NO SPACES), SSD[2.0,20,'demons'] (NO SPACES)
     EM[lambda,qLevels,max_inner_iter,step_type]
         lambda: the smoothing parameter (the greater the smoother)
         qLevels: number of quantization levels (hidden variables) in the EM formulation
         max_inner_iter: maximum number of iterations of each level of the multi-resolution Gauss-Seidel algorithm
         step_type : energy minimization step, either 'gauss_newton' (optimized using multi-resolution Gauss Seidel)
-        or 'demons' e.g.: EM[25.0,256,20,'gauss_newton'] (NO SPACES), EM[25.0,256,20,'demons'] (NO SPACES)
+        or 'demons' e.g.: EM[25.0,256,20,'gauss_newton'] (NO SPACES), EM[2.0,256,20,'demons'] (NO SPACES)
     CC[sigma_smooth,neigh_radius]
         sigma_smooth: std. dev. of the smoothing kernel to be used to smooth the gradient at each step
         neigh_radius: radius of the squared neighborhood to be used to compute the Cross Correlation at each voxel
@@ -296,7 +301,7 @@ def save_registration_results(mapping, params):
     base_fixed = rcommon.getBaseFileName(params.reference)
     moving = nib.load(params.target).get_data().squeeze().astype(np.float64)
     moving = moving.copy(order='C')
-    warped = np.array(mapping.transform(moving, 'tri')).astype(np.int16)
+    warped = np.array(mapping.transform(moving, 'lin')).astype(np.int16)
     img_warped = nib.Nifti1Image(warped, fixed_affine)
     img_warped.to_filename('warpedDiff_'+base_moving+'_'+base_fixed+'.nii.gz')
     #---warp all volumes in the warp directory using NN interpolation
@@ -345,7 +350,13 @@ def register_3d(params):
     metric_params_list=params.metric[params.metric.find('[')+1:params.metric.find(']')].split(',')
 
     #Initialize the appropriate metric
-    if metric_name=='EM':
+    if metric_name == 'SSD':
+        smooth=float(metric_params_list[0])
+        inner_iter=int(metric_params_list[1])
+        iter_type = metric_params_list[2]
+        similarity_metric = metrics.SSDMetric(
+            3, smooth, inner_iter, iter_type)
+    elif metric_name=='EM':
         smooth=float(metric_params_list[0])
         q_levels=int(metric_params_list[1])
         inner_iter=int(metric_params_list[2])
