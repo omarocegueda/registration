@@ -16,6 +16,25 @@ import tensorFieldUtils as tf
 ###############################################################
 const_prefilter_map_coordinates=False
 
+
+# def affine_registration(static, moving):
+#     from nipy.io.files import nipy2nifti, nifti2nipy
+#     from nipy.algorithms.registration import HistogramRegistration, resample
+#     nipy_static = nifti2nipy(static)
+#     nipy_moving = nifti2nipy(moving)
+#     similarity = 'crl1' #'crl1' 'cc', 'mi', 'nmi', 'cr', 'slr'
+#     interp = 'tri' #'pv', 'tri',
+#     renormalize = True
+#     optimizer = 'powell'
+#     R = HistogramRegistration(nipy_static, nipy_moving, similarity=similarity,
+#                           interp=interp, renormalize=renormalize)
+#     T = R.optimize('affine', optimizer=optimizer)
+#     warped= resample(nipy_moving, T, reference=nipy_static, interp_order=1)
+#     warped = nipy2nifti(warped, strict=True)
+#     return warped, T
+
+# warped, affine_init = affine_registration(nib_static, nib_moving)
+
 def getBaseFileName(fname):
     base=os.path.basename(fname)
     noExt=os.path.splitext(base)[0]
