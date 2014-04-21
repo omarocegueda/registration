@@ -36,7 +36,7 @@ deformationField=${targetbase}_${referencebase}Warp.nii.gz
 if [ -r $deformationField ]; then
     echo "Deformation found. Registration skipped."
 else
-    exe="ANTS 3 -m  MI[reference/$reference,target/$target,1,3] -t SyN[0.25] -a ${affine} -r Gauss[2,0] -o ${targetbase}_${referencebase} -i 100x100x25 --continue-affine false"
+    exe="ANTS 3 -m  CC[reference/$reference,target/$target,1,4] -t SyN[0.25] -a ${affine} -r Gauss[3,0] -o ${targetbase}_${referencebase} -i 10x10x5 --continue-affine false"
     echo " $exe "
     $exe
 fi
