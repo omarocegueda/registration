@@ -2,6 +2,7 @@
 This script is the main launcher of the multi-modal non-linear image
 registration
 """
+from __future__ import print_function
 import sys
 import os
 import numpy as np
@@ -336,7 +337,7 @@ def save_registration_results(mapping, params):
                 if os.path.exists(aname) and os.path.exists(cname):
                     ibsrutils.computeJacard(cname, aname)
                 else:
-                    print 'Pair not found ['+cname+'], ['+aname+']'
+                    print('Pair not found ['+cname+'], ['+aname+']')
     #---finally, the optional output
     if params.output_list == None:
         return
@@ -396,7 +397,7 @@ def register_3d(params):
     moving_affine = moving.get_affine()
     fixed = nib.load(params.reference)
     fixed_affine = fixed.get_affine()
-    print 'Affine:', params.affine
+    print('Affine:', params.affine)
     if not params.affine:
         transform = np.eye(4)
     else:
@@ -440,7 +441,7 @@ def test_exec():
     moving = (moving-moving.min())/(moving.max()-moving.min())
     fixed = (fixed-fixed.min())/(fixed.max()-fixed.min())
 
-    print 'Affine:', affine
+    print('Affine:', affine)
     if not affine:
         transform = np.eye(4)
     else:
@@ -505,6 +506,10 @@ def test_scale_space():
 
 
 if __name__ == '__main__':
+    import time
     params = parser.parse_args()
     print_arguments(params)
+    tic = time.clock()
     register_3d(params)
+    toc = time.clock()
+    print('Time elapsed (sec.): ',toc - tic)
