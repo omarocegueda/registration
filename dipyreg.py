@@ -208,6 +208,29 @@ parser.add_argument(
            is 'b.nii.gz', then the resulting deformation field will be saved as
            'invLatticeDispDiff_a_b.npy'.''')
 
+def print_arguments(params):
+    r'''
+    Verify all arguments were correctly parsed and interpreted
+    '''
+    print('========================Parameters========================')
+    print('target: ', params.target)
+    print('reference: ', params.reference)
+    print('affine: ', params.affine)
+    print('warp_dir: ', params.warp_dir)
+    print('metric: ', params.metric)
+    print('iter:', params.iter)
+    print('step_length:', params.step_length)
+    print('ss_sigma_factor', params.ss_sigma_factor)
+    print('inversion_iter', params.inversion_iter)
+    print('inversion_tolerance', params.inversion_tolerance)
+    print('single_gradient', params.single_gradient)
+    print('mask0',params.mask0)
+    print('report_status', params.report_status)
+    print('---------Output requested--------------')
+    print(params.output_list)
+    print('==========================================================')
+
+
 def renormalize_image(image):
     m=np.min(image)
     M=np.max(image)
@@ -262,17 +285,6 @@ def callback_CC(optimizer, status):
                            wstatic[:,wstatic.shape[1]//2,:], 
                            'Moving', 'Static')
 
-def check_arguments(params):
-    r'''
-    Verify all arguments were correctly parsed and interpreted
-    '''
-    print(params.target, params.reference, params.affine, params.warp_dir)
-    print('iter:', [int(i) for i in params.iter.split(',')])
-    print(params.inner_iter, params.quantization_levels,
-          params.single_gradient)
-    print('Inversion:', params.inversion_iter, params.inversion_tolerance)
-    print('---------Output requested--------------')
-    print(params.output_list)
 
 def save_deformed_lattice_3d(displacement, oname):
     r'''
@@ -493,4 +505,6 @@ def test_scale_space():
 
 
 if __name__ == '__main__':
-    register_3d(parser.parse_args())
+    params = parser.parse_args()
+    print_arguments(params)
+    register_3d(params)
