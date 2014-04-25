@@ -377,7 +377,7 @@ def register_3d(params):
         double_gradient=False if params.single_gradient else True
         similarity_metric = metrics.EMMetric(
             3, smooth, inner_iter, q_levels, double_gradient, iter_type)
-        similarity_metric.mask0 = True
+        similarity_metric.mask0 = params.mask0
     elif metric_name=='CC':
         sigma_diff = float(metric_params_list[0])
         radius = int(metric_params_list[1])
