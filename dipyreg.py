@@ -85,16 +85,21 @@ parser.add_argument(
     CC[sigma_smooth,neigh_radius]
         sigma_smooth: std. dev. of the smoothing kernel to be used to smooth the gradient at each step
         neigh_radius: radius of the squared neighborhood to be used to compute the Cross Correlation at each voxel
-        e.g.:CC[0.25,3.0,4] (NO SPACES)
+        e.g.:CC[3.0,4] (NO SPACES)
+    ECC[sigma_smooth,neigh_radius,qLevels]
+        sigma_smooth: std. dev. of the smoothing kernel to be used to smooth the gradient at each step
+        neigh_radius: radius of the squared neighborhood to be used to compute the Cross Correlation at each voxel
+        qLevels: number of quantization levels (hidden variables) in the ECC formulation
+        e.g.:CC[3.0,4,256] (NO SPACES)
     ''',
-    default = 'CC[0.25,3.0,4]')
+    default = 'CC[3.0,4]')
 
 parser.add_argument(
     '-i', '--iter', action = 'store', metavar = 'i_0,i_1,...,i_n',
     help = '''A comma-separated (WITH NO SPACES) list of integers indicating the maximum number
            of iterations at each level of the Gaussian Pyramid (similar to
            ANTS), e.g. 10,100,100 (NO SPACES)''',
-    default = '25,50,100')
+    default = '25,100,100')
 
 parser.add_argument(
     '-stepl', '--step_length', action = 'store',
@@ -263,17 +268,96 @@ def overlay_images(L, R, ltitle='Left', rtitle='Right', fname=None):
         sleep(1)
         plt.savefig(fname, bbox_inches='tight')
 
+def load_callback_EM_data():
+    wmoving = np.load('wmoving.npy')
+    wstatic = np.load('wstatic.npy')
+    staticq_means = np.load('staticq_means.npy')
+    movingq_means = np.load('movingq_means.npy')
+    staticq_variances = np.load('staticq_variances.npy')
+    movingq_variances = np.load('movingq_variances.npy')
+    staticq_means_field = np.load('staticq_means_field.npy')
+    movingq_means_field = np.load('movingq_means_field.npy')
+    staticq_sigma_sq_field = np.load('staticq_sigma_sq_field.npy')
+    movingq_sigma_sq_field = np.load('movingq_sigma_sq_field.npy')
+    
+    mid_slice = wmoving.shape[2] // 2
+    
+    figure()
+    subplot(1,2,1)
+    imshow(wstatic[:,:,mid_slice], cmap=cm.gray)
+    title('Static')
+    subplot(1,2,2)
+    imshow(movingq_means_field[:,:,mid_slice], cmap=cm.gray)
+    title('movingq_means_field')
+
+    figure()
+    subplot(1,2,1)
+    imshow(staticq_means_field[:,:,mid_slice], cmap=cm.gray)
+    title('staticq_means_field')
+    subplot(1,2,2)
+    imshow(wmoving[:,:,mid_slice], cmap=cm.gray)
+    title('Moving')
+
+    staticq_inf_mask = np.isinf(staticq_sigma_sq_field)
+    movingq_inf_mask = np.isinf(movingq_sigma_sq_field)
+    staticq_sigma_sq_field[staticq_inf_mask] = 0
+    movingq_sigma_sq_field[movingq_inf_mask] = 0
+    print('staticq_sigma_sq_field range: [%f, %f]'%(staticq_sigma_sq_field.min(), staticq_sigma_sq_field.max()))
+    print('movingq_sigma_sq_field range: [%f, %f]'%(movingq_sigma_sq_field.min(), movingq_sigma_sq_field.max()))
+
+    figure()
+    subplot(1,2,1)
+    imshow(staticq_sigma_sq_field[:,:,mid_slice], cmap=cm.gray)
+    title('staticq_sigma_sq_field')
+    subplot(1,2,2)
+    imshow(movingq_sigma_sq_field[:,:,mid_slice], cmap=cm.gray)
+    title('movingq_sigma_sq_field')
+
+    figure()
+    subplot(1,2,1)
+    imshow(staticq_inf_mask[:,:,mid_slice], cmap=cm.gray)
+    title('staticq_inf_mask')
+    subplot(1,2,2)
+    imshow(movingq_inf_mask[:,:,mid_slice], cmap=cm.gray)
+    title('movingq_inf_mask')
+
+    #Now the residuals
+    movingq_residuals = (movingq_means_field - wstatic)**2
+    staticq_residuals = (staticq_means_field - wmoving)**2
+    print("Movingq energy: %f"%(movingq_residuals.sum()))
+    print("Staticq energy: %f"%(staticq_residuals.sum()))
+
 
 def callback_EM(optimizer, status):
     if status == imwarp.RegistrationStages.ITER_END:
         wmoving = optimizer.metric.moving_image
         wstatic = optimizer.metric.static_image
-        if optimizer.dim == 2:
-            overlay_images(wmoving, wstatic, 'Moving', 'Static')
-        else:
-            overlay_images(wmoving[:,wmoving.shape[1]//2,:], 
-                           wstatic[:,wstatic.shape[1]//2,:], 
-                           'Moving', 'Static')
+        staticq_means = optimizer.metric.staticq_means
+        movingq_means = optimizer.metric.movingq_means
+        staticq_variances = optimizer.metric.staticq_variances
+        movingq_variances = optimizer.metric.movingq_variances
+        staticq_means_field = optimizer.metric.staticq_means_field
+        movingq_means_field = optimizer.metric.movingq_means_field
+        staticq_sigma_sq_field =  optimizer.metric.staticq_sigma_sq_field
+        movingq_sigma_sq_field =  optimizer.metric.movingq_sigma_sq_field
+        np.save('wmoving.npy',wmoving)
+        np.save('wstatic.npy',wstatic)
+        np.save('staticq_means.npy',staticq_means)
+        np.save('movingq_means.npy',movingq_means)
+        np.save('staticq_variances.npy',staticq_variances)
+        np.save('movingq_variances.npy',movingq_variances)
+        np.save('staticq_means_field.npy',staticq_means_field)
+        np.save('movingq_means_field.npy',movingq_means_field)
+        np.save('staticq_sigma_sq_field.npy',staticq_sigma_sq_field)
+        np.save('movingq_sigma_sq_field.npy',movingq_sigma_sq_field)
+        #if optimizer.dim == 2:
+        #    overlay_images(wmoving, wstatic, 'Moving', 'Static')
+        #else:
+        #    overlay_images(wmoving[:,wmoving.shape[1]//2,:], 
+        #                   wstatic[:,wstatic.shape[1]//2,:], 
+        #                   'Moving', 'Static')
+    elif status == imwarp.RegistrationStages.SCALE_END:
+        print('Scale end.')
 
 def callback_CC(optimizer, status):
     if status == imwarp.RegistrationStages.ITER_START:
@@ -382,6 +466,12 @@ def register_3d(params):
         sigma_diff = float(metric_params_list[0])
         radius = int(metric_params_list[1])
         similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
+    elif metric_name=='ECC':
+        from dipy.align.ECCMetric import ECCMetric
+        sigma_diff = float(metric_params_list[0])
+        radius = int(metric_params_list[1])
+        q_levels = int(metric_params_list[2])
+        similarity_metric = ECCMetric(3, sigma_diff, radius, q_levels)
     #Initialize the optimizer
     opt_iter = [int(i) for i in params.iter.split(',')]
     step_length = float(params.step_length)
@@ -425,6 +515,7 @@ def register_3d(params):
     del similarity_metric
     save_registration_results(mapping, params)
 
+
 def test_exec():
     target='target/IBSR_16_ana_strip.nii.gz'
     reference='reference/IBSR_10_ana_strip.nii.gz'
@@ -450,25 +541,37 @@ def test_exec():
     print('Registering %s to %s'%(target, reference))
     sys.stdout.flush()
     ####Initialize parameter dictionaries####
-    sel_metric = 'EM'
+    sel_metric = 'ECC'
     selected_callback = None
     if sel_metric is 'CC':
         selected_callback = callback_CC
         sigma_diff = 2.0
         radius = 4
         similarity_metric = metrics.CCMetric(3, sigma_diff, radius)
+        step_length = 0.25
+    elif sel_metric is 'ECC':
+        from dipy.align.ECCMetric import ECCMetric
+        selected_callback = callback_CC
+        sigma_diff = 2.0
+        radius = 4
+        qlevels = 256
+        similarity_metric = ECCMetric(3, sigma_diff, radius, qlevels)
+        step_length = 0.25
     else:
         selected_callback = callback_EM
-        smooth = 2.0
-        inner_iter = 20
+        smooth = 25.0
+        inner_iter = 5
         q_levels = 256
         double_gradient = False
-        iter_type = 'demons'
+        iter_type = 'gauss_newton'
         similarity_metric = metrics.EMMetric(
             3, smooth, inner_iter, q_levels, double_gradient, iter_type)
-        similarity_metric.mask0 = True
+        similarity_metric.mask0 = False
+        if iter_type is 'gauss_newton':
+            step_length = 0.4
+        else:
+            step_length = 0.25
     opt_iter = [25, 100, 100]
-    step_length = 0.25
     opt_tol = 1e-4
     inv_iter = 20
     inv_tol = 1e-3
@@ -506,10 +609,11 @@ def test_scale_space():
 
 
 if __name__ == '__main__':
-    import time
-    params = parser.parse_args()
-    print_arguments(params)
-    tic = time.clock()
-    register_3d(params)
-    toc = time.clock()
-    print('Time elapsed (sec.): ',toc - tic)
+     #test_exec()    
+      import time
+      params = parser.parse_args()
+      print_arguments(params)
+      tic = time.clock()
+      register_3d(params)
+      toc = time.clock()
+      print('Time elapsed (sec.): ',toc - tic)
