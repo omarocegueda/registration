@@ -448,7 +448,7 @@ Finally, solving for $z^{\cdot}$, we obtain the Gauss-Seidel iterative update in
 
 
 \begin{displaymath}
-	z^{\cdot}=-\frac{1}{C}\left[ \sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\beta_{x}d_{x} + \sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\beta_{x}^{c}d_{x}  + \sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}d_{x} + \sum_{x\in 
+	z^{\cdot}=-\frac{1}{C}\left[ \sum_{x\in R_{1}(z^{\cdot})}\alpha_{x}\beta_{x}d_{x} + \sum_{x\in R_{2}(z^{\cdot})}\alpha_{x}\beta_{x}^{c}d_{x}  + \sum_{x\in R_{3}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}d_{x} + \sum_{x\in
 	R_{4}(z^{\cdot})}\alpha_{x}^{c}\beta_{x}^{c}d_{x}\right.+
 \end{displaymath}
 \begin{displaymath}
@@ -494,9 +494,9 @@ By introducing the (unknown) hidden variables $Y(x)=F_{1}[I_{1}(x)], x\in \Omega
 	Q(\Psi, \Psi^{t-1}) = E_{Y,Z}\left[\log \left( \frac{P(I_{1}, I_{2}, Y, Z|\Psi)P(\Psi)}{P(I_{1}, I_{2}, Y, Z)}\right) | I_{1}, I_{2}, \Psi^{t-1}\right]
 \end{equation}
 \begin{equation}
-=\int_{y,z} -(K_1 + U(\Psi, y, z))dP(y,z| I_{1}, I_{2}, \Psi^{t-1}) 
+=\int_{y,z} -(K_1 + U(\Psi, y, z))dP(y,z| I_{1}, I_{2}, \Psi^{t-1})
 \end{equation}
-where $\Psi = (\psi_{1}, \psi_{2})$, $\Psi^{t-1} = (\psi_{1}^{t-1}, \psi_{2}^{t-1})$, $K_{1} =\log P(I_{1}, I_{2}, Y, Z)$  and 
+where $\Psi = (\psi_{1}, \psi_{2})$, $\Psi^{t-1} = (\psi_{1}^{t-1}, \psi_{2}^{t-1})$, $K_{1} =\log P(I_{1}, I_{2}, Y, Z)$  and
 \begin{equation}
 	U(\Psi, y, z) = \log \left(P(I_{1}, I_{2}, Y, Z|\Psi)P(\Psi)\right)=
 \end{equation}
@@ -508,22 +508,22 @@ where $\Psi = (\psi_{1}, \psi_{2})$, $\Psi^{t-1} = (\psi_{1}^{t-1}, \psi_{2}^{t-
 \end{equation}
 where $\tilde{I_{2}}(v) := I_{2}(\psi_{2}^{-1}(v))$ and $\tilde{I_{1}}(v) := I_{1}(\psi_{1}^{-1}(v)), v\in \Omega_{R}$ are the warped input images under the corresponing inverse transformations and are both defined on the reference domain $\Omega_{R}$.\\
 
-If we assume $Y, Z$ are independent, and their components $Y(g), g\in G$, $Z(g), g\in G$ are independent to each other, the density function $P(y,z| I_{1}, I_{2}, \Psi^{t-1})$ can be written as $P(y,z| I_{1}, I_{2}, \Psi^{t-1}) = h_{Y}(y)h_{Z}(z) = 
-\prod_{g\in G}h_{Y(g)}(y(g)) \prod_{g\in G}h_{Z(g)}(z(g))$, and the expected value can be written as 
+If we assume $Y, Z$ are independent, and their components $Y(g), g\in G$, $Z(g), g\in G$ are independent to each other, the density function $P(y,z| I_{1}, I_{2}, \Psi^{t-1})$ can be written as $P(y,z| I_{1}, I_{2}, \Psi^{t-1}) = h_{Y}(y)h_{Z}(z) =
+\prod_{g\in G}h_{Y(g)}(y(g)) \prod_{g\in G}h_{Z(g)}(z(g))$, and the expected value can be written as
 \begin{equation}
--K_{1}-\int_{G^{|G|}}\sum_{g\in G} \sum_{x : I_{1}(x) = g} \frac{\left(y(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{1}(g)^{2}}d h_{Y}(y) 
+-K_{1}-\int_{G^{|G|}}\sum_{g\in G} \sum_{x : I_{1}(x) = g} \frac{\left(y(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{1}(g)^{2}}d h_{Y}(y)
 \end{equation}
 \begin{equation}
--\int_{G^{|G|}}\sum_{g\in G} \sum_{x : I_{2}(x) = g} \frac{\left(z(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{2}(g)^{2}}d h_{Z}(z) 
+-\int_{G^{|G|}}\sum_{g\in G} \sum_{x : I_{2}(x) = g} \frac{\left(z(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{2}(g)^{2}}d h_{Z}(z)
 \end{equation}
 which can be further simplified as
 \begin{equation}
--K_{1}-\sum_{g\in G} \sum_{x : I_{1}(x) = g} \int_{G}\frac{\left(r - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{1}(g)^{2}}d h_{Y(g)}(r) 
+-K_{1}-\sum_{g\in G} \sum_{x : I_{1}(x) = g} \int_{G}\frac{\left(r - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{1}(g)^{2}}d h_{Y(g)}(r)
 \end{equation}
 \begin{equation}
--\sum_{g\in G} \sum_{x : I_{2}(x) = g} \int_{G}\frac{\left(s - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{2}(g)^{2}}d h_{Z(g)}(s) 
+-\sum_{g\in G} \sum_{x : I_{2}(x) = g} \int_{G}\frac{\left(s - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}}{\sigma_{2}(g)^{2}}d h_{Z(g)}(s)
 \end{equation}
-now let $\bar{r}(g)$ and $\bar{s}(g)$ be the expected value of $Y(g)$ and $Z(g)$ given $I_{1}, I_{2}, \Psi^{t-1}$, then 
+now let $\bar{r}(g)$ and $\bar{s}(g)$ be the expected value of $Y(g)$ and $Z(g)$ given $I_{1}, I_{2}, \Psi^{t-1}$, then
 \begin{equation}
 \int_{G}\left(r - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}d h_{Y(g)}(r) = \int_{G}\left(r - \bar{r}(g) + \bar{r}(g) - \tilde{I_{2}}(\psi_{1}(x))\right)^{2}d h_{Y(g)}(r)
 \end{equation}
