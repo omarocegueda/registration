@@ -145,12 +145,6 @@ if __name__=='__main__':
             subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
             for w in namesMoving[i][1:]:
                 subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
-            for w in namesFixed[i][1:]:
-                subprocess.call('ln '+w+' '+dirName+'/jaccard', shell=True)
-            with open(dirName+'/jaccard_pairs.lst','w') as f:
-                n = len(namesMoving[i])-1
-                for j in range(n):
-                    f.write(namesMoving[i][1+j]+' '+namesFixed[i][0]+' '+namesFixed[i][1+j]+'\n')
         sys.exit(0)
     ############################Submit###################################
     if sys.argv[1]=='u':
