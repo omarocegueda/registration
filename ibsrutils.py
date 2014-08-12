@@ -1,5 +1,5 @@
 #!/opt/python/anaconda/bin/python
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import nibabel as nib
 import itertools

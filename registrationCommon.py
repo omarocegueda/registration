@@ -7,7 +7,7 @@ Created on Mon Sep 30 15:40:28 2013
 import numpy as np
 import scipy as sp
 from scipy import ndimage
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import nibabel as nib
 import os
 import tensorFieldUtils as tf
