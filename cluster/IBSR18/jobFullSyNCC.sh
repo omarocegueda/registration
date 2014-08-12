@@ -31,5 +31,5 @@ else
     echo "Affine mapping found ($affine). Skipping affine registration."
 fi
 #Diffeomorphic registration
-python dipyreg.py target/$target reference/$reference $affine warp --metric=CC[0.25,3.0,4] --iter=25,100,100
+python dipyreg.py target/$target reference/$reference $affine warp --metric=CC[0.25,3.0,4] --iter=100,100,25
 date

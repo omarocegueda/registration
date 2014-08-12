@@ -88,7 +88,7 @@ parser.add_argument(
     help = '''A comma-separated (WITH NO SPACES) list of integers indicating the maximum number
            of iterations at each level of the Gaussian Pyramid (similar to
            ANTS), e.g. 10,100,100 (NO SPACES)''',
-    default = '25,50,100')
+    default = '100,50,25')
 
 parser.add_argument(
     '-inv_iter', '--inversion_iter', action = 'store', metavar = 'max_iter',
@@ -316,7 +316,7 @@ def test_exec():
     target='target/IBSR_01_ana_strip.nii.gz'
     reference='reference/t1_icbm_normal_1mm_pn0_rf0_peeled.nii.gz'
     affine='IBSR_01_ana_strip_t1_icbm_normal_1mm_pn0_rf0_peeledAffine.txt'
-    paramiter='0x30x30'
+    paramiter='30x30x0'
     inversion_iter='20'
     inversion_tolerance='1e-3'
     report_status=True
