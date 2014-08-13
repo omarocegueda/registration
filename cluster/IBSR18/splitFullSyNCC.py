@@ -99,8 +99,6 @@ if __name__=='__main__':
                 subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
                 for w in target[1:]:
                     subprocess.call('ln '+w+' '+dirName+'/warp', shell=True)
-                for w in reference[1:]:
-                    subprocess.call('ln '+w+' '+dirName+'/jaccard', shell=True)
                 with open(dirName+'/jaccard_pairs.lst','w') as f:
                     n = len(target)-1
                     for k in range(n):
