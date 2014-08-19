@@ -94,6 +94,7 @@ def writeAntsAffine(T, fname):
         f.write("\nFixedParameters: ")
         for x in c:
             f.write("%0.16f "%x)
+        f.write("\n")
 
 def uncenter_matrix_file(iname, oname=None):
     T = readAntsAffine(iname)
