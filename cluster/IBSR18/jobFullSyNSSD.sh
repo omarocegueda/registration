@@ -14,8 +14,10 @@ export PATH=$HOME/opt:$PATH
 export PYTHONPATH=$HOME/opt/dipy:$HOME/opt/lib/python2.7/site-packages:$PYTHONPATH
 ###################################
 echo "=====Dipy commit ====="
+(cd ~/opt/dipy &&  git branch|grep "*")
 (cd ~/opt/dipy &&  git show --stat|grep "commit\|Date")
 echo "====dipyreg commit===="
+(cd ~/code/registration &&  git branch|grep "*")
 (cd ~/code/registration &&  git show --stat|grep "commit\|Date")
 echo "======================"
 date
