@@ -1,7 +1,9 @@
 #!/bin/bash
 ####################################################
 # Author: Omar Ocegueda (omar@cimat.mx)
-#PBS -l mem=4gb
+#PBS -l mem=3GB
+#PBS -l pmem=3GB
+#PBS -l vmem=3GB
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=03:00:00
 #PBS -N FullSyNEM
@@ -36,6 +38,6 @@ else
     echo "Affine mapping found ($affine). Skipping affine registration."
 fi
 #Diffeomorphic registration
-#python dipyreg.py target/$target reference/$reference $affine warp --metric=EM[25.0,256,20,v_cycle]
-python dipyreg.py target/$target reference/$reference $affine warp --metric=EM[2.0,256,20,demons] --iter=25,100,100 --step_length=0.25 --single_gradient  
+#python dipyreg.py target/$target reference/$reference $affine warp --metric=EM[25.0,256,20,gauss_newton]
+python dipyreg.py target/$target reference/$reference $affine warp --metric=EM[1.7,256,20,demons] --iter=100,100,25 --step_length=0.25 --single_gradient  
 date
