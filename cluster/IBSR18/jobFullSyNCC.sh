@@ -11,6 +11,11 @@ export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/
 export PATH=$HOME/opt:$PATH
 export PYTHONPATH=$HOME/opt/dipy:$HOME/opt/lib/python2.7/site-packages:$PYTHONPATH
 ###################################
+echo "=====Dipy commit ====="
+(cd ~/opt/dipy &&  git show --stat|grep "commit\|Date")
+echo "====dipyreg commit===="
+(cd ~/code/registration &&  git show --stat|grep "commit\|Date")
+echo "======================"
 date
 reference=$(ls reference)
 target=$(ls target)

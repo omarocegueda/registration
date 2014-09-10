@@ -404,6 +404,7 @@ def getRohlfingResults(meanName, sdName):
     R=getRohlfingResults('jacard_mean_warpedDiff_3.txt', 'jacard_std_warpedDiff_3.txt')
     R=getRohlfingResults('jacard_mean_warpedAffine_3.txt', 'jacard_std_warpedAffine_3.txt')
     R=getRohlfingResults('jacard_mean.txt', 'jacard_std.txt')
+    R=getRohlfingResults('jacard_mean_3.txt', 'jacard_std_3.txt')
     '''
     labels, colors=getLabelingInfo('/opt/registration/data/IBSR_common_labels.txt')
     r=np.loadtxt('data/rohlfing_table.txt')    

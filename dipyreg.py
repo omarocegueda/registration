@@ -5,6 +5,7 @@ registration
 from __future__ import print_function
 import sys
 import os
+import subprocess
 import numpy as np
 import nibabel as nib
 import registrationCommon as rcommon
@@ -13,7 +14,6 @@ import dipy.align.imwarp as imwarp
 import dipy.align.metrics as metrics
 import dipy.align.vector_fields as vf
 from dipy.fixes import argparse as arg
-#import matplotlib.pyplot as plt
 from dipy.align import VerbosityLevels
 
 parser = arg.ArgumentParser(
