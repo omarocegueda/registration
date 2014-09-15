@@ -66,6 +66,14 @@ parser.add_argument(
            with the obtained deformation field''')
 
 parser.add_argument(
+    'target_mask', action = 'store', metavar = 'target_mask',
+    help = '''Nifti1 image or other formats supported by Nibabel''')
+
+parser.add_argument(
+    'reference_mask', action = 'store', metavar = 'reference_mask',
+    help = '''Nifti1 image or other formats supported by Nibabel''')
+
+parser.add_argument(
     '-m', '--metric', action = 'store', metavar = 'metric',
     help = '''Any of {EM[L], CC[L]} specifying the metric to be used
     SSD=sum of squared diferences (monomodal), EM=Expectation Maximization
@@ -221,6 +229,8 @@ def print_arguments(params):
     print('========================Parameters========================')
     print('target: ', params.target)
     print('reference: ', params.reference)
+    print('target_mask: ', params.target_mask)
+    print('reference_mask: ', params.reference_mask)
     print('affine: ', params.affine)
     print('warp_dir: ', params.warp_dir)
     print('metric: ', params.metric)
@@ -338,6 +348,17 @@ def register_3d(params):
         radius = int(metric_params_list[1])
         q_levels = int(metric_params_list[2])
         similarity_metric = ECCMetric(3, sigma_diff, radius, q_levels)
+        moving_mask = None
+        static_mask = None
+
+        if params.target_mask is not None and os.path.isfile(params.target_mask):
+            moving_mask = nib.load(params.target_mask)
+            moving_mask = moving_mask.get_data().squeeze().astype(np.int32)
+
+        if params.reference_mask is not None and os.path.isfile(params.reference_mask):
+            static_mask = nib.load(params.reference_mask)
+            static_mask = static_mask.get_data().squeeze().astype(np.int32)
+
     #Initialize the optimizer
     opt_iter = [int(i) for i in params.iter.split(',')]
     step_length = float(params.step_length)
@@ -376,7 +397,7 @@ def register_3d(params):
         mapping=imwarp.DiffeomorphicMap(3, direct, inv, None, init_affine)    
     else:
         registration_optimizer.verbosity = VerbosityLevels.DEBUG
-        mapping = registration_optimizer.optimize(fixed, moving, fixed_affine, moving_affine, transform)
+        mapping = registration_optimizer.optimize(fixed, moving, fixed_affine, moving_affine, transform, static_mask, moving_mask)
     del registration_optimizer
     del similarity_metric
     save_registration_results(mapping, params)

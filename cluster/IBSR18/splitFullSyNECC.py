@@ -95,6 +95,8 @@ if __name__=='__main__':
                 mkdir_p(os.path.join(dirName,'warp'))
                 subprocess.call('ln '+target[0]+' '+dirName+'/target', shell=True)
                 subprocess.call('ln '+reference[0]+' '+dirName+'/reference', shell=True)
+                subprocess.call('ln '+target[1]+' '+dirName+'target_mask.nii.gz', shell=True)
+                subprocess.call('ln '+reference[1]+' '+dirName+'reference_mask.nii.gz', shell=True)
                 subprocess.call('ln jobFullSyNECC.sh '+dirName, shell=True)
                 subprocess.call('ln '+registrationScriptName+' '+dirName, shell=True)
                 for w in target[1:]:
