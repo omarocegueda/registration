@@ -353,11 +353,13 @@ def register_3d(params):
 
         if params.target_mask is not None and os.path.isfile(params.target_mask):
             moving_mask = nib.load(params.target_mask)
-            moving_mask = moving_mask.get_data().squeeze().astype(np.int32)
+            moving_mask = moving_mask.get_data().squeeze()
+            moving_mask = (moving_mask>0).astype(np.int32)
 
         if params.reference_mask is not None and os.path.isfile(params.reference_mask):
             static_mask = nib.load(params.reference_mask)
-            static_mask = static_mask.get_data().squeeze().astype(np.int32)
+            static_mask = static_mask.get_data().squeeze()
+            static_mask = (static_mask>0).astype(np.int32)
 
     #Initialize the optimizer
     opt_iter = [int(i) for i in params.iter.split(',')]
