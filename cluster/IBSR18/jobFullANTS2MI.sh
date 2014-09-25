@@ -1,9 +1,9 @@
 #!/bin/bash
 ####################################################
 # Author: Omar Ocegueda (omar@cimat.mx)
-#PBS -l mem=2GB
-#PBS -l pmem=2GB
-#PBS -l vmem=2GB
+#PBS -l mem=4GB
+#PBS -l pmem=4GB
+#PBS -l vmem=4GB
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=03:00:00
 #PBS -N FullANTS
@@ -66,7 +66,8 @@ else
                       -t syn[ .25, 3, 0 ] \
                       -c [ 100x100x25,-0.01,5 ] \
                       -s 1x0.5x0vox \
-                      -f 4x2x1 -l 1 -u 0 -z 1
+                      -f 4x2x1 -l 1 -u 0 -z 1 \
+                      --float \
                       -o [${op}, warpedDiff_${op}.nii.gz, warpedDiff_${op}.nii.gz]"
     echo " $exe "
     $exe
@@ -79,7 +80,7 @@ for towarp in $( ls warp ); do
     towarpbase="${towarpbase%.*}"
     oname=warpedDiff_${towarpbase}_${referencebase}.nii.gz
     deformationField=${targetbase}_${referencebase}0Warp.nii.gz
-    antsApplyTransforms -d 3 -i warp/$towarp -o $oname -r reference/$reference -n NearestNeighbor -t $deformationField -t $affine
+    antsApplyTransforms -d 3 -i warp/$towarp -o $oname -r reference/$reference -n NearestNeighbor --float -t $deformationField -t $affine
 done
 
 python jaccard.py
