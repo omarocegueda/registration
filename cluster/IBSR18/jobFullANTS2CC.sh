@@ -62,12 +62,12 @@ if [ -r $deformationField ]; then
     echo "Deformation found. Registration skipped."
 else
     exe="antsRegistration -d 3 -r $affine \
-                      -m mattes[reference/$reference, target/$target, 1 , 32 ] \
+                      -m cc[reference/$reference, target/$target, 0.5 , 4 ] \
                       -t syn[ .25, 3, 0 ] \
                       -c [ 100x100x25,-0.01,5 ] \
                       -s 1x0.5x0vox \
-                      -f 4x2x1 -l 1 -u 0 -z 1 \
-                      --float \
+                      -f 4x2x1 -l 1 -u 0 -z 1
+                      --float
                       -o [${op}, warpedDiff_${op}.nii.gz, warpedDiff_${op}.nii.gz]"
     echo " $exe "
     $exe
