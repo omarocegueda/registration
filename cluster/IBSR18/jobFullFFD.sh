@@ -6,7 +6,6 @@ nthreads=1
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=04:00:00
 #PBS -N FullFFD
-#PBS -M omar@cimat.com
 export PATH=$HOME/opt:$PATH
 ###################################
 date

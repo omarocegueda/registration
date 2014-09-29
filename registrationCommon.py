@@ -153,7 +153,7 @@ def readAntsAffine(fname):
     for line in lines[2:]:
         data=line.split()
         if data[0]=='Transform:':
-            if data[1]!='MatrixOffsetTransformBase_double_3_3':
+            if data[1]!='MatrixOffsetTransformBase_double_3_3' and data[1]!='AffineTransform_double_3_3':
                 print 'Unknown transformation type'
                 return
         elif data[0]=='Parameters:':

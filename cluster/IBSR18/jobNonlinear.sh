@@ -5,7 +5,6 @@
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=04:00:00
 #PBS -N Nonlinear
-#PBS -M jomaroceguedag@gmail.com
 export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
 export PATH=$HOME/opt:$PATH

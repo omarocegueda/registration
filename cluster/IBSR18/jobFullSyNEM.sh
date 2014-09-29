@@ -7,7 +7,6 @@
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=03:00:00
 #PBS -N FullSyNEM
-#PBS -M omar@cimat.com
 export PATH="/opt/python/anaconda/bin:$PATH"
 export PYTHONPATH="/opt/python/anaconda/lib/python2.7/site-packages:/export/opt/python/anaconda/lib/python2.7/site-packages:$PYTHONPATH:$HOME/code/registration"
 export PATH=$HOME/opt:$PATH
